@@ -951,7 +951,22 @@ Implement these next:
       to the stockpile during the wait while remaining assigned to the
       Farm throughout.
 
-- Replace basic farm with cabbage farm
+- [DONE] Replace basic farm with cabbage farm
+    - Cosmetic rename only: BuildingCatalog's "farm" entry's display_name
+      is now "Cabbage Farm" (id stays "farm" - it's a save-persisted
+      identifier, not player-facing, and renaming it would break
+      BuildingCatalog.get_option("farm") lookups for old saves'
+      fixed_farm_option_id). The fixed scene node's own display_name
+      override in Base.tscn matches. resource_type stays "food" rather
+      than becoming a new "cabbage" resource - that would ripple into
+      GameState.FOOD_RESOURCES, the hunger system, HUD's Food label, and
+      save compatibility for a purely cosmetic ask, so a Cabbage Farm
+      still produces generically-named "food" under the hood (same
+      trade-off Grain/Hops/Fruit/Potato Farms don't have, since those
+      already had their own distinctly-named resource from the start).
+    - Verified headless: confirmed the fixed Farm node, its BuildingCatalog
+      entry, and the build menu's derived short-name button label all read
+      "Cabbage Farm"/"Cabbage" consistently.
 
 - Levels should improve efficiency in a skill
   - ex. Same inputs -> more outputs
@@ -968,6 +983,8 @@ Implement these next:
   - Satisfying feedback for steady progression
 
 - House upgrade with stone to increase capacity
+
+- Replace placeholder farm art with recolored cabagge farm art
 
 - Implement level 'titles' a citizen can earn for reaching certain levels in a skill
   - Only one title can be active at a time, the highest one they have earned. If multiple of the same level choose current job title

@@ -11,7 +11,7 @@ const OPTIONS := [
 	},
 	{
 		"id": "farm",
-		"display_name": "Farm",
+		"display_name": "Cabbage Farm",
 		"scene": preload("res://scenes/workstation/Farm.tscn"),
 		"resource_type": "food",
 		"output_per_tick": 1.0,

@@ -38,7 +38,7 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 | Building | Footprint | Cost | Grants | Notes |
 |---|---|---|---|---|
 | Outpost Hall | 2×2 | 20 wood | — | A stockpile drop-off/pickup point - haulers use whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest. |
-| Farm | 2×2 | 6 wood | — | Converts wood → food. See production table below. |
+| Cabbage Farm | 2×2 | 6 wood | — | Converts wood → food. See production table below. |
 | Lumber Camp | 1×1 | 5 wood | — | Produces wood by chopping trees. See production table below. |
 | House | 2×2 | 10 wood | +2 population capacity | Passive — no worker slot. |
 | Stone Mine | 1×1 | 8 wood | — | Produces stone, no input needed. See production table below. |

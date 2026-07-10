@@ -38,7 +38,7 @@ position = Vector2(576, 298)
 
 [node name="Farm" parent="." instance=ExtResource("2")]
 position = Vector2(320, 362)
-display_name = "Farm"
+display_name = "Cabbage Farm"
 resource_type = "food"
 output_per_tick = 1.0
 
