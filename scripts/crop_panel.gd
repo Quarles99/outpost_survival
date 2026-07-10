@@ -6,6 +6,9 @@ signal option_selected(option: Dictionary)
 const SLIDE_OFFSET := Vector2(0, 20)
 const ANIM_DURATION := 0.18
 const ICON_SIZE := Vector2(64, 64)
+const LABEL_FONT_SIZE := 13
+const BACKGROUND_DARKEN := 0.35
+const DEFAULT_BACKGROUND := Color(0.22, 0.24, 0.28)
 
 @onready var panel_control: Control = $Control
 @onready var title_label: Label = $Control/Panel/VBoxContainer/TitleLabel
@@ -16,14 +19,15 @@ var _option_callables: Array[Callable] = []
 var _base_position: Vector2
 var _anim_tween: Tween
 
-## Shares BuildMenu's icon-grid look (and its _get_icon_data approach) but
-## is otherwise a separate class rather than a second mode bolted onto
-## BuildMenu - retooling an already-placed building is a meaningfully
-## different action (free, instant, no ghost/placement flow) from placing
-## a new one, and the two panels shouldn't need to agree on one option's
-## worth of behavior just because they look alike. See RecruitPanel for the
-## same "near-exact clone for a different purpose" precedent.
-var _icon_cache: Dictionary = {}
+## Shares BuildMenu's text-on-color square button design (see its own doc
+## comment on _add_button for why - shrunk-down in-world sprites read as an
+## illegible smudge, especially since most Farm-family buildings share one
+## generic silhouette differing only by tint) but is otherwise a separate
+## class rather than a second mode bolted onto BuildMenu - retooling an
+## already-placed building is a meaningfully different action (free,
+## instant, no ghost/placement flow) from placing a new one. See
+## RecruitPanel for the same "near-exact clone for a different purpose"
+## precedent.
 
 
 func _ready() -> void:
@@ -73,6 +77,12 @@ func _choose(option: Dictionary) -> void:
 	close()
 
 
+## See BuildMenu._short_name - identical derivation, kept as a separate copy
+## since the two panels have no other coupling.
+func _short_name(display_name: String) -> String:
+	return display_name.split(" ")[0]
+
+
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
@@ -86,6 +96,7 @@ func _input(event: InputEvent) -> void:
 func _add_button(option: Dictionary, keybind: String, on_pressed: Callable) -> void:
 	var button := Button.new()
 	button.custom_minimum_size = ICON_SIZE
+	button.clip_contents = true
 	button.tooltip_text = option["display_name"]
 	button.pressed.connect(on_pressed)
 	button.resized.connect(func() -> void: button.pivot_offset = button.size / 2)
@@ -95,51 +106,40 @@ func _add_button(option: Dictionary, keybind: String, on_pressed: Callable) -> v
 		tween.tween_property(button, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	)
 
-	var icon_data := _get_icon_data(option)
-	if icon_data.get("texture"):
-		var icon_rect := TextureRect.new()
-		icon_rect.texture = icon_data["texture"]
-		icon_rect.modulate = icon_data["modulate"]
-		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-		button.add_child(icon_rect)
+	var tint: Color = option.get("sprite_tint", Color.WHITE)
+	var background := DEFAULT_BACKGROUND if tint == Color.WHITE else tint.darkened(BACKGROUND_DARKEN)
+	var background_rect := ColorRect.new()
+	background_rect.color = background
+	background_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	background_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	button.add_child(background_rect)
+
+	var name_label := Label.new()
+	name_label.text = _short_name(option["display_name"])
+	name_label.add_theme_font_size_override("font_size", LABEL_FONT_SIZE)
+	name_label.add_theme_color_override("font_color", Color.WHITE)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	name_label.offset_left += 2
+	name_label.offset_right -= 2
+	button.add_child(name_label)
 
 	if not keybind.is_empty():
 		var keybind_label := Label.new()
 		keybind_label.text = keybind
 		keybind_label.add_theme_font_size_override("font_size", 12)
+		keybind_label.add_theme_color_override("font_color", Color.WHITE)
+		keybind_label.add_theme_constant_override("outline_size", 3)
+		keybind_label.add_theme_color_override("font_outline_color", Color.BLACK)
 		keybind_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		keybind_label.position = Vector2(4, 2)
 		button.add_child(keybind_label)
 
 	button_container.add_child(button)
 	_buttons.append(button)
-
-
-## See BuildMenu._get_icon_data - same throwaway-instance approach, kept as
-## a separate copy rather than a shared helper since the two panels have no
-## other coupling and this is the only thing they'd share.
-func _get_icon_data(option: Dictionary) -> Dictionary:
-	var id: String = option["id"]
-	if _icon_cache.has(id):
-		return _icon_cache[id]
-
-	var data := {"texture": null, "modulate": Color.WHITE}
-	var instance: Node2D = option["scene"].instantiate()
-	for key in Base.BUILDING_PROPERTIES:
-		if option.has(key):
-			instance.set(key, option[key])
-	instance.visible = false
-	add_child(instance)
-	if instance.has_node("Sprite2D"):
-		var sprite: Sprite2D = instance.get_node("Sprite2D")
-		data["texture"] = sprite.texture
-		data["modulate"] = sprite.modulate
-	instance.queue_free()
-
-	_icon_cache[id] = data
-	return data
 
 
 func _clear_buttons() -> void:

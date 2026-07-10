@@ -6,6 +6,17 @@ signal option_selected(option: Dictionary)
 const SLIDE_OFFSET := Vector2(0, 20)
 const ANIM_DURATION := 0.18
 const ICON_SIZE := Vector2(64, 64)
+const LABEL_FONT_SIZE := 13
+## Darkens a building's sprite_tint before using it as a button's background,
+## so white text stays legible on top regardless of how light the tint
+## itself is (several crop-chain tints - e.g. Mill's near-white
+## (0.8, 0.78, 0.72) - would otherwise wash out white text almost entirely).
+const BACKGROUND_DARKEN := 0.35
+## Background for anything with no custom sprite_tint (Color.WHITE, the
+## Workstation default) - most non-crop buildings fall here. A flat neutral
+## rather than white-darkened-by-BACKGROUND_DARKEN so it doesn't just read
+## as "generic gray version of every tinted button."
+const DEFAULT_BACKGROUND := Color(0.22, 0.24, 0.28)
 
 @onready var panel_control: Control = $Control
 @onready var title_label: Label = $Control/Panel/VBoxContainer/TitleLabel
@@ -15,14 +26,6 @@ var _buttons: Array[Button] = []
 var _option_callables: Array[Callable] = []
 var _base_position: Vector2
 var _anim_tween: Tween
-
-## option id -> {"texture": Texture2D, "modulate": Color}, built the first
-## time each option is shown. Read from a throwaway instance of the
-## option's own scene (mirroring Base._apply_option_properties, so an icon
-## always matches what actually gets placed) rather than hand-mapping
-## textures per option here, which would silently drift if the catalog's
-## resource_type/sprite_tint ever changed.
-var _icon_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -78,6 +81,16 @@ func _format_cost(cost: Dictionary) -> String:
 	return " (%s)" % ", ".join(parts)
 
 
+## The first word of a building's display_name ("Grain Farm" -> "Grain",
+## "Stone Mine" -> "Stone") - short enough to read at a glance inside a
+## small square, and happens to be the more distinctive word in every
+## current two-word name (checked against all 14 catalog entries; if a
+## future addition collides, this would need a dedicated short-name field
+## instead of deriving one).
+func _short_name(display_name: String) -> String:
+	return display_name.split(" ")[0]
+
+
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
@@ -88,9 +101,19 @@ func _input(event: InputEvent) -> void:
 			_option_callables[idx].call()
 
 
+## Square buttons used to show each building's actual in-world sprite
+## shrunk down, but most buildings share one generic silhouette texture
+## (see CLAUDE.md/BuildingCatalog - 9 of today's 14 only differ by tint),
+## and even the buildings with distinct art were drawn for a zoomed-in
+## world view, not a 64px button - both read as an illegible, near-
+## identical smudge at this size. A bold, self-contained name is the one
+## thing guaranteed to actually identify the building at a glance, so
+## that's now the button's entire content - the tooltip (full name + cost)
+## is a supplement, not a requirement, for figuring out what it is.
 func _add_button(option: Dictionary, keybind: String, on_pressed: Callable) -> void:
 	var button := Button.new()
 	button.custom_minimum_size = ICON_SIZE
+	button.clip_contents = true
 	button.tooltip_text = option["display_name"] + _format_cost(option.get("cost", {}))
 	button.pressed.connect(on_pressed)
 	button.resized.connect(func() -> void: button.pivot_offset = button.size / 2)
@@ -100,56 +123,40 @@ func _add_button(option: Dictionary, keybind: String, on_pressed: Callable) -> v
 		tween.tween_property(button, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	)
 
-	var icon_data := _get_icon_data(option)
-	if icon_data.get("texture"):
-		var icon_rect := TextureRect.new()
-		icon_rect.texture = icon_data["texture"]
-		icon_rect.modulate = icon_data["modulate"]
-		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-		button.add_child(icon_rect)
+	var tint: Color = option.get("sprite_tint", Color.WHITE)
+	var background := DEFAULT_BACKGROUND if tint == Color.WHITE else tint.darkened(BACKGROUND_DARKEN)
+	var background_rect := ColorRect.new()
+	background_rect.color = background
+	background_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	background_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	button.add_child(background_rect)
+
+	var name_label := Label.new()
+	name_label.text = _short_name(option["display_name"])
+	name_label.add_theme_font_size_override("font_size", LABEL_FONT_SIZE)
+	name_label.add_theme_color_override("font_color", Color.WHITE)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	name_label.offset_left += 2
+	name_label.offset_right -= 2
+	button.add_child(name_label)
 
 	if not keybind.is_empty():
 		var keybind_label := Label.new()
 		keybind_label.text = keybind
 		keybind_label.add_theme_font_size_override("font_size", 12)
+		keybind_label.add_theme_color_override("font_color", Color.WHITE)
+		keybind_label.add_theme_constant_override("outline_size", 3)
+		keybind_label.add_theme_color_override("font_outline_color", Color.BLACK)
 		keybind_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		keybind_label.position = Vector2(4, 2)
 		button.add_child(keybind_label)
 
 	button_container.add_child(button)
 	_buttons.append(button)
-
-
-## Reads the icon straight off a throwaway instance of the option's scene
-## (added to the tree just long enough for _ready() to pick its real
-## texture/tint, then freed) rather than duplicating the RESOURCE_VISUALS/
-## sprite_tint logic here - see the _icon_cache doc comment above.
-func _get_icon_data(option: Dictionary) -> Dictionary:
-	var id: String = option["id"]
-	if _icon_cache.has(id):
-		return _icon_cache[id]
-
-	var data := {"texture": null, "modulate": Color.WHITE}
-	var instance: Node2D = option["scene"].instantiate()
-	for key in Base.BUILDING_PROPERTIES:
-		if option.has(key):
-			instance.set(key, option[key])
-	## Hidden before entering the tree - add_child()/queue_free() in the same
-	## call still leaves the node live for part of a frame, which would
-	## otherwise flash the full-size building at this CanvasLayer's origin
-	## (top-left of screen) for an instant the first time each icon loads.
-	instance.visible = false
-	add_child(instance)
-	if instance.has_node("Sprite2D"):
-		var sprite: Sprite2D = instance.get_node("Sprite2D")
-		data["texture"] = sprite.texture
-		data["modulate"] = sprite.modulate
-	instance.queue_free()
-
-	_icon_cache[id] = data
-	return data
 
 
 func _clear_buttons() -> void:

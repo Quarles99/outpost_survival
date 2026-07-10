@@ -22,7 +22,7 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Resource income/minute.** The HUD's Food/Wood/Stone rows now show a rolling net income-per-minute rate alongside the current amount, computed from a trailing 60-second window of resource-pool snapshots so bursty haul-trip deposits read as a steady rate.
 
-**Condensed build menu.** The build menu is now a grid of square icon buttons (real per-building texture + tint) with small keybind numbers, instead of a vertical list of full-width text buttons — hover an icon for its full name and cost.
+**Condensed build menu.** The build menu is now a grid of square buttons with small keybind numbers, instead of a vertical list of full-width text buttons. Each square is a solid color (the building's own tint, or a neutral default) with its name in bold centered text — an earlier version used the building's actual in-world sprite as an icon, but most buildings share one generic silhouette differing only by tint, and shrinking any of the art down to button size read as an illegible smudge; the name is now the one thing that reliably identifies a building at a glance. Hover a button for its full name and cost. Applies identically to the crop-retooling panel (see below).
 
 **Larger map.** The playable grid is now 28×28 tiles (784 total), 4x the original 14×14 — a pure data change, since bounds/camera limits were already computed dynamically from the ground's size.
 

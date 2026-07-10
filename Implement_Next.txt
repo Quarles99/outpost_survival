@@ -376,6 +376,33 @@ Implement these next:
       legibility at 64px, keybind label contrast, tooltip readability) -
       recommend a playtest pass, especially since several buildings will
       look identical or near-identical at a glance (see above).
+    - Post-review fix, from actual in-editor feedback: the icon approach
+      above was confirmed unreadable in practice, exactly as the risk noted
+      above predicted - 9 of the 14 buildings share one generic silhouette
+      texture differing only by tint, and even the buildings with distinct
+      art were drawn for a zoomed-in world view, so shrinking either down
+      to 64px produced an illegible, near-identical smudge rather than
+      something a player could identify at a glance. Replaced the
+      TextureRect icon entirely with a solid-color ColorRect background
+      (the building's own sprite_tint, darkened so white text stays legible
+      on top; a flat neutral for anything with no custom tint) plus a bold,
+      centered Label showing the first word of the building's display_name
+      ("Grain Farm" -> "Grain", "Stone Mine" -> "Stone" - checked all 14
+      current entries for collisions; there are none, and every one reads
+      as a clear, self-contained identification without needing the hover
+      tooltip at all). Applied identically to CropPanel (scripts/
+      crop_panel.gd), which shared the exact same icon approach and problem
+      for its 8 Farm-family options. Also added `clip_contents = true` to
+      the button so nothing can ever bleed past the square's own edges.
+      Removed the throwaway-scene-instantiation icon cache entirely from
+      both panels - no longer needed, and the sprite_tint field is already
+      sitting right in the catalog dict, so this is simpler and more
+      robust than before, not just prettier.
+    - Verified headless: derived label text for all 14 build-menu options
+      and all 8 crop-panel options, confirmed every button has both a
+      background and a label with no duplicate text and clip_contents
+      correctly set. Not verified in-editor for the actual visual result -
+      recommend a playtest to confirm this reads as clearly as intended.
 
 - [DONE] Increase the size of the map
   - At least 4 times current size
