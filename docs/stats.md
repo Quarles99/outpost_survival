@@ -61,7 +61,7 @@ All 8 of the above (Farm through Potato Farm) can be clicked once placed to reto
 | Output resource | food | wood | stone |
 | Output per work cycle | 1.0 × skill multiplier | 2.0 × skill multiplier (per chop) | 0.5 × skill multiplier |
 | Input resource | wood | — | — |
-| Input cost per work cycle | 0.5 wood × skill multiplier | — | — |
+| Input cost per work cycle | 0.5 wood flat (not scaled by skill) | — | — |
 | Work cycle interval | 1.5 s | 1.2 s (per chop) | 1.5 s |
 | Carry limit (output buffer cap / haul size) | 6.0 | 6.0 | 6.0 |
 | Search radius (tree-finding, Lumber Camp only) | — | 4.5 tiles | — |
@@ -89,7 +89,7 @@ The **Farm** class is a generic single-input/single-output converter (exported `
 | Fruit Orchard | none → fruit | 0 | 0.6 | 3.0 s (slower) | `farming` |
 | Potato Farm | none → potato | 0 | 1.0 | 1.5 s (default) | `farming` |
 
-All values scale by the worker's skill multiplier the same way the base Farm's do. Fruit Orchard and Potato Farm never haul input (no delivery trip is ever triggered) — matching the design intent of a "consistent" crop that isn't gated on deliveries.
+Output/tick scales by the worker's skill multiplier the same way the base Farm's does; input/tick does not - a higher-level worker gets more output from the same input, not just more of both at a fixed ratio. Fruit Orchard and Potato Farm never haul input (no delivery trip is ever triggered) — matching the design intent of a "consistent" crop that isn't gated on deliveries.
 
 A Farm-class post's haul trip triggers when its input buffer can't cover the next work cycle's input cost, or its output buffer is full (whichever comes first). A Lumber Camp or Stone Mine's haul trip triggers when its output buffer hits the carry limit.
 

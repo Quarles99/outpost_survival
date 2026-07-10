@@ -968,9 +968,27 @@ Implement these next:
       entry, and the build menu's derived short-name button label all read
       "Cabbage Farm"/"Cabbage" consistently.
 
-- Levels should improve efficiency in a skill
+- [DONE] Levels should improve efficiency in a skill
   - ex. Same inputs -> more outputs
   - exceptions are of course speed and strength which just scale higher
+    - Only one real change needed: Character._run_farm_loop's input_needed
+      was `farm.input_per_tick * multiplier` (skill scaled both sides of
+      the conversion, preserving the ratio - more throughput, not better
+      efficiency); now it's flat `farm.input_per_tick`, unscaled, while
+      output stays `output_per_tick * multiplier` as before. A higher-level
+      farmer now genuinely gets more food/crops out of the same wood/
+      intermediate good, not just proportionally more of both.
+      Lumberjack/StoneMine already worked this way and needed no change:
+      a chop removes a fixed amount from the tree regardless of skill
+      (WorldTree.harvest(camp.wood_per_chop), unscaled) and the multiplier
+      only affects how much of that gets credited to the buffer; simple
+      gatherers have no input at all to begin with. Speed/strength are
+      the stated exception and already scale movement speed/carry
+      capacity directly rather than a conversion ratio - untouched.
+    - Verified headless: boosted a citizen to level 50 farming (1.98x
+      multiplier) and confirmed one production tick drained input_buffer
+      by exactly 0.5 (the flat per-tick cost, not 0.5*1.98) while
+      crediting 1.98 to output_buffer (1.0*1.98, unchanged scaling).
 
 - Track all types of food under the food category in the UI but have a collapsable drop down with individual food types listed as well
   - Recruiting a new citizen will now offer a choice of citizens each costing one of the types of food with the higher tier foods granting citizens with higher starting levels, the higher level citizens should cost their particular food tier as well as an equal amount of all food from lower tiers, this keeps all food types relevant throughout progression

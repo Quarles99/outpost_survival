@@ -549,8 +549,16 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 ## reassigned (session changes).
 func _run_farm_loop(farm: Farm, session: int) -> void:
 	while _work_active and session == _work_session:
+		## Skill only scales output, not input_needed - a higher-level
+		## worker converts the same input into more output (a genuine
+		## efficiency gain), rather than just moving proportionally more
+		## of both through the post at the same ratio. Speed/strength are
+		## the deliberate exception (Character.WATER_FARM_OUTPUT_BONUS's
+		## sibling doc comments) - they scale movement/carry capacity
+		## directly instead of a conversion ratio, since there's no
+		## "input" for them to hold fixed.
 		var multiplier: float = data.get_skill_multiplier(farm.get_skill_id())
-		var input_needed: float = farm.input_per_tick * multiplier
+		var input_needed: float = farm.input_per_tick
 
 		if farm.input_buffer < input_needed or farm.output_buffer >= _carry_capacity(farm):
 			if not await _haul_to_stockpile(farm, session, farm.resource_type, farm.get_input_resource()):
