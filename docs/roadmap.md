@@ -40,6 +40,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Distinct crop-chain skills.** Grain/Hops/Fruit/Potato farming trains "farming," but Mill/Bakery/Brewery each train their own distinct skill (milling/baking/brewing) - briefly unified into one "farming" skill and then reverted, since those refinement trades aren't really farming. See [mechanics.md](mechanics.md#skills--leveling).
 
+**Water farming bonus.** Any Farm-family building produces 25% more output for the same input cost once at least one Well is built. See [mechanics.md](mechanics.md#resources).
+
 **Explicit hauler assignment.** The Outpost Hall and any Storage Facility can now be dragged onto (or clicked while a citizen is selected) to explicitly assign that citizen as a hauler - the same logistics work an unassigned citizen already does automatically, now a deliberate, capped, savable assignment instead of only ever an implicit fallback. See [mechanics.md](mechanics.md#assigning-citizens).
 
 ## Planned Next (from `Implement_Next.txt`)

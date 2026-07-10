@@ -10,7 +10,7 @@ Every resource is clamped independently between 0 and the town's **storage capac
 
 Each displayed resource also shows a rolling **income/minute** rate next to its amount — net change over roughly the last minute (shorter right after boot), not an instantaneous snapshot, so a single big haul-trip deposit doesn't make the rate spike and vanish a second later. It measures what actually reached the stockpile, so a workstation whose output is being lost to a full storage cap won't show a positive rate for it.
 
-**Water** works differently: it isn't a depletable stockpile at all. A **Well** grants unlimited access rather than producing units of water, so the game just tracks whether at least one Well has been built (water available or not), not an amount.
+**Water** works differently: it isn't a depletable stockpile at all. A **Well** grants unlimited access rather than producing units of water, so the game just tracks whether at least one Well has been built (water available or not), not an amount. Water access also boosts every Farm-family building's output for the same input cost — more food/crops per unit of wood or intermediate good spent, not a discount on the input itself.
 
 ## Population & Housing
 

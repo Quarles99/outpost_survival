@@ -22,6 +22,12 @@ const XP_PER_GATHER := 4.0
 ## Brief hold at the stockpile while dropping off/picking up, so even a
 ## short haul doesn't read as an instant teleport-and-return.
 const STOCKPILE_PAUSE := 0.3
+## Farm-family output bonus once at least one Well is built (GameState.
+## has_water()) - more food/crops for the *same* input cost, not a discount
+## on the input itself, so this only scales farm.output_per_tick, never
+## input_needed. Binary (built or not) rather than eased like the
+## happiness multiplier - water access itself doesn't gradually change.
+const WATER_FARM_OUTPUT_BONUS := 1.25
 ## Idle haulers ignore a workstation buffer below this - not worth a whole
 ## round trip for a trickle.
 const HAUL_MIN_THRESHOLD := 1.0
@@ -524,8 +530,9 @@ func _run_farm_loop(farm: Farm, session: int) -> void:
 		if farm.input_buffer < input_needed:
 			continue
 
+		var water_bonus: float = WATER_FARM_OUTPUT_BONUS if GameState.has_water() else 1.0
 		farm.input_buffer -= input_needed
-		farm.output_buffer += farm.output_per_tick * multiplier * GameState.happiness_output_multiplier
+		farm.output_buffer += farm.output_per_tick * multiplier * GameState.happiness_output_multiplier * water_bonus
 		gather_sound.play()
 		_gain_skill_xp(farm.get_skill_id(), XP_PER_GATHER)
 

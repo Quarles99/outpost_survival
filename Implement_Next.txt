@@ -824,15 +824,33 @@ Implement these next:
 
 - Unique art for every building aligning with current design standards
 
-- Calculate income per minute for resources constantly looking back at the last minute of income rather than when turn ins happen
+- [DONE] Calculate income per minute for resources constantly looking back at the last minute of income rather than when turn ins happen
+    - Already addressed by an earlier post-review pass this session (see
+      the income/minute commit further up): GameState._income_history
+      samples every 1s continuously on its own timer regardless of
+      whether a haul trip ("turn in") happened, and get_income_per_minute
+      interpolates to an exact trailing 60.000s window rather than
+      whatever the nearest discrete sample happens to be. No further
+      change needed.
 
 - Fix stone miner not returning to mine after drop off at storehouse
 
 - Buildings should show how many of their worker slots are filled in the text field above them
   - Most buildings should only allow 1 worker max
 
-- Farm efficiency buff when well is built
+- [DONE] Farm efficiency buff when well is built
   - I'm thinking more production for the same wood cost
+    - Character.WATER_FARM_OUTPUT_BONUS (1.25x) applied in _run_farm_loop
+      to farm.output_per_tick only, alongside the existing skill/happiness
+      multipliers - input_needed/input_buffer consumption is untouched,
+      so this is purely "more output for the same input," not a cost
+      discount. Active whenever GameState.has_water() is true; binary
+      (no easing) since water access itself doesn't gradually change,
+      unlike the happiness multiplier it sits next to.
+    - Verified headless: isolated a single production tick from haul-trip
+      timing noise (huge carry_limit, pre-filled input_buffer) and
+      confirmed output_buffer went from 1.0 (no well) to exactly 1.25
+      (after building a well) for the same tick.
 
 - [DONE] Seperate brewing, milling, and baking from farming skill
     - Reverts last turn's unification (confirmed with user: that was a

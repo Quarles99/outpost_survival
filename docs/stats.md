@@ -124,6 +124,12 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | Idle retry delay (no work found / target too empty) | 2.5 s |
 | Minimum buffer amount worth an idle-hauler trip | 1.0 |
 
+## Water Farming Bonus (`Character`)
+
+| | Value |
+|---|---|
+| Farm-family output bonus with a Well built | 1.25× (output only, input cost unaffected) |
+
 ## Speed & Strength (`Character`)
 
 | | Value |
