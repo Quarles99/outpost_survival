@@ -845,6 +845,14 @@ Implement these next:
     - Verified headless: instantiated Mill/Bakery/Brewery/Grain Farm from
       their catalog entries and confirmed get_skill_id() returns
       "milling"/"baking"/"brewing"/"farming" respectively.
+    - Post-review fix: docs/stats.md's Farm-class description ("exported
+      `input_per_tick`, `input_resource`, `sprite_tint`") dropped
+      `skill_id` from the list twice now - once when the original
+      unification commit removed the export without updating this prose
+      line, and again here, since restoring the export didn't restore the
+      line either (it's easy to miss - the field is mentioned in a
+      sentence, not a table row like everything else this feature
+      touched). Fixed by adding `skill_id` back to the list.
 
 - Implement building system
   - Citizens need to drop off building materials at building site

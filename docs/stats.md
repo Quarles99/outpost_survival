@@ -77,7 +77,7 @@ All 8 of the above (Farm through Potato Farm) can be clicked once placed to reto
 | Max workers per Wall Segment | 1 |
 | Max haulers per Outpost Hall or Storage Facility | 10 (generous rather than matching Workstation's 3 - haulers don't share a production buffer, so there's no throughput reason to bottleneck it) |
 
-The **Farm** class is a generic single-input/single-output converter (exported `input_per_tick`, `input_resource`, `sprite_tint`) — the row above is its default configuration (wood → food, "farming"). The full Alternative Crop Types chain is built from the same class, sharing one scene (`CropStation.tscn`) and distinguished only by catalog configuration:
+The **Farm** class is a generic single-input/single-output converter (exported `input_per_tick`, `input_resource`, `skill_id`, `sprite_tint`) — the row above is its default configuration (wood → food, "farming"). The full Alternative Crop Types chain is built from the same class, sharing one scene (`CropStation.tscn`) and distinguished only by catalog configuration:
 
 | Building | Input → Output | Input/tick | Output/tick | Work interval | Skill trained |
 |---|---|---|---|---|---|
