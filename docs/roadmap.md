@@ -42,6 +42,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Water farming bonus.** Any Farm-family building produces 25% more output for the same input cost once at least one Well is built. See [mechanics.md](mechanics.md#resources).
 
+**Multi-stockpile hauling.** A Storage Facility is now a real drop-off/pickup point for haulers, not just a storage-capacity bump - haul trips go to whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest, so building one near a cluster of workstations actually shortens their trips. See [mechanics.md](mechanics.md#gathering--hauling).
+
 **Explicit hauler assignment.** The Outpost Hall and any Storage Facility can now be dragged onto (or clicked while a citizen is selected) to explicitly assign that citizen as a hauler - the same logistics work an unassigned citizen already does automatically, now a deliberate, capped, savable assignment instead of only ever an implicit fallback. See [mechanics.md](mechanics.md#assigning-citizens).
 
 ## Planned Next (from `Implement_Next.txt`)

@@ -18,6 +18,18 @@ func _ready() -> void:
 	label.text = display_name
 
 
+## A placed Storage Facility is a real drop-off/pickup point for haulers,
+## not just a storage_capacity bump - Base registers/unregisters this with
+## WorldGrid.stockpile_spots on placement/removal, so Character's haul
+## loops can route to whichever registered stockpile (this or the Outpost
+## Hall) is nearest instead of always the Outpost Hall (see WorldGrid.
+## nearest_stockpile). Reuses worker_spot rather than a second marker -
+## thematically fine for an assigned hauler to also drop off right where
+## they're standing.
+func get_stockpile_spot() -> Vector2:
+	return worker_spot.global_position
+
+
 ## Same "post" interface Workstation/WallSegment/OutpostHall expose - lets
 ## a citizen be dragged (or clicked-then-clicked) onto a placed Storage
 ## Facility to be explicitly assigned as a hauler (see Character.assign_to's

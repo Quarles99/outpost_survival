@@ -37,13 +37,13 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 
 | Building | Footprint | Cost | Grants | Notes |
 |---|---|---|---|---|
-| Outpost Hall | 2×2 | 20 wood | — | The one placed at game start is the town's stockpile (all hauling trips target it). Additional ones can be built via the menu but only exist as a cost sink today — a second Hall does not become an additional stockpile. |
+| Outpost Hall | 2×2 | 20 wood | — | A stockpile drop-off/pickup point - haulers use whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest. |
 | Farm | 2×2 | 6 wood | — | Converts wood → food. See production table below. |
 | Lumber Camp | 1×1 | 5 wood | — | Produces wood by chopping trees. See production table below. |
 | House | 2×2 | 10 wood | +2 population capacity | Passive — no worker slot. |
 | Stone Mine | 1×1 | 8 wood | — | Produces stone, no input needed. See production table below. |
 | Well | 1×1 | 10 stone + 4 wood | +1 to water-well count (unlocks water access) | Passive — no worker slot. |
-| Storage Facility | 2×4 | 15 wood + 10 stone | +30 storage capacity (all resources) | Passive — no worker slot. Not upgradeable in place yet; build another for more capacity. |
+| Storage Facility | 2×4 | 15 wood + 10 stone | +30 storage capacity (all resources) | Also a stockpile drop-off/pickup point, same as the Outpost Hall, and assignable as a hauler post (see Assigning Citizens). Not upgradeable in place yet; build another for more capacity. |
 | Grain Farm | 2×2 | 6 wood | — | Converts wood → grain. Crop-chain building; see table below. |
 | Mill | 2×2 | 8 wood | — | Converts grain → flour. |
 | Bakery | 2×2 | 8 wood + 4 stone | — | Converts flour → bread (edible). |

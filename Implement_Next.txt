@@ -892,7 +892,28 @@ Implement these next:
   - Citizens need to drop off building materials at building site
   - Then preferring citizens with the highest proficiency in the new construction skill the building must be contructed which requires a certain amount of labor
 
-- Fix citizens not dropping off at storehouse and prefering outpost hall instead
+- [DONE] Fix citizens not dropping off at storehouse and prefering outpost hall instead
+    - Root cause: WorldGrid.stockpile_spot was a single fixed Vector2, set
+      once to the Outpost Hall's position in Base._ready() - every haul
+      trip (Character._haul_to_stockpile/_deliver_to_post) always targeted
+      it specifically, so a Storage Facility never had any effect beyond
+      raising storage_capacity, no matter where it was built.
+    - Replaced with WorldGrid.stockpile_spots (an array) plus
+      register_stockpile()/unregister_stockpile()/nearest_stockpile(from).
+      Base registers the Outpost Hall's spot once in _ready(), and now
+      registers/unregisters any placed building exposing
+      get_stockpile_spot() (Outpost Hall or Storage Facility - a second
+      placed Outpost Hall now works as an additional stockpile too, not
+      just a cost sink) at placement/load-rebuild time. StorageFacility
+      gained get_stockpile_spot() (reusing its existing worker_spot
+      marker). Character's two haul functions now call
+      WorldGrid.nearest_stockpile(global_position) instead of reading the
+      single fixed spot, so a haul trip goes to whichever registered
+      stockpile is actually closest at the time.
+    - Verified headless: built a Storage Facility next to the starting
+      Farm (closer to it than the Outpost Hall) and confirmed
+      nearest_stockpile() from the Farm's position correctly resolved to
+      the new Storage Facility's spot, not the Outpost Hall's.
 
 - Save citizens current position with save data
 

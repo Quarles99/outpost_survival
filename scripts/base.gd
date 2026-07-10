@@ -128,7 +128,7 @@ func _ready() -> void:
 	var min_cell := Vector2i(iso_ground.start_x, iso_ground.start_y)
 	var max_cell := Vector2i(iso_ground.start_x + iso_ground.width - 1, iso_ground.start_y + iso_ground.depth - 1)
 	WorldGrid.configure(iso_ground.position, min_cell, max_cell, self)
-	WorldGrid.stockpile_spot = $OutpostHall.get_stockpile_spot()
+	WorldGrid.register_stockpile($OutpostHall.get_stockpile_spot())
 	_configure_camera_limits(min_cell, max_cell)
 
 	posts.append($Farm)
@@ -716,6 +716,8 @@ func _confirm_placement() -> void:
 		GameState.add_storage_capacity(option["storage_capacity"])
 	if building.has_method("add_worker"):
 		posts.append(building)
+	if building.has_method("get_stockpile_spot"):
+		WorldGrid.register_stockpile(building.get_stockpile_spot())
 
 	_placed_buildings.append({"save_id": save_id, "option_id": option["id"], "origin": origin, "node": building})
 
@@ -931,6 +933,8 @@ func _restore_placed_buildings(entries: Array) -> void:
 		var node: Node = entry["node"]
 		if is_instance_valid(node):
 			posts.erase(node)
+			if node.has_method("get_stockpile_spot"):
+				WorldGrid.unregister_stockpile(node.get_stockpile_spot())
 			node.queue_free()
 		var option := BuildingCatalog.get_option(entry["option_id"])
 		if option.has("grid_size"):
@@ -956,6 +960,8 @@ func _restore_placed_buildings(entries: Array) -> void:
 		_wire_farm_clicks(building)
 		if building.has_method("add_worker"):
 			posts.append(building)
+		if building.has_method("get_stockpile_spot"):
+			WorldGrid.register_stockpile(building.get_stockpile_spot())
 
 		_placed_buildings.append({"save_id": save_id, "option_id": entry["option_id"], "origin": origin, "node": building})
 

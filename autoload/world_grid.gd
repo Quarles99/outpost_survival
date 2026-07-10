@@ -10,9 +10,14 @@ var ground_origin := Vector2.ZERO
 var bounds_min := Vector2i.ZERO
 var bounds_max := Vector2i.ZERO
 var trees_container: Node = null
-## Where workers walk to drop off/pick up hauled resources (the Outpost
-## Hall). Set once by Base._ready(); Vector2.ZERO until then.
-var stockpile_spot := Vector2.ZERO
+## Every position workers can walk to drop off/pick up hauled resources -
+## the Outpost Hall (registered once by Base._ready()) plus every placed
+## Storage Facility (registered/unregistered as they're built or a save is
+## loaded). Haulers use whichever is nearest (see nearest_stockpile) rather
+## than always the Outpost Hall, so a Storage Facility built near a
+## workstation actually shortens that workstation's haul trips instead of
+## only ever raising the storage cap.
+var stockpile_spots: Array[Vector2] = []
 
 var _occupied: Dictionary = {}
 var _trees: Array[WorldTree] = []
@@ -25,6 +30,35 @@ func configure(ground_pos: Vector2, min_cell: Vector2i, max_cell: Vector2i, tree
 	trees_container = trees_node
 	_occupied.clear()
 	_trees.clear()
+	## WorldGrid is an autoload, unlike Base itself - a fresh Base.tscn
+	## instantiation (New Game, or MainMenu -> Continue) calls configure()
+	## exactly once in _ready(), so this is where stale stockpile spots
+	## from a *previous* playthrough in the same process run get cleared,
+	## same reasoning as GameState.reset_to_defaults().
+	stockpile_spots.clear()
+
+
+func register_stockpile(pos: Vector2) -> void:
+	stockpile_spots.append(pos)
+
+
+func unregister_stockpile(pos: Vector2) -> void:
+	stockpile_spots.erase(pos)
+
+
+## Whichever registered stockpile is closest to `from` - always the Outpost
+## Hall if it's the only one, or if no Storage Facility happens to be
+## closer. Vector2.ZERO if none are registered yet (shouldn't happen once
+## Base._ready() has run, since the Outpost Hall always registers one).
+func nearest_stockpile(from: Vector2) -> Vector2:
+	var best := Vector2.ZERO
+	var best_dist := INF
+	for spot in stockpile_spots:
+		var dist := from.distance_to(spot)
+		if dist < best_dist:
+			best = spot
+			best_dist = dist
+	return best
 
 
 func grid_to_local(grid: Vector2) -> Vector2:

@@ -374,8 +374,9 @@ func _find_haul_job() -> Dictionary:
 	return {}
 
 
-## Walks from wherever the character currently is to the stockpile (Outpost
-## Hall), drops everything in post.output_buffer into `drop_resource`, then
+## Walks from wherever the character currently is to whichever registered
+## stockpile (the Outpost Hall, or a Storage Facility) is nearest, drops
+## everything in post.output_buffer into `drop_resource`, then
 ## - if `pickup_resource` is non-empty (Farm's own dedicated worker only; a
 ## generalist hauler delivers input via _deliver_to_post instead) -
 ## withdraws enough of it into post.input_buffer to top the buffer up to
@@ -391,7 +392,7 @@ func _find_haul_job() -> Dictionary:
 ## doc comment for why xp scales with time/frequency of the activity rather
 ## than with quantity carried.
 func _haul_to_stockpile(post: Workstation, session: int, drop_resource: String, pickup_resource: String) -> bool:
-	await get_tree().create_timer(_move_to(WorldGrid.stockpile_spot)).timeout
+	await get_tree().create_timer(_move_to(WorldGrid.nearest_stockpile(global_position))).timeout
 	if session != _work_session:
 		return false
 
@@ -426,7 +427,7 @@ func _haul_to_stockpile(post: Workstation, session: int, drop_resource: String, 
 ## multi-leg trip could - see below). Returns false if a reassignment
 ## interrupted the trip.
 func _deliver_to_post(post: Workstation, session: int, resource: String) -> bool:
-	await get_tree().create_timer(_move_to(WorldGrid.stockpile_spot)).timeout
+	await get_tree().create_timer(_move_to(WorldGrid.nearest_stockpile(global_position))).timeout
 	if session != _work_session:
 		return false
 
