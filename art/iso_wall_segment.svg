@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="170" height="140" viewBox="0 0 170 140">
+  <ellipse cx="99" cy="126" rx="75" ry="13" fill="#000000" opacity="0.28" transform="rotate(-26.565 99 126)"/>
+
+  <polygon points="15,120 155,50 155,38 15,108" fill="#4a3320" stroke="#0f0c07" stroke-width="2"/>
+  <polygon points="20,103 150,33 150,29 20,99" fill="#3a2a18" stroke="#0f0c07" stroke-width="1.2" opacity="0.85"/>
+
+  <g stroke="#0f0c07" stroke-width="1.8">
+    <polygon points="25,100 39,100 39,70 32,60 25,70" fill="#5c4327"/>
+    <polygon points="58,83 72,83 72,53 65,43 58,53" fill="#4f3a22"/>
+    <polygon points="92,66 106,66 106,36 99,26 92,36" fill="#5c4327"/>
+    <polygon points="126,49 140,49 140,19 133,9 126,19" fill="#4f3a22"/>
+  </g>
+  <g stroke="#2c2013" stroke-width="1" opacity="0.5">
+    <line x1="32" y1="98" x2="32" y2="64"/>
+    <line x1="65" y1="81" x2="65" y2="47"/>
+    <line x1="99" y1="64" x2="99" y2="30"/>
+    <line x1="133" y1="47" x2="133" y2="13"/>
+  </g>
+</svg>

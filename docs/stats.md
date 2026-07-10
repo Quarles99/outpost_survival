@@ -1,0 +1,133 @@
+# Stats Reference
+
+Every concrete number currently in the game. Grouped by system; see [mechanics.md](mechanics.md) for how these numbers are used.
+
+## Starting State
+
+| | Value |
+|---|---|
+| Starting food | 10 |
+| Starting wood | 10 |
+| Starting stone / grain / flour / bread / hops / beer / fruit / potato | 0 each |
+| Starting population | 3 (Aldric, Brenna, Cass) |
+| Starting population capacity | 3 |
+| Starting water access | None (no Well built) |
+| Starting citizen skill levels | All skills level 1 (0 xp) |
+| Initial scattered trees | 12, mature, scattered within 5 tiles of the starting Lumber Camp |
+
+## Resource Storage
+
+| | Value |
+|---|---|
+| Baseline storage capacity (per resource, with no Storage Facility) | 30 |
+| Storage Facility bonus | +30 (stacks per facility built) |
+| Overflow behavior | Excess above capacity is lost, not refunded |
+| Food-equivalent resources (drawn down for hunger, in priority order) | food → bread → potato → fruit |
+
+## Resource Consumption
+
+| | Value |
+|---|---|
+| Food (or food-equivalent) eaten per citizen | 0.3 / second |
+| Consumption tick interval | every 1 second |
+| Applies to | every citizen, regardless of work assignment |
+| Floor | resources can't go below 0 |
+
+## Buildings
+
+| Building | Footprint | Cost | Grants | Notes |
+|---|---|---|---|---|
+| Outpost Hall | 2×2 | 20 wood | — | The one placed at game start is the town's stockpile (all hauling trips target it). Additional ones can be built via the menu but only exist as a cost sink today — a second Hall does not become an additional stockpile. |
+| Farm | 2×2 | 6 wood | — | Converts wood → food. See production table below. |
+| Lumber Camp | 1×1 | 5 wood | — | Produces wood by chopping trees. See production table below. |
+| House | 2×2 | 10 wood | +2 population capacity | Passive — no worker slot. |
+| Stone Mine | 1×1 | 8 wood | — | Produces stone, no input needed. See production table below. |
+| Well | 1×1 | 10 stone + 4 wood | +1 to water-well count (unlocks water access) | Passive — no worker slot. |
+| Storage Facility | 2×4 | 15 wood + 10 stone | +30 storage capacity (all resources) | Passive — no worker slot. Not upgradeable in place yet; build another for more capacity. |
+| Grain Farm | 2×2 | 6 wood | — | Converts wood → grain. Crop-chain building; see table below. |
+| Mill | 2×2 | 8 wood | — | Converts grain → flour. |
+| Bakery | 2×2 | 8 wood + 4 stone | — | Converts flour → bread (edible). |
+| Hops Farm | 2×2 | 6 wood | — | Converts wood → hops. |
+| Brewery | 2×2 | 10 wood + 4 stone | — | Converts hops → beer (luxury good, not edible). |
+| Fruit Orchard | 2×2 | 8 wood | — | Produces fruit (edible), no input needed — slower but reliable. |
+| Potato Farm | 2×2 | 6 wood | — | Produces potato (edible), no input needed. |
+
+## Workstation Production
+
+| | Farm | Lumber Camp | Stone Mine |
+|---|---|---|---|
+| Output resource | food | wood | stone |
+| Output per work cycle | 1.0 × skill multiplier | 2.0 × skill multiplier (per chop) | 0.5 × skill multiplier |
+| Input resource | wood | — | — |
+| Input cost per work cycle | 0.5 wood × skill multiplier | — | — |
+| Work cycle interval | 1.5 s | 1.2 s (per chop) | 1.5 s |
+| Carry limit (output buffer cap / haul size) | 6.0 | 6.0 | 6.0 |
+| Search radius (tree-finding, Lumber Camp only) | — | 4.5 tiles | — |
+| Target forest size maintained (Lumber Camp only) | — | 16 trees within search radius | — |
+| Skill trained | `farming` | `lumberjacking` | `mining` |
+
+The **Farm** class is a generic single-input/single-output converter (exported `input_per_tick`, `input_resource`, `skill_id`, `sprite_tint`) — the row above is its default configuration (wood → food, "farming"). The full Alternative Crop Types chain is built from the same class, sharing one scene (`CropStation.tscn`) and distinguished only by catalog configuration:
+
+| Building | Input → Output | Input/tick | Output/tick | Work interval | Skill trained |
+|---|---|---|---|---|---|
+| Grain Farm | wood → grain | 0.5 | 1.0 | 1.5 s (default) | `farming` |
+| Mill | grain → flour | 1.0 | 1.0 | 1.5 s (default) | `milling` |
+| Bakery | flour → bread | 1.0 | 1.0 | 1.5 s (default) | `baking` |
+| Hops Farm | wood → hops | 0.5 | 1.0 | 1.5 s (default) | `farming` |
+| Brewery | hops → beer | 1.0 | 1.0 | 1.5 s (default) | `brewing` |
+| Fruit Orchard | none → fruit | 0 | 0.6 | 3.0 s (slower) | `farming` |
+| Potato Farm | none → potato | 0 | 1.0 | 1.5 s (default) | `farming` |
+
+All values scale by the worker's skill multiplier the same way the base Farm's do. Fruit Orchard and Potato Farm never haul input (no delivery trip is ever triggered) — matching the design intent of a "consistent" crop that isn't gated on deliveries.
+
+A Farm-class post's haul trip triggers when its input buffer can't cover the next work cycle's input cost, or its output buffer is full (whichever comes first). A Lumber Camp or Stone Mine's haul trip triggers when its output buffer hits the carry limit.
+
+## Trees (`WorldTree`)
+
+| | Value |
+|---|---|
+| Wood per mature tree | 20.0 |
+| Sapling → maturity grow time | 25 seconds |
+| Sapling starting visual scale | 0.35× of full size |
+| Wood harvested per chop | 2.0 × chopper's skill multiplier |
+
+## Skill Curve (`SkillCurve`)
+
+RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1..L-1] floor(n + 300 * 2^(n/7)))`.
+
+| | Value |
+|---|---|
+| Max level | 99 |
+| Output multiplier per level above 1 | +2% |
+| Multiplier at level 99 | ~2.96× a level-1 worker |
+| XP granted per gather action (chop or production tick) | 4.0 flat, regardless of level or output |
+
+## Movement & Work Timing (`Character`)
+
+| | Value |
+|---|---|
+| Move speed | 140 px/s |
+| Min move duration (even for very short trips) | 0.3 s |
+| Max move duration (even for very long trips) | 4.0 s |
+| Pause at stockpile per haul trip | 0.3 s |
+| Idle retry delay (no work found / target too empty) | 2.5 s |
+| Minimum buffer amount worth an idle-hauler trip | 1.0 |
+
+## Camera (`RtsCamera`)
+
+| | Value |
+|---|---|
+| Zoom range | 0.5× (zoomed out) – 2.0× (zoomed in) |
+| Zoom step per scroll click | 0.1 |
+| Zoom tween duration | 0.15 s |
+| Edge-scroll trigger margin | 24 px from screen edge |
+| Edge-scroll speed | 900 px/s (world space, scaled by zoom) |
+| Extra pan room beyond map bounds | 320 world units |
+
+## Grid Projection (`IsoUtils`)
+
+| | Value |
+|---|---|
+| Tile width | 128 px |
+| Tile height | 64 px |
+| Projection | 2:1 dimetric ("AoE2-style"), not true isometric |

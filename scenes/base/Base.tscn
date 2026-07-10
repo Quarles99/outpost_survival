@@ -1,0 +1,62 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/base.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/workstation/Farm.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/character/Character.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/ui/TaskPanel.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="5"]
+[ext_resource type="Resource" path="res://resources/characters/aldric.tres" id="6"]
+[ext_resource type="Resource" path="res://resources/characters/brenna.tres" id="7"]
+[ext_resource type="Resource" path="res://resources/characters/cass.tres" id="8"]
+[ext_resource type="PackedScene" path="res://scenes/world/IsoGround.tscn" id="9"]
+[ext_resource type="PackedScene" path="res://scenes/ui/BuildMenu.tscn" id="12"]
+[ext_resource type="PackedScene" path="res://scenes/building/OutpostHall.tscn" id="13"]
+[ext_resource type="PackedScene" path="res://scenes/workstation/LumberCamp.tscn" id="14"]
+[ext_resource type="Script" path="res://scripts/rts_camera.gd" id="15"]
+
+[node name="Base" type="Node2D"]
+script = ExtResource("1")
+y_sort_enabled = true
+
+[node name="Camera2D" type="Camera2D" parent="."]
+script = ExtResource("15")
+current = true
+
+[node name="IsoGround" parent="." instance=ExtResource("9")]
+position = Vector2(576, 170)
+start_x = -5
+start_y = -5
+width = 14
+depth = 14
+
+[node name="OutpostHall" parent="." instance=ExtResource("13")]
+position = Vector2(576, 298)
+
+[node name="Farm" parent="." instance=ExtResource("2")]
+position = Vector2(320, 362)
+display_name = "Farm"
+resource_type = "food"
+output_per_tick = 1.0
+
+[node name="Woodpile" parent="." instance=ExtResource("14")]
+position = Vector2(832, 362)
+display_name = "Lumber Camp"
+resource_type = "wood"
+
+[node name="Aldric" parent="." instance=ExtResource("3")]
+position = Vector2(384, 458)
+data = ExtResource("6")
+
+[node name="Brenna" parent="." instance=ExtResource("3")]
+position = Vector2(576, 458)
+data = ExtResource("7")
+
+[node name="Cass" parent="." instance=ExtResource("3")]
+position = Vector2(768, 458)
+data = ExtResource("8")
+
+[node name="TaskPanel" parent="." instance=ExtResource("4")]
+
+[node name="BuildMenu" parent="." instance=ExtResource("12")]
+
+[node name="HUD" parent="." instance=ExtResource("5")]

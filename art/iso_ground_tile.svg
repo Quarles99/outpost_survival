@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="64" viewBox="0 0 128 64">
+  <defs>
+    <clipPath id="diamond">
+      <polygon points="64,0 128,32 64,64 0,32"/>
+    </clipPath>
+    <linearGradient id="shade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3d4a34"/>
+      <stop offset="1" stop-color="#293220"/>
+    </linearGradient>
+  </defs>
+  <polygon points="64,0 128,32 64,64 0,32" fill="url(#shade)"/>
+  <g clip-path="url(#diamond)">
+    <ellipse cx="40" cy="24" rx="12" ry="5" fill="#2c3521" opacity="0.4"/>
+    <ellipse cx="90" cy="20" rx="10" ry="4" fill="#414f34" opacity="0.35"/>
+    <ellipse cx="80" cy="44" rx="14" ry="5" fill="#242b19" opacity="0.4"/>
+    <ellipse cx="30" cy="42" rx="9" ry="4" fill="#414f34" opacity="0.3"/>
+    <circle cx="20" cy="30" r="1.6" fill="#4a3f2a" opacity="0.5"/>
+    <circle cx="70" cy="10" r="1.4" fill="#4a3f2a" opacity="0.4"/>
+    <circle cx="100" cy="40" r="1.8" fill="#4a3f2a" opacity="0.5"/>
+  </g>
+</svg>

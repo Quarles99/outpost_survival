@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect x="2" y="2" width="60" height="60" rx="4" fill="#4a3620" stroke="#171009" stroke-width="2.5"/>
+  <g stroke="#5c4527" stroke-width="4">
+    <line x1="6" y1="14" x2="58" y2="14"/>
+    <line x1="6" y1="26" x2="58" y2="26"/>
+    <line x1="6" y1="38" x2="58" y2="38"/>
+    <line x1="6" y1="50" x2="58" y2="50"/>
+  </g>
+  <g stroke="#3a2a18" stroke-width="1.5" opacity="0.6">
+    <line x1="6" y1="10" x2="58" y2="10"/>
+    <line x1="6" y1="18" x2="58" y2="18"/>
+    <line x1="6" y1="22" x2="58" y2="22"/>
+    <line x1="6" y1="30" x2="58" y2="30"/>
+    <line x1="6" y1="34" x2="58" y2="34"/>
+    <line x1="6" y1="42" x2="58" y2="42"/>
+    <line x1="6" y1="46" x2="58" y2="46"/>
+    <line x1="6" y1="54" x2="58" y2="54"/>
+  </g>
+  <g fill="#6a9f3f" stroke="#4f7a2e" stroke-width="1">
+    <path d="M 12 14 q 2 -8 0 -12 q 3 4 1 12 z"/>
+    <path d="M 20 14 q 2 -7 0 -11 q 3 4 1 11 z"/>
+    <path d="M 32 26 q 2 -8 0 -12 q 3 4 1 12 z"/>
+    <path d="M 44 38 q 2 -8 0 -12 q 3 4 1 12 z"/>
+    <path d="M 16 50 q 2 -8 0 -12 q 3 4 1 12 z"/>
+    <path d="M 50 50 q 2 -8 0 -12 q 3 4 1 12 z"/>
+  </g>
+</svg>

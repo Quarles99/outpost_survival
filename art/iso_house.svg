@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="264" height="260" viewBox="0 0 264 260">
+  <ellipse cx="145" cy="245" rx="78" ry="18" fill="#000000" opacity="0.35"/>
+
+  <!-- walls: front corner points down to align with the grid, like the farm plot -->
+  <polygon points="132,235 4,171 4,116 132,180" fill="#5a4a34" stroke="#171009" stroke-width="2.5"/>
+  <polygon points="132,235 260,171 260,116 132,180" fill="#3c3122" stroke="#171009" stroke-width="2.5"/>
+
+  <!-- door + windows -->
+  <rect x="93" y="180" width="26" height="42" fill="#1c1810" stroke="#14110b" stroke-width="2"/>
+  <rect x="26" y="140" width="16" height="14" fill="#c98a3d" stroke="#14110b" stroke-width="1.5"/>
+  <rect x="202" y="148" width="16" height="14" fill="#c98a3d" stroke="#14110b" stroke-width="1.5"/>
+
+  <!-- roof -->
+  <polygon points="132,180 4,116 132,81" fill="#4a4030" stroke="#0f0c07" stroke-width="2.5"/>
+  <polygon points="132,180 260,116 132,81" fill="#332b1f" stroke="#0f0c07" stroke-width="2.5"/>
+
+  <!-- chimney -->
+  <polygon points="165,105 177,105 177,80 165,80" fill="#6d5a3f" stroke="#0f0c07" stroke-width="1.5"/>
+  <polygon points="177,105 183,101.5 183,76.5 177,80" fill="#241f19" stroke="#0f0c07" stroke-width="1.2"/>
+</svg>

@@ -1,0 +1,54 @@
+Outpost Survival Game
+
+Inspiration:
+    - State of Decay 2
+    - Warcraft 3
+    - Age of Empires 2
+    - Project Zomboid
+    - Runescape
+    - Battle Brothers
+
+Core Systems:
+    - Manage a town in a large world
+    - Different base options across the map
+    - Recruit characters to your outpost with different skills
+    - Secure resources on the map to give your main base additional income
+    - Destroy or befriend other settlers in the world
+    - Simulated World Economy
+    - Semi-idle game, player will want to grind their citizen's skill levels to maximize progression
+        - This progression will take many hours of play time and a game could last for dozens or even hundreds of hours
+    - Perma-death for citizens but many ways to minimize lethality
+
+Enemies:
+    - Aggressive and Powerful Wildlife
+    - Enemy settlers
+
+Setting:
+    - Grim dark style fantasy
+        - Mostly conventional medieval combat
+        - Occasional powerful and terrifying magic
+
+Base Control
+    - Production Chain for commodities
+    - Resources:
+        - Lumber
+            - Gathered at lumber camp
+            - Lumber camp re-plants trees as well
+            - Sustainable resource
+        - Water
+        - Food
+        - Housing
+        - Commodities
+        - Gold
+    - Import / Export
+        - Difficult due to the danger of the world
+        - Armed caravans needed
+    - Defenses important
+        - Random raids and sieges
+
+Skill System:
+    - Long grind to max out a skill
+    - Skill for every type of combat and labor
+    - Max total level achievable does not allow every skill to be maxed
+    - Have to specialize
+

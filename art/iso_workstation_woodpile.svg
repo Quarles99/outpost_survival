@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="144" height="148" viewBox="0 0 144 148">
+  <defs>
+    <clipPath id="woodplot">
+      <polygon points="72,70 136,102 72,134 8,102"/>
+    </clipPath>
+  </defs>
+  <ellipse cx="72" cy="104" rx="62" ry="28" fill="#000000" opacity="0.2"/>
+  <polygon points="72,70 136,102 72,134 8,102" fill="#4a3620" stroke="#171009" stroke-width="2.5"/>
+  <g clip-path="url(#woodplot)" fill="#5c4527" opacity="0.6">
+    <circle cx="30" cy="96" r="3"/>
+    <circle cx="112" cy="88" r="2.4"/>
+    <circle cx="50" cy="118" r="2.6"/>
+    <circle cx="96" cy="120" r="3"/>
+    <circle cx="24" cy="110" r="2"/>
+    <circle cx="122" cy="106" r="2.2"/>
+  </g>
+
+  <!-- log pile -->
+  <g stroke="#14100b" stroke-width="2">
+    <rect x="24" y="96" width="96" height="28" rx="13" fill="#4a3320"/>
+    <rect x="32" y="74" width="80" height="26" rx="12" fill="#3d2a1a"/>
+  </g>
+  <g stroke="#14100b" stroke-width="1.5">
+    <circle cx="44" cy="87" r="11" fill="#caa06a"/>
+    <circle cx="44" cy="87" r="6.5" fill="#a67d4c"/>
+    <circle cx="44" cy="87" r="2.6" fill="#7a5c38"/>
+    <circle cx="100" cy="87" r="11" fill="#caa06a"/>
+    <circle cx="100" cy="87" r="6.5" fill="#a67d4c"/>
+    <circle cx="100" cy="87" r="2.6" fill="#7a5c38"/>
+    <circle cx="37" cy="110" r="13" fill="#caa06a"/>
+    <circle cx="37" cy="110" r="8" fill="#a67d4c"/>
+    <circle cx="107" cy="110" r="13" fill="#caa06a"/>
+    <circle cx="107" cy="110" r="8" fill="#a67d4c"/>
+  </g>
+
+  <!-- axe -->
+  <path d="M 96 74 L 114 32" stroke="#5a4028" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 104 40 L 118 30 L 124 36 L 110 48 Z" fill="#9aa0a6" stroke="#14100b" stroke-width="1.5"/>
+  <path d="M 104 40 L 110 48 L 106 52 L 100 44 Z" fill="#4b4f54" stroke="#14100b" stroke-width="1.5"/>
+
+  <g stroke="#3a2a18" stroke-width="3" stroke-linecap="round">
+    <line x1="8" y1="102" x2="8" y2="88"/>
+    <line x1="136" y1="102" x2="136" y2="88"/>
+  </g>
+</svg>

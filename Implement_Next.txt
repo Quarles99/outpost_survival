@@ -1,0 +1,241 @@
+Implement these next:
+
+- [DONE] Save system to store gamedata between sessions
+    - Character levels
+    - Resources
+    - World Map State
+    - local for now, cloud based later
+    - Implemented as SaveManager autoload (JSON to user://savegame.json) + save/load
+      orchestration in Base (scripts/base.gd's _save_game/_load_game and helpers).
+      Triggered via F5 (quicksave) / F9 (quickload) - no menu UI yet, just a HUD
+      flash message (HUD.flash_message). Covers: GameState resources/population,
+      every WorldGrid tree (position/maturity/wood remaining - saplings regrow
+      from scratch rather than resuming mid-grow), every placed building (fixed
+      Outpost Hall/Farm/Woodpile are implicit; player-placed ones are rebuilt from
+      catalog id + grid origin), and each of the 3 fixed characters' skill_xp and
+      current work assignment. No dedicated tests were added (no test framework
+      in this repo); verified via headless boot only, not a full editor run -
+      recommend an in-editor playtest (assign a worker, let it tick, F5, change
+      state, F9, confirm it reverts) before relying on this.
+
+- [DONE] Realistic travel and labor times for work facilities
+    - Facilities need inputs brought to them from the stockpile and output brought out to the stockpile
+        - Set up buffers and carry limits to make logistics efficient
+    - Overhaul movement and work speed balance
+        - Focus on slow but consistent output
+    - Citizens will need to reserve the item or job they are working on to prevent conflicting jobs
+    - The Outpost Hall is the stockpile (scripts/outpost_hall.gd's new StockpileSpot
+      marker, wired via WorldGrid.stockpile_spot in Base._ready()). Workstation
+      gained output_buffer + an exported carry_limit (scripts/workstation.gd);
+      Farm additionally gained input_buffer + work_interval (scripts/farm.gd).
+      Character's old per-tick Timer (Farm) and lumberjack-only coroutine were
+      unified into two coroutines - _run_farm_loop and _run_lumberjack_loop - both
+      calling a shared _haul_to_stockpile helper (scripts/character.gd) that walks
+      to the Outpost Hall, drops off output_buffer, and (Farm only) withdraws up to
+      carry_limit of wood capped by what the stockpile actually has. A farm haul
+      trip fires when input can't cover the next tick OR output is full, whichever
+      first, so one trip covers both directions when possible. A lumberjack now
+      caps out at carry_limit per tree visit and releases (doesn't deplete) a tree
+      that still has wood left when that happens, so it can be finished later.
+      Movement was slowed down (MOVE_SPEED 300->140, MIN/MAX_MOVE_DURATION
+      0.2/3.0->0.3/4.0) so a stockpile round-trip reads as real travel time -
+      "slow but consistent" per the design note - these are first-pass numbers,
+      not iterated on via playtesting.
+    - Playtested and confirmed working; fixes applied after playtest feedback:
+      1) Lumberjacks now maintain a shared area-wide forest target
+      (LumberCamp.optimal_tree_count, checked via WorldGrid.count_trees_near) and
+      plant toward it every loop pass regardless of who chopped what, replacing
+      the old per-worker "replant N after each harvest I personally finished"
+      logic (removed max_cultivated_trees/replant_per_harvest/_cultivated_trees).
+      2) optimal_tree_count's default had to be raised from 8 to 16 - the initial
+      scatter already seeds ~11-12 trees near the camp, so a default *below* that
+      meant the "plant if under target" condition was false from turn one and
+      never visibly triggered in a normal playtest; the default now sits above
+      the initial population so topping-up is visible immediately. 3) Lumberjacks
+      were making a wasted stockpile-then-back-to-camp-then-to-tree round trip -
+      _haul_to_stockpile no longer walks the character back to the post it came
+      from (only Farm's loop does that explicitly now, since production only
+      happens standing at the farm; a lumberjack instead heads straight from the
+      stockpile to its next tree/planting spot). 4) Idle citizens (no assigned
+      post, including the default state at game start) now automatically haul
+      whichever workstation has the fullest output_buffer to the stockpile
+      (Character._run_hauler_loop/_find_haul_job), on top of - not instead of -
+      each dedicated worker's own self-haul when their own buffer/input hits a
+      threshold; both were verified coexisting correctly in the same headless run.
+      Idle characters' status label now reads "Hauling" instead of "idle" since
+      that's what they're actually doing. 5) Extended to inputs too: any
+      Workstation can now declare get_input_resource() (Farm returns "wood",
+      the base default is "" meaning none - LumberCamp doesn't override it);
+      _find_haul_job picks whichever job (output pickup or input delivery)
+      would move more material, and idle haulers carry the needed resource from
+      the stockpile out to a starved post via the new _deliver_to_post. Caught
+      and fixed a real bug this surfaced: unlike output pickup (a single atomic
+      read-and-zero at the stockpile, no travel gap), input delivery computes
+      its carry amount at pickup time and only applies it after walking back to
+      the post - with multiple idle characters converging on the same starved
+      post from an identical "empty" snapshot, their deliveries stacked past
+      carry_limit and drained the stockpile well past what was needed.
+      _deliver_to_post now re-checks the post's actual remaining space at the
+      moment of delivery and refunds any surplus (or an interrupted mid-trip
+      carry) back to the stockpile instead of overshooting or destroying it.
+      Re-verified headless with 3 idle characters converging on one starved
+      farm (capped correctly at carry_limit, refund landed back in the pool)
+      and with dedicated Farm+LumberCamp workers plus one idle assistant
+      running together (no overshoot, sensible behavior throughout).
+    - Job reservation: only WorldTree.claimed (pre-existing) was needed to prevent
+      two lumberjacks fighting over the same tree. Did NOT build a general
+      job-reservation abstraction beyond that - multiple workers sharing one
+      Farm/LumberCamp's buffers is intentional (parallel throughput), and nothing
+      else in the game currently has a conflicting-job case to guard against.
+    - Known gap: output_buffer/input_buffer aren't covered by the save system
+      (Implement_Next.txt item above) - a quickload resets in-transit buffers to
+      0 rather than persisting them. Low-impact (self-corrects within a work
+      cycle) but worth closing if it turns out to matter.
+    - Verified via a temporary headless auto-assign + fixed-timestep run (removed
+      before finishing) that exercised ~15 simulated seconds: confirmed a farm
+      correctly hauls wood in, produces food, hauls out; confirmed a lumber camp
+      chops into its buffer and dumps a full load at carry_limit; confirmed xp,
+      resource pool, and worker positions all evolved as expected. Not tested
+      interactively in the editor (no GUI in this environment) - recommend an
+      in-editor playtest, especially for the visual feel of the slower movement
+      and the tree-release-at-carry_limit behavior.
+
+- [DONE] Water Resource
+    - Need a well made with stone
+    - Infinite water from well
+    - Implemented as GameState.water_wells (a count, not a resources[] entry -
+      water is explicitly unlimited, not a depletable stockpile) + has_water().
+      Well (scripts/well.gd, scenes/building/Well.tscn) is a passive structure
+      like House/OutpostHall (no worker assignment), costs 10 stone + 4 wood,
+      registered in BuildingCatalog with a "water_wells": 1 field that
+      Base._confirm_placement reads the same way population_capacity already
+      was. HUD gained a Water: Available/None label (GameState.water_changed
+      signal). Saved/restored via GameState.water_wells in Base's save data,
+      same pattern as population_capacity. Verified headless: placement costs
+      the right stone, has_water() flips true, and it survives a save/load
+      round-trip. Not yet consumed by anything - Happiness (below) is what
+      will actually read has_water() once built.
+
+- [DONE] Stone Resource
+    - Mined from a stone mine
+    - StoneMine (scripts/stone_mine.gd, scenes/workstation/StoneMine.tscn)
+      extends Workstation with no extra fields - it's the first user of a new
+      generic Character._run_generic_work_loop (plain produce-and-haul, no
+      special walking/consumption pattern), which required moving
+      work_interval from Farm up onto the Workstation base so any future
+      simple gatherer can reuse it too. Registered in BuildingCatalog
+      (1x1, costs wood only, since nothing costs stone yet but a stone mine
+      itself has to be buildable from turn one). "stone" added to
+      GameState.resources and to the HUD (generalized HUD's label lookup
+      from a hardcoded food/wood ternary to a _resource_labels dict so a
+      third resource didn't need more special-casing). Verified headless:
+      output accumulates and gets hauled by both the dedicated worker and an
+      idle assistant with no special-casing needed in the hauler code -
+      confirms the buffer/carry_limit/hauler system genuinely generalizes to
+      new Workstation types.
+
+- Happiness System
+    - Each citizen has a personal happiness
+    - Settlement happiness is an average of all citizen's happiness
+    - Access to water and food boost happiness while lack of vital resources reduces happiness
+    - Citizens may leave the town if their individual happiness is too low for too long
+    - Food variety gives improved happiness
+
+- [DONE] Alternative Crop Types
+    - Grain
+        - Make into flour at a mill
+        - Make flour into bread at a bakery
+        - Make beer with hops at a brewery
+    - Fruit
+        - Fruit trees take longer to grow but are consistent
+    - Potatoes
+        - Consistent and doesn't require additional refinement
+    - Rather than 7 new subclasses, generalized Farm (scripts/farm.gd) into a
+      configurable single-input/single-output converter - despite the name it
+      now covers raw crops AND refinement buildings alike, each just a
+      differently-configured Farm instance sharing one loop
+      (Character._run_farm_loop). New exported fields: input_per_tick/
+      input_resource (was hardcoded "wood"/wood_per_tick), skill_id (was
+      hardcoded "farming" - Mill/Bakery/Brewery train "milling"/"baking"/
+      "brewing" instead, since sharing a class doesn't mean sharing a trade).
+      A no-input crop (Fruit/Potato - "consistent", not gated on deliveries)
+      just sets input_per_tick to 0, which makes the loop's restock check
+      always pass without any special-casing. All 7 new buildings
+      (GrainFarm/Mill/Bakery/HopsFarm/Brewery/FruitOrchard/PotatoFarm) share
+      one new scene, scenes/workstation/CropStation.tscn, distinguished
+      purely by BuildingCatalog fields - which required adding a sprite_tint
+      export to Workstation (scripts/workstation.gd) so they don't all look
+      identical despite sharing art. GameState.resources grew grain/flour/
+      bread/hops/beer/fruit/potato. GameState.FOOD_RESOURCES (["food",
+      "bread", "potato", "fruit"] - grain/flour/hops/beer are intermediate or
+      luxury goods, not directly edible) generalizes the hunger-consumption
+      timer to draw from any of them in priority order rather than only
+      "food"; exposed as a const for the Happiness system to read for its
+      "food variety" bonus. Beer/hops/grain/flour are NOT in FOOD_RESOURCES
+      and aren't consumed by hunger - beer in particular is left as a future
+      Happiness luxury-good input rather than a calorie source.
+    - Did NOT add HUD rows for the 7 new resources - the compact corner panel
+      already has 5 rows (Food/Wood/Stone/Water/Population); adding 7 more
+      wasn't practical for this pass. They're fully functional in
+      GameState/production logic, just not individually surfaced in the HUD.
+      A more scalable resource display (collapsible list, icon bar) would be
+      its own follow-up.
+    - Caught and fixed two real bugs while verifying this, neither specific
+      to crops: 1) HUD._on_resources_changed crashed on any resource without
+      a display label (every new resource type) - it's wired to ALL resource
+      changes, not just displayed ones, and indexed straight into a
+      dictionary that only had 3 keys. Now bails out early for anything it
+      doesn't have a label for. 2) A genuine pre-existing race in
+      Character._run_farm_loop, only surfaced now because a 3-stage chain
+      made it easy to accidentally point two workers at one post during
+      testing: the "is there enough input" check happened before the
+      work_interval wait, not right before consuming, so two workers sharing
+      one Farm-class post (always allowed, same as LumberCamp) could both
+      pass the check, both wait, and both decrement - driving input_buffer
+      negative. Fixed by re-checking immediately before the actual
+      consumption; a losing check now just skips that cycle instead of
+      corrupting the buffer.
+    - Verified headless: a real GrainFarm->Mill->Bakery chain run confirmed
+      grain flowing to flour to bread with no negative buffers anywhere, and
+      confirmed bread got drawn down by hunger once "food" ran dry (matching
+      FOOD_RESOURCES priority order). Separately verified a PotatoFarm
+      produces and gets consumed by hunger without ever attempting to haul
+      in an input (input_buffer stays 0 throughout).
+
+- [DONE] Storage Facility
+    - Determines how much storage the town has
+    - Can have multiple, each increasing storage capacity
+    - Can also be upgraded for additional capacity
+    - 2 x 4 size
+    - GameState.resources previously had NO upper bound at all - add_resource
+      only ever clamped the floor at 0. Added GameState.storage_capacity
+      (baseline 30, see BASE_STORAGE_CAPACITY), now clamped on both ends in
+      add_resource; the cap applies to every resource type independently
+      (a full food stockpile doesn't crowd out wood/stone). Note: a haul
+      dropping off more than the remaining headroom silently loses the
+      overflow rather than refunding it to the workstation - unlike the
+      earlier input-hauler bug, this is an intentional consequence of the cap
+      existing at all (build more storage or spend down what you have), not
+      an accounting error. StorageFacility (scripts/storage_facility.gd,
+      scenes/building/StorageFacility.tscn) is a passive structure like
+      House/Well, 2x4, grants +30 via a "storage_capacity" catalog field read
+      the same way population_capacity/water_wells already were. HUD resource
+      labels now show "Food: 12/30" format; capacity changes refresh all of
+      them since the cap is shared across resource types, not per-label.
+      Saved/restored via GameState.storage_capacity, same pattern as the
+      other capacity fields. Did NOT implement the "can also be upgraded"
+      part - that needs a new building-selection/upgrade interaction that
+      doesn't exist yet (Storage Facility isn't clickable post-placement,
+      unlike Farm/LumberCamp which are selectable via the character
+      assignment flow) and felt like it deserved its own design pass rather
+      than a one-off bolted onto this feature; "place multiple, each adds
+      capacity" was implemented and covers the core ask. Verified headless:
+      clamping works, placing a facility raises the cap and immediately
+      allows further filling, and it survives a save/load round-trip.
+
+- Citizen recruitment system
+    - Pay food to recruit a new citizen from the outpost hall
+    - Choose between 3 options
+        - Different starting skills
+
+- Show resource income per minute on the HUD
