@@ -149,7 +149,7 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | | Value |
 |---|---|
 | History sample interval | 1 s |
-| Rolling window | 60 s (shorter just after boot) |
+| Rolling window | Exactly 60 s once that much history exists (interpolated between samples straddling the boundary); shorter and exact just after boot |
 | Displayed for | Food, Wood, Stone (the HUD's dedicated resource rows) |
 
 ## Happiness (`Base`, `CharacterData`)

@@ -83,7 +83,10 @@ func _rebuild_slots() -> void:
 
 	for slot in range(1, SaveManager.SLOT_COUNT + 1):
 		var button := Button.new()
-		button.text = "[%d] %s" % [slot, _slot_summary(slot)]
+		var summary := _slot_summary(slot)
+		if _mode != "load" and SaveManager.has_save(slot):
+			summary += " (will overwrite)"
+		button.text = "[%d] %s" % [slot, summary]
 		button.disabled = _mode == "load" and not SaveManager.has_save(slot)
 		button.pressed.connect(_choose.bind(slot))
 		slot_container.add_child(button)
@@ -93,7 +96,10 @@ func _rebuild_slots() -> void:
 ## "Slot 1: Empty", or "Slot 1: 2026-07-10 14:32 - Pop 4" for an occupied
 ## one - read straight off the full saved dict (SaveManager.load_game())
 ## rather than a dedicated summary API, since a save file is tiny JSON and
-## this only runs when the panel opens, not every frame.
+## this only runs when the panel opens, not every frame. The "(will
+## overwrite)" suffix for a non-"load" mode is appended by the caller
+## (_rebuild_slots), not here, since it's about the panel's *purpose* rather
+## than the slot's own contents.
 func _slot_summary(slot: int) -> String:
 	if not SaveManager.has_save(slot):
 		return "Slot %d: Empty" % slot

@@ -348,6 +348,33 @@ Implement these next:
       reported rate ~9.6/min). Not verified in-editor for the visual/label
       layout - recommend a quick playtest to confirm the widened panel and
       appended rate text read well against the existing punch/tween juice.
+    - Post-review fix, from an explicit request to double-check this against
+      the actual gathering rate: found a real (if small) systematic
+      over-count. _sample_income_history's old trim policy dropped the
+      oldest sample as soon as *it* crossed the 60s boundary, so the
+      retained "oldest" sample's true age could be anywhere up to one full
+      INCOME_SAMPLE_INTERVAL (1s) past 60s - close enough to look right,
+      but a real bias for a bursty producer (haul trips arrive in discrete
+      chunks, not a smooth trickle), averaging up to ~1.67% over-counted
+      and confirmed empirically at ~1.5-3% in a live test. Fixed two ways:
+      the trim policy now keeps the oldest sample until the *next* one has
+      also crossed the boundary (guaranteeing a valid "before" anchor
+      at-or-before "now - 60s" always exists once that much history has
+      accumulated), and get_income_per_minute now interpolates the
+      resource value at exactly "now - 60s" between whichever two samples
+      straddle it, rather than reading the coarse discrete sample that
+      happened to still be retained. Net effect: the window is now exactly
+      60.000s (not "somewhere between 60 and 61s") regardless of how
+      coarse INCOME_SAMPLE_INTERVAL is.
+    - Verified headless with an independent cross-check using a *separate*
+      0.1s-resolution log of the same resource, picking whichever
+      independent sample landed closest to "now minus 60s" rather than
+      assuming a fixed sample count - before the fix, reported rate ran
+      ~1.5-3% above this independent measurement at every checkpoint
+      (consistently over, not random noise, matching the theorized bias);
+      after the fix, reported and independent rates matched to within
+      floating-point/timing noise (e.g. 20.0 vs 19.99, 8.1 vs 8.10) once
+      past the initial 60s ramp-up.
 
 - [DONE] Condense build menu into square icons with small keybind text
     - ButtonContainer switched from a VBoxContainer of full-width text
@@ -715,5 +742,17 @@ Implement these next:
       verified in-editor for feel/layout (SlotPanel and SystemMenu's
       centered positioning, MainMenu's visual polish, whether "Esc opens
       the system menu" reads as expected) - recommend a playtest.
+    - Post-review fix: SlotPanel.open_for()'s own doc comment claimed an
+      occupied slot "just says it'll be overwritten" in "new"/"save" mode,
+      but _rebuild_slots()/_slot_summary() never actually generated that
+      text - an occupied slot rendered identically regardless of whether
+      the panel was opened to load it, overwrite it with a new game, or
+      overwrite it by saving. Concretely: New Game -> pick an occupied
+      slot showed the exact same "[1] 2026-07-10 14:32 - Pop 4" text a
+      Load Game prompt would, with no visual distinction, so a player
+      could pick it thinking they were continuing that save and only
+      discover the overwrite once they next saved. Fixed by appending
+      " (will overwrite)" to an occupied slot's button text whenever
+      _mode != "load".
 
 - Nothing else queued - add new items above this line to continue.

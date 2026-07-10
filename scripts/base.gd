@@ -198,6 +198,7 @@ func _ready() -> void:
 		SaveManager.should_load_on_start = false
 		_load_game()
 
+
 func _configure_camera_limits(min_cell: Vector2i, max_cell: Vector2i) -> void:
 	var corners := [
 		WorldGrid.grid_to_local(Vector2(min_cell.x, min_cell.y)),

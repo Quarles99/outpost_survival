@@ -172,23 +172,69 @@ func reset_to_defaults() -> void:
 
 
 func _sample_income_history() -> void:
-	_income_history.append({"time": Time.get_ticks_msec() / 1000.0, "resources": resources.duplicate()})
-	while _income_history.size() > 1 and Time.get_ticks_msec() / 1000.0 - _income_history[0]["time"] > INCOME_WINDOW_SECONDS:
+	var now := Time.get_ticks_msec() / 1000.0
+	_income_history.append({"time": now, "resources": resources.duplicate()})
+	## Keep at least one sample at-or-before "now - INCOME_WINDOW_SECONDS"
+	## at all times (once that much history exists at all), rather than
+	## discarding the current-oldest as soon as *it* crosses the window
+	## boundary - only pop it once the *next* sample has also crossed, so
+	## get_income_per_minute always has a valid "before" anchor to
+	## interpolate from. Trimming as soon as the oldest exceeds the window
+	## (the previous policy) meant the retained oldest sample's true age
+	## could be anywhere up to a full INCOME_SAMPLE_INTERVAL past the
+	## window - close enough to look right most of the time, but a
+	## systematic over-count for a bursty producer (a hauler's output
+	## arrives in discrete trip-sized chunks, not a smooth trickle), since
+	## the window would silently run up to ~1.67% long on average.
+	while _income_history.size() > 1 and _income_history[1]["time"] <= now - INCOME_WINDOW_SECONDS:
 		_income_history.pop_front()
 
 
-## Net change in `resource_name` per minute, measured over however much of
-## the trailing INCOME_WINDOW_SECONDS window has elapsed so far (shorter
-## just after boot). This is net income into the stockpile, not gross
-## production - a workstation whose output is being lost to a full storage
-## cap (see storage_capacity docs above) won't show up here, since nothing
-## actually reached the resource pool.
+## Net change in `resource_name` per minute, measured over exactly the
+## trailing INCOME_WINDOW_SECONDS (shorter just after boot, while there
+## isn't that much history yet) - interpolated between whichever two
+## samples straddle "now - INCOME_WINDOW_SECONDS" so the window length is
+## always precise regardless of how coarse INCOME_SAMPLE_INTERVAL is (see
+## _sample_income_history's doc comment for why an imprecise window
+## matters here, not just adds noise). This is net income into the
+## stockpile, not gross production - a workstation whose output is being
+## lost to a full storage cap (see storage_capacity docs above) won't show
+## up here, since nothing actually reached the resource pool.
 func get_income_per_minute(resource_name: String) -> float:
 	if _income_history.is_empty():
 		return 0.0
+	var now := Time.get_ticks_msec() / 1000.0
+	var target_time := now - INCOME_WINDOW_SECONDS
 	var oldest: Dictionary = _income_history[0]
-	var elapsed: float = Time.get_ticks_msec() / 1000.0 - oldest["time"]
-	if elapsed <= 0.0:
-		return 0.0
-	var delta: float = resources.get(resource_name, 0.0) - (oldest["resources"] as Dictionary).get(resource_name, 0.0)
-	return delta / elapsed * 60.0
+
+	if target_time <= oldest["time"]:
+		## Not enough history yet (still within INCOME_WINDOW_SECONDS of
+		## boot) - use the oldest sample actually on hand and the real
+		## elapsed time since it, same spirit as the full case below but
+		## over a shorter, honest window rather than pretending it's 60s.
+		var elapsed: float = now - oldest["time"]
+		if elapsed <= 0.0:
+			return 0.0
+		var delta: float = resources.get(resource_name, 0.0) - (oldest["resources"] as Dictionary).get(resource_name, 0.0)
+		return delta / elapsed * 60.0
+
+	var before: Dictionary = oldest
+	var after: Dictionary = oldest
+	for entry in _income_history:
+		if entry["time"] <= target_time:
+			before = entry
+		else:
+			after = entry
+			break
+
+	var value_at_target: float
+	if after["time"] <= before["time"]:
+		value_at_target = (before["resources"] as Dictionary).get(resource_name, 0.0)
+	else:
+		var t: float = (target_time - before["time"]) / (after["time"] - before["time"])
+		var before_val: float = (before["resources"] as Dictionary).get(resource_name, 0.0)
+		var after_val: float = (after["resources"] as Dictionary).get(resource_name, 0.0)
+		value_at_target = lerp(before_val, after_val, t)
+
+	var delta: float = resources.get(resource_name, 0.0) - value_at_target
+	return delta / INCOME_WINDOW_SECONDS * 60.0
