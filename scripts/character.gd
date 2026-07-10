@@ -133,6 +133,22 @@ func leave() -> void:
 	_stop_work()
 
 
+## Snaps to `pos` immediately, cancelling any in-flight move tween - used
+## only by Base._restore_characters, right after assign_to() (which already
+## started this character's restored work loop and its own initial
+## _move_to toward the post), to put a loaded citizen exactly where they
+## were saved rather than at their post/home position. The just-restarted
+## loop wasn't told which step it was on when the save happened, so it
+## just resumes from here as if it always started at this exact spot -
+## e.g. if a haul was in progress, its next _move_to naturally continues
+## from here rather than restarting from the post.
+func snap_to_position(pos: Vector2) -> void:
+	if _move_tween:
+		_move_tween.kill()
+	_base_position = pos
+	position = pos
+
+
 func assign_to(post: Node) -> void:
 	if assigned_post:
 		assigned_post.remove_worker()

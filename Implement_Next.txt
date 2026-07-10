@@ -915,7 +915,20 @@ Implement these next:
       nearest_stockpile() from the Farm's position correctly resolved to
       the new Storage Facility's spot, not the Outpost Hall's.
 
-- Save citizens current position with save data
+- [DONE] Save citizens current position with save data
+    - New Character.snap_to_position(pos) kills any in-flight move tween
+      and sets both _base_position and position directly - used only by
+      Base._restore_characters, right after assign_to() (which already
+      moves them toward their post/home and restarts their work loop),
+      to override that with wherever they actually were when saved. The
+      restored loop wasn't told which step it was on, so it just resumes
+      naturally from this exact spot (e.g. a haul in progress continues
+      from here on its next _move_to rather than restarting from the
+      post). Older saves without a "position" field just keep assign_to's
+      normal placement, unchanged from before this field existed.
+    - Verified headless: moved a citizen to an arbitrary far-off position,
+      saved, moved them elsewhere, loaded, and confirmed their position
+      matched the saved one exactly.
 
 - Citizens assigned to a job who are idle should help with hauling at other work sites
 

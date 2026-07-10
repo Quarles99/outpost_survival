@@ -1007,6 +1007,7 @@ func _serialize_characters() -> Array:
 			"happiness": character.data.happiness,
 			"unhappy_streak": character.data.unhappy_streak,
 			"assigned_save_id": save_id,
+			"position": [character.position.x, character.position.y],
 		})
 	return out
 
@@ -1048,6 +1049,13 @@ func _restore_characters(entries: Array) -> void:
 		character.data.happiness = float(entry.get("happiness", character.data.happiness))
 		character.data.unhappy_streak = int(entry.get("unhappy_streak", 0))
 		character.assign_to(_post_by_save_id(entry.get("assigned_save_id", "")))
+		## Overrides assign_to's own _move_to (toward the post/home
+		## position) with wherever this citizen actually was when saved -
+		## older saves without "position" just keep assign_to's placement,
+		## same as before this field existed.
+		if entry.has("position"):
+			var pos_arr: Array = entry["position"]
+			character.snap_to_position(Vector2(pos_arr[0], pos_arr[1]))
 		matched_ids[character.data.id] = true
 
 	## Any live citizen not accounted for above didn't exist at the point
