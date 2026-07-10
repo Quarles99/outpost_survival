@@ -755,4 +755,28 @@ Implement these next:
       " (will overwrite)" to an occupied slot's button text whenever
       _mode != "load".
 
+- [DONE] Unify Farm-family skills back to one "farming" skill (ad-hoc request)
+    - Alternative Crop Types had deliberately split Mill/Bakery/Brewery into
+      their own "milling"/"baking"/"brewing" skills, reasoning that
+      "sharing a class doesn't mean sharing a trade" - reverted per an
+      explicit request that every type of farm should train the same
+      skill. Farm.gd's skill_id export is gone; get_skill_id() now just
+      returns the literal "farming" for every Farm-family instance,
+      regardless of recipe. Removed "skill_id" from BuildingCatalog's 7
+      crop-chain entries (all of them already either said "farming" or
+      one of the three now-gone skills) and from Base.BUILDING_PROPERTIES
+      (nothing left to override per-catalog-entry). RecruitCatalog.
+      SPECIALIZATIONS and SkillPanel.SKILL_DISPLAY_ORDER/SKILL_LABELS
+      dropped milling/baking/brewing too, since nothing trains them
+      anymore - down to farming/lumberjacking/mining plus speed/strength.
+    - A save with old milling/baking/brewing skill_xp entries loads fine -
+      they just sit unused in CharacterData.skill_xp, no migration needed
+      (SkillCurve.get_skill_level() still works for any skill_id, trained
+      or not; they simply never gain further xp or show up in the skill
+      panel anymore).
+    - Verified headless: instantiated all 8 Farm-family catalog options
+      (including Mill/Bakery/Brewery) and confirmed get_skill_id() returns
+      "farming" for every one; confirmed RecruitCatalog now only offers
+      farming/lumberjacking/mining as recruit specializations.
+
 - Nothing else queued - add new items above this line to continue.

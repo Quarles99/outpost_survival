@@ -8,11 +8,13 @@ const INVALID_TINT := Color(1.0, 0.4, 0.4, 0.6)
 ## building scenes they configure (e.g. distinguishing a Farm from a
 ## Lumber Camp, which share the generic Workstation scene). Applied via
 ## `option.has(key)` so it's safe to list properties only some Workstation
-## subclasses have (e.g. input_resource/input_per_tick/skill_id are Farm-
-## only) - a catalog entry for a class without them just never sets them.
+## subclasses have (e.g. input_resource/input_per_tick are Farm-only) - a
+## catalog entry for a class without them just never sets them. skill_id
+## isn't here - every Farm-family building trains "farming" unconditionally
+## now (see Farm.get_skill_id()), not a per-catalog-entry override.
 const BUILDING_PROPERTIES := [
 	"display_name", "resource_type", "output_per_tick", "work_interval",
-	"sprite_tint", "input_resource", "input_per_tick", "skill_id",
+	"sprite_tint", "input_resource", "input_per_tick",
 ]
 
 const INITIAL_TREE_COUNT := 12
@@ -545,11 +547,13 @@ func _on_farm_clicked(farm: Farm) -> void:
 
 
 ## Reconfigures _crop_target in place with `option`'s Farm-family fields
-## (resource_type/input_resource/input_per_tick/output_per_tick/skill_id/
-## sprite_tint/work_interval) via the same _apply_option_properties used for
-## placing a brand new building - this is a free, instant retool, not a
-## rebuild, so the node itself (and its assigned workers/coroutines) is left
-## alone. Clears output_buffer/input_buffer since whatever was accumulated
+## (resource_type/input_resource/input_per_tick/output_per_tick/sprite_tint/
+## work_interval - skill_id isn't one of these, every Farm-family building
+## trains "farming" regardless of recipe) via the same
+## _apply_option_properties used for placing a brand new building - this is
+## a free, instant retool, not a rebuild, so the node itself (and its
+## assigned workers/coroutines) is left alone. Clears output_buffer/
+## input_buffer since whatever was accumulated
 ## under the old recipe doesn't carry over to the new one (e.g. half a load
 ## of grain sitting in a buffer that's about to become a Bakery's flour
 ## input would be a silent, confusing bug otherwise) - an accepted loss on

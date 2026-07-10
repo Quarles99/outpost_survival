@@ -18,14 +18,15 @@ signal clicked
 ## check always false without any special-casing.
 @export var input_per_tick: float = 0.5
 @export var input_resource: String = "wood"
-## Skill this building trains - "farming" for raw crops, but "milling"/
-## "baking"/"brewing" etc. for refinement buildings, since those are
-## meaningfully different trades even though they share this class.
-@export var skill_id: String = "farming"
 
 
+## Every Farm-family building trains "farming," full stop - a raw crop and
+## a refinement step (Mill/Bakery/Brewery) used to train separate skills
+## ("milling"/"baking"/"brewing"), but that was reverted: they're all still
+## the same trade as far as skill progression is concerned, not a formal
+## export here for a catalog entry to override.
 func get_skill_id() -> String:
-	return skill_id
+	return "farming"
 
 
 func get_input_resource() -> String:

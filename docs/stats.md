@@ -81,12 +81,14 @@ The **Farm** class is a generic single-input/single-output converter (exported `
 | Building | Input → Output | Input/tick | Output/tick | Work interval | Skill trained |
 |---|---|---|---|---|---|
 | Grain Farm | wood → grain | 0.5 | 1.0 | 1.5 s (default) | `farming` |
-| Mill | grain → flour | 1.0 | 1.0 | 1.5 s (default) | `milling` |
-| Bakery | flour → bread | 1.0 | 1.0 | 1.5 s (default) | `baking` |
+| Mill | grain → flour | 1.0 | 1.0 | 1.5 s (default) | `farming` |
+| Bakery | flour → bread | 1.0 | 1.0 | 1.5 s (default) | `farming` |
 | Hops Farm | wood → hops | 0.5 | 1.0 | 1.5 s (default) | `farming` |
-| Brewery | hops → beer | 1.0 | 1.0 | 1.5 s (default) | `brewing` |
+| Brewery | hops → beer | 1.0 | 1.0 | 1.5 s (default) | `farming` |
 | Fruit Orchard | none → fruit | 0 | 0.6 | 3.0 s (slower) | `farming` |
 | Potato Farm | none → potato | 0 | 1.0 | 1.5 s (default) | `farming` |
+
+Every Farm-family building trains `farming`, regardless of recipe — refinement steps (Mill/Bakery/Brewery) don't train a separate trade.
 
 All values scale by the worker's skill multiplier the same way the base Farm's do. Fruit Orchard and Potato Farm never haul input (no delivery trip is ever triggered) — matching the design intent of a "consistent" crop that isn't gated on deliveries.
 
@@ -184,7 +186,7 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | Candidates offered per visit | 3 |
 | Recruit cost | 15 food |
 | Starting specialization level | 5 |
-| Possible specializations | farming, lumberjacking, mining, milling, baking, brewing |
+| Possible specializations | farming, lumberjacking, mining |
 | Gated on | open population capacity, and affording the food cost |
 
 ## Map Size (`IsoGround`, `Base.tscn`)

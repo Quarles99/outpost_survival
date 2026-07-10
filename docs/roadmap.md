@@ -38,6 +38,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Main menu with save/load UI.** The game now boots into a main menu (Continue / New Game / Load Game / Quit) instead of straight into the base, with 3 numbered save slots shown with their timestamp and population instead of one hidden fixed file. In-game, a new System Menu (`Esc`, or the HUD's Menu button) offers Save/Load/Main Menu/Quit alongside the existing `F5`/`F9` shortcuts. See [mechanics.md](mechanics.md#main-menu--saveload) and [controls.md](controls.md).
 
+**Unified farming skill.** Every Farm-family building (including Mill/Bakery/Brewery, which briefly trained their own separate skills) now trains the same "farming" skill regardless of recipe. See [mechanics.md](mechanics.md#skills--leveling).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.

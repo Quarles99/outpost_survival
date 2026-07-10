@@ -4,22 +4,21 @@ class_name SkillPanel
 const SLIDE_OFFSET := Vector2(0, 20)
 const ANIM_DURATION := 0.18
 
-## Every skill a citizen can train: the 6 work skills a Workstation/Farm-
-## family post can train, plus "speed"/"strength" - the 2 universal skills
-## every citizen trains passively regardless of assignment (see
-## Character.SPEED_XP_PER_SECOND's doc comment). RecruitCatalog.
-## SPECIALIZATIONS has its own copy of the 6 work-skill labels for a
-## different purpose (picking a recruit's starting specialization, not
-## listing everything a citizen has) - small, stable, and separate enough a
-## shared constant felt like unneeded coupling between the two panels.
-const SKILL_DISPLAY_ORDER := ["farming", "lumberjacking", "mining", "milling", "baking", "brewing", "speed", "strength"]
+## Every skill a citizen can train: the 3 work skills a Workstation/Farm-
+## family post can train (every Farm-family building trains "farming"
+## regardless of recipe - see Farm.get_skill_id()), plus "speed"/"strength" -
+## the 2 universal skills every citizen trains passively regardless of
+## assignment (see Character.SPEED_XP_PER_SECOND's doc comment).
+## RecruitCatalog.SPECIALIZATIONS has its own copy of the work-skill labels
+## for a different purpose (picking a recruit's starting specialization,
+## not listing everything a citizen has) - small, stable, and separate
+## enough a shared constant felt like unneeded coupling between the two
+## panels.
+const SKILL_DISPLAY_ORDER := ["farming", "lumberjacking", "mining", "speed", "strength"]
 const SKILL_LABELS := {
 	"farming": "Farming",
 	"lumberjacking": "Lumberjacking",
 	"mining": "Mining",
-	"milling": "Milling",
-	"baking": "Baking",
-	"brewing": "Brewing",
 	"speed": "Speed",
 	"strength": "Strength",
 }
