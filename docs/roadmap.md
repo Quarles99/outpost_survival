@@ -32,10 +32,12 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Per-farm crop selection.** Any placed Farm-family building can be clicked to retool it into any other Farm-family recipe, free and instant, without disturbing an assigned worker or the building's footprint. See [mechanics.md](mechanics.md#building--placement).
 
+**Worker caps.** Every Workstation now caps out at 3 assigned workers (Wall Segments, unchanged, still cap at 1) - generalized from a cap that used to be hardcoded as a WallSegment-only special case. See [mechanics.md](mechanics.md#gathering--hauling).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Not yet built. Listed in priority order as currently planned:
-- **Per-workstation worker cap** — a maximum number of citizens assignable to a single post (today's "multiple workers share one post's buffers" is uncapped).
+
 - **Remove the click-to-open task list** — assignment becomes drag-only, or click-citizen-then-click-workstation, instead of today's menu-of-posts panel.
 - **Per-citizen skill panel** — a condensed view of all of a citizen's skill levels, opened by clicking them (today only the task-assignment menu opens on click).
 

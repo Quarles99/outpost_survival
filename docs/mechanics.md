@@ -30,7 +30,7 @@ Production isn't instant or teleported — it's a physical loop of walking, work
   - **Stone Mine** workers use the plain generic loop: produce on a timer, haul when full. No special walking pattern.
 - **Idle citizens aren't wasted.** A citizen with no assignment automatically looks for the single most valuable haul job across every workstation — either carrying a full output buffer to the stockpile, or carrying a needed input out to a workstation that's running short — and does that, then looks for the next one. This means idle workers passively do logistics for the rest of the town, including keeping Farms fed even without a dedicated hauler. Multiple haulers converging on the same starved post won't over-deliver past its capacity — a delivery re-checks the post's remaining space right before unloading and refunds any surplus to the stockpile instead of overshooting.
 
-Multiple citizens can be assigned to the same workstation — they share that post's buffers and work in parallel rather than needing one dedicated hauler each.
+Multiple citizens can be assigned to the same workstation — they share that post's buffers and work in parallel rather than needing one dedicated hauler each — up to a per-post worker cap (see [stats.md](stats.md)); once full, that post no longer shows up as an assignment option for another citizen. A wall segment is the exception, capped at a single defender.
 
 ## Sustainable Forestry
 

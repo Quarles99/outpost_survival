@@ -2,6 +2,9 @@ extends Area2D
 class_name WallSegment
 
 @export var display_name: String = "Wall Section"
+## Unlike a Workstation, a wall segment only has room for one defender - see
+## Workstation.max_workers' doc comment for how Base checks this.
+@export var max_workers: int = 1
 
 @onready var label: Label = $Label
 @onready var sprite: Sprite2D = $Sprite2D

@@ -331,7 +331,7 @@ func _end_character_drag() -> void:
 		return
 
 	var post := _post_at(get_global_mouse_position())
-	if post and not (post is WallSegment and post.active_workers >= 1):
+	if _post_has_room(post, character):
 		character.end_drag()
 		character.assign_to(post)
 	else:
@@ -358,6 +358,20 @@ func _post_at(global_pos: Vector2) -> Node:
 	return null
 
 
+## Whether `for_character` could be assigned to `post` right now - false for
+## a null post, or one already at its max_workers (duck-typed on Workstation
+## and WallSegment, which each set their own default - see their max_workers
+## doc comments). Always true for a post `for_character` is already assigned
+## to: re-dropping them back onto their current post shouldn't be blocked
+## just because they themselves count toward its own occupancy.
+func _post_has_room(post: Node, for_character: Character = null) -> bool:
+	if not post:
+		return false
+	if for_character and for_character.assigned_post == post:
+		return true
+	return post.active_workers < post.max_workers
+
+
 func _on_character_selected(character: Character) -> void:
 	if _placing_option:
 		return
@@ -366,7 +380,7 @@ func _on_character_selected(character: Character) -> void:
 	_selected_character = character
 	_selected_character.set_selected(true)
 
-	var assignable := posts.filter(func(post: Node) -> bool: return not (post is WallSegment and post.active_workers >= 1))
+	var assignable := posts.filter(func(post: Node) -> bool: return _post_has_room(post, character))
 	task_panel.open_for(character, assignable)
 
 

@@ -534,7 +534,45 @@ Implement these next:
       relevant once the planned task-list removal below changes how
       workstation clicks are otherwise handled) - recommend a playtest.
 
-- Maximum number of citizens per workstation
+- [DONE] Maximum number of citizens per workstation
+    - Generalized a pre-existing but hardcoded special case rather than
+      building something new: WallSegment already capped itself at 1
+      worker, but only via a literal `post is WallSegment and
+      post.active_workers >= 1` check inlined at both of Base's assignment
+      entry points (drag-drop in _end_character_drag, and TaskPanel's
+      assignable-list filter in _on_character_selected) - Workstation-family
+      posts (Farm/LumberCamp/StoneMine) had no cap at all. Added
+      `max_workers` as an export on both Workstation (default 3 - a
+      first-pass number, not tuned via playtesting; multiple workers
+      sharing one post's buffers for parallel throughput is intentional
+      per CLAUDE.md, so this isn't 1) and WallSegment (default 1,
+      preserving its exact prior behavior), duck-typed the same way
+      add_worker/remove_worker/get_worker_spot/display_name already are.
+      Both call sites now go through one new Base._post_has_room(post,
+      for_character) helper instead of the inlined WallSegment check.
+    - _post_has_room() always returns true for a post the character being
+      considered is *already* assigned to, even if that post is at its cap
+      - re-dropping a worker back onto their current post (a no-op
+      reassignment) shouldn't read as "denied" just because they themselves
+      count toward its own occupancy at the moment of the check.
+    - The cap is enforced only at these two UI entry points, same as
+      WallSegment's cap always was - Character.assign_to()/Workstation.
+      add_worker() themselves have no denial logic and will accept a
+      worker unconditionally if called directly (e.g. _restore_characters
+      during load). This is a deliberate continuation of the existing
+      pattern, not a gap introduced here - an old save from before this cap
+      existed, with more workers on one post than the new max_workers,
+      would just carry that over (grandfathered) rather than being
+      force-corrected on load.
+    - Verified headless: assigned 3 characters to the starting Farm
+      (max_workers 3, succeeds), confirmed a 4th spawned character is
+      denied room there, and confirmed an already-assigned character still
+      reads as having room on that same now-full post. WallSegment's
+      analogous behavior wasn't separately re-verified live (no wall
+      segments are currently placed anywhere in the game - see CLAUDE.md's
+      note on the wall-building concept being unfinished/unwired) but is
+      structurally identical to Workstation's already-verified path. Not
+      verified in-editor.
 
 - Remove current task list UI from citizens
   - Have to be assigned by clicking and dragging or clicking on the citizen and then the workstation

@@ -67,6 +67,14 @@ All 8 of the above (Farm through Potato Farm) can be clicked once placed to reto
 | Search radius (tree-finding, Lumber Camp only) | — | 4.5 tiles | — |
 | Target forest size maintained (Lumber Camp only) | — | 16 trees within search radius | — |
 | Skill trained | `farming` | `lumberjacking` | `mining` |
+| Max workers assigned at once | 3 | 3 | 3 |
+
+## Worker Caps (`Workstation`, `WallSegment`)
+
+| | Value |
+|---|---|
+| Max workers per Workstation (Farm-family, Lumber Camp, Stone Mine) | 3 |
+| Max workers per Wall Segment | 1 |
 
 The **Farm** class is a generic single-input/single-output converter (exported `input_per_tick`, `input_resource`, `skill_id`, `sprite_tint`) — the row above is its default configuration (wood → food, "farming"). The full Alternative Crop Types chain is built from the same class, sharing one scene (`CropStation.tscn`) and distinguished only by catalog configuration:
 

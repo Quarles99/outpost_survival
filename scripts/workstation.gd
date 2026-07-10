@@ -24,6 +24,13 @@ const RESOURCE_VISUALS := {
 ## work loop (e.g. StoneMine); Farm reads it too even though it has its own
 ## specialized loop, and LumberCamp ignores it in favor of chop_interval.
 @export var work_interval: float = 1.5
+## How many citizens can be assigned here at once - sharing a post's buffers
+## for parallel throughput is intentional (see CLAUDE.md), but unbounded
+## stacking isn't; a first-pass default, not tuned via playtesting. Checked
+## by Base (_post_has_room) before allowing a new assignment via drag or the
+## task menu, alongside WallSegment's own max_workers (duck-typed the same
+## way add_worker/remove_worker/get_worker_spot/display_name already are).
+@export var max_workers: int = 3
 ## Lets several BuildingCatalog entries share one placeholder scene (e.g.
 ## every crop/refinement building in the Farm family) while still reading
 ## visually distinct - applied over whatever RESOURCE_VISUALS or the scene's
