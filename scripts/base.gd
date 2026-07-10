@@ -63,6 +63,7 @@ const CHARACTER_SCENE := preload("res://scenes/character/Character.tscn")
 @onready var task_panel: TaskPanel = $TaskPanel
 @onready var build_menu: BuildMenu = $BuildMenu
 @onready var recruit_panel: RecruitPanel = $RecruitPanel
+@onready var crop_panel: CropPanel = $CropPanel
 @onready var hud: HUD = $HUD
 @onready var iso_ground: IsoGround = $IsoGround
 @onready var camera: RtsCamera = $Camera2D
@@ -70,11 +71,27 @@ const CHARACTER_SCENE := preload("res://scenes/character/Character.tscn")
 
 var posts: Array[Node] = []
 
+## The Farm-family building currently open in crop_panel, set by
+## _on_farm_clicked and consumed by _on_crop_selected. Only one crop panel
+## can be open at a time (opening a new one closes any other panel first,
+## same as recruit/build), so a single field is enough - no stack needed.
+var _crop_target: Farm = null
+
 ## Buildings placed at runtime via the build menu (not the fixed scene-file
 ## ones), tracked so a save can rebuild them and a load can wipe/replace
 ## them. Entries: {save_id: String, option_id: String, origin: Vector2i, node: Node}.
+## A retool via _on_crop_selected updates an entry's option_id in place, so
+## save/load naturally picks up the new recipe through the same mechanism
+## that already rebuilds placed buildings from their option_id.
 var _placed_buildings: Array[Dictionary] = []
 var _next_placed_id := 0
+
+## The catalog option id the fixed scene-file $Farm currently matches -
+## unlike player-placed buildings (tracked in _placed_buildings above),
+## $Farm has no entry there to update on retool (see _restore_placed_buildings'
+## doc comment: fixed buildings are left alone by save/load), so this is a
+## separate, minimal bit of save state just for it.
+var _fixed_farm_option_id := "farm"
 
 var _selected_character: Character = null
 
@@ -101,6 +118,7 @@ func _ready() -> void:
 	posts.append($Woodpile)
 	$Farm.set_meta("save_id", "farm")
 	$Woodpile.set_meta("save_id", "woodpile")
+	_wire_farm_clicks($Farm)
 
 	_reserve_existing_footprint($OutpostHall, BuildingCatalog.get_option("outpost_hall")["grid_size"])
 	_reserve_existing_footprint($Farm, BuildingCatalog.get_option("farm")["grid_size"])
@@ -125,6 +143,8 @@ func _ready() -> void:
 
 	recruit_panel.candidate_selected.connect(_on_candidate_selected)
 	$OutpostHall.clicked.connect(_on_outpost_hall_clicked)
+
+	crop_panel.option_selected.connect(_on_crop_selected)
 
 	var happiness_timer := Timer.new()
 	happiness_timer.wait_time = HAPPINESS_TICK_INTERVAL
@@ -262,6 +282,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if recruit_panel.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
 		recruit_panel.close()
 		return
+	if crop_panel.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
+		crop_panel.close()
+		return
 	if _selected_character == null:
 		return
 	if (event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel"):
@@ -371,6 +394,7 @@ func _on_build_pressed() -> void:
 	if _selected_character:
 		_deselect()
 	recruit_panel.close()
+	crop_panel.close()
 	build_menu.open_for(BuildingCatalog.placeable_options())
 
 
@@ -379,7 +403,75 @@ func _on_outpost_hall_clicked() -> void:
 	if _selected_character:
 		_deselect()
 	build_menu.close()
+	crop_panel.close()
 	recruit_panel.open_for(RecruitCatalog.generate_candidates())
+
+
+## Connects a Farm-family building's clicked signal (see Farm.gd) so
+## clicking it opens the crop-selection panel - called for both fixed
+## scene-file Farms ($Farm) and every dynamically placed/restored one.
+## Buildings that aren't Farm instances (LumberCamp, StoneMine, passive
+## structures) don't have this signal at all, so this is a no-op for them.
+func _wire_farm_clicks(building: Node) -> void:
+	if building is Farm:
+		building.clicked.connect(_on_farm_clicked.bind(building))
+
+
+func _on_farm_clicked(farm: Farm) -> void:
+	_cancel_placement()
+	if _selected_character:
+		_deselect()
+	build_menu.close()
+	recruit_panel.close()
+	_crop_target = farm
+	crop_panel.open_for(BuildingCatalog.farm_family_options(), farm.display_name)
+
+
+## Reconfigures _crop_target in place with `option`'s Farm-family fields
+## (resource_type/input_resource/input_per_tick/output_per_tick/skill_id/
+## sprite_tint/work_interval) via the same _apply_option_properties used for
+## placing a brand new building - this is a free, instant retool, not a
+## rebuild, so the node itself (and its assigned workers/coroutines) is left
+## alone. Clears output_buffer/input_buffer since whatever was accumulated
+## under the old recipe doesn't carry over to the new one (e.g. half a load
+## of grain sitting in a buffer that's about to become a Bakery's flour
+## input would be a silent, confusing bug otherwise) - an accepted loss on
+## switching, same spirit as storage overflow being lost rather than
+## refunded elsewhere in this game. Character's work loops re-read the
+## post's fields fresh every iteration, so an already-assigned worker just
+## starts producing the new recipe on their next pass with no need to
+## restart their coroutine.
+func _on_crop_selected(option: Dictionary) -> void:
+	if not is_instance_valid(_crop_target):
+		return
+	_apply_crop_option(_crop_target, option)
+	_crop_target.output_buffer = 0.0
+	_crop_target.input_buffer = 0.0
+	hud.flash_message("Now growing %s" % option["display_name"])
+
+	## Keep whatever tracks this building's recipe for save/load in sync -
+	## otherwise a retool would silently revert on the next save/load
+	## round-trip, since both paths rebuild a Farm-family building's fields
+	## from an option_id rather than reading them live off the node.
+	if _crop_target == $Farm:
+		_fixed_farm_option_id = option["id"]
+	else:
+		for entry in _placed_buildings:
+			if entry["node"] == _crop_target:
+				entry["option_id"] = option["id"]
+				break
+
+	_crop_target = null
+
+
+## Applies a Farm-family option's fields and refreshes the sprite to match -
+## the part of "place/restore/retool a Farm-family building" that's common
+## to all three, without the buffer-clearing/flash-message side effects
+## that only make sense for an interactive retool (_on_crop_selected), not
+## for silently re-establishing state during load (_load_game).
+func _apply_crop_option(building: Node, option: Dictionary) -> void:
+	_apply_option_properties(building, option)
+	building.refresh_visual()
 
 
 func _on_candidate_selected(candidate: Dictionary) -> void:
@@ -479,6 +571,7 @@ func _confirm_placement() -> void:
 	_next_placed_id += 1
 	building.set_meta("save_id", save_id)
 	add_child(building)
+	_wire_farm_clicks(building)
 
 	if option.has("population_capacity"):
 		GameState.add_population_capacity(option["population_capacity"])
@@ -573,6 +666,7 @@ func _save_game() -> void:
 		"placed_buildings": _serialize_placed_buildings(),
 		"post_buffers": _serialize_post_buffers(),
 		"characters": _serialize_characters(),
+		"fixed_farm_option_id": _fixed_farm_option_id,
 	}
 	SaveManager.save_game(data)
 	hud.flash_message("Saved")
@@ -610,6 +704,18 @@ func _load_game() -> void:
 	GameState.water_changed.emit(GameState.has_water())
 	GameState.storage_capacity = float(data.get("storage_capacity", GameState.storage_capacity))
 	GameState.storage_capacity_changed.emit(GameState.storage_capacity)
+
+	## $Farm is a fixed scene-file building, not one of the entries
+	## _restore_placed_buildings rebuilds - its recipe (if ever retooled via
+	## the crop-selection panel) is tracked separately and reapplied here.
+	## Done before _restore_post_buffers below, since (unlike
+	## _on_crop_selected's interactive path) this must NOT clear
+	## output_buffer/input_buffer - the save's actual buffer values are the
+	## authority here, not the empty-buffer reset a live retool wants.
+	_fixed_farm_option_id = data.get("fixed_farm_option_id", "farm")
+	var fixed_farm_option := BuildingCatalog.get_option(_fixed_farm_option_id)
+	if not fixed_farm_option.is_empty():
+		_apply_crop_option($Farm, fixed_farm_option)
 
 	## Buildings are restored before trees: WorldGrid.plant_tree() doesn't
 	## check cell occupancy, and a stale placed building torn down after
@@ -693,6 +799,7 @@ func _restore_placed_buildings(entries: Array) -> void:
 		var save_id: String = entry["save_id"]
 		building.set_meta("save_id", save_id)
 		add_child(building)
+		_wire_farm_clicks(building)
 		if building.has_method("add_worker"):
 			posts.append(building)
 

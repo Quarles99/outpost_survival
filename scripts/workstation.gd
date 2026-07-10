@@ -43,14 +43,39 @@ var output_buffer: float = 0.0
 var input_buffer: float = 0.0
 var _pulse_tween: Tween
 
+## The scene's own baked-in sprite, captured before any RESOURCE_VISUALS
+## override is applied - refresh_visual() falls back to this for a
+## resource_type with no RESOURCE_VISUALS entry (e.g. "grain"), so
+## reconfiguring resource_type at runtime (see Farm's crop-selection) can
+## correctly revert to it rather than getting stuck on whatever texture an
+## earlier resource_type happened to pick.
+var _default_texture: Texture2D
+var _default_centered: bool
+var _default_offset: Vector2
+
 
 func _ready() -> void:
 	label.text = display_name
+	_default_texture = sprite.texture
+	_default_centered = sprite.centered
+	_default_offset = sprite.offset
+	refresh_visual()
+
+
+## Re-applies resource_type/sprite_tint to the sprite - split out of _ready()
+## so a caller reconfiguring these exported fields at runtime (Farm's
+## crop-selection panel) can refresh the visual without needing _ready() to
+## run again (it only runs once, on entering the tree).
+func refresh_visual() -> void:
 	var visual: Dictionary = RESOURCE_VISUALS.get(resource_type, {})
 	if visual:
 		sprite.texture = visual["texture"]
 		sprite.centered = visual["centered"]
 		sprite.offset = visual["offset"]
+	else:
+		sprite.texture = _default_texture
+		sprite.centered = _default_centered
+		sprite.offset = _default_offset
 	sprite.modulate = sprite_tint
 
 

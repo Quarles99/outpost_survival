@@ -164,6 +164,23 @@ static func placeable_options() -> Array:
 	return OPTIONS.filter(func(option: Dictionary) -> bool: return option.has("grid_size"))
 
 
+## Options sharing a Farm-class scene (the original wood->food Farm plus
+## every Alternative Crop Types building - see farm.gd) - identified
+## structurally by which scene they instantiate rather than a hardcoded id
+## list, so a future Farm-family addition doesn't need to remember to
+## register here separately. Offered by Base's crop-selection panel when an
+## already-placed Farm-family building is clicked, letting the player
+## retool it into any other recipe in this list.
+const FARM_FAMILY_SCENE_PATHS := [
+	"res://scenes/workstation/Farm.tscn",
+	"res://scenes/workstation/CropStation.tscn",
+]
+
+
+static func farm_family_options() -> Array:
+	return OPTIONS.filter(func(option: Dictionary) -> bool: return option["scene"].resource_path in FARM_FAMILY_SCENE_PATHS)
+
+
 static func get_option(id: String) -> Dictionary:
 	for option in OPTIONS:
 		if option["id"] == id:

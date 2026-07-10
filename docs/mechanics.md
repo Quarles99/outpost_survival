@@ -66,6 +66,8 @@ The **Build** button opens a menu of buildable options as a grid of square icon 
 
 Only one building occupies any grid cell — buildings and trees share the same occupancy grid, so neither can ever be placed on top of the other.
 
+**Retooling a Farm-family building.** Every Alternative Crop Types building (and the original wood→food Farm) shares one underlying class, so any of them can be freely reconfigured into any other after the fact — click an already-placed one to open a panel of every Farm-family recipe and pick a different one. It's free and instant, not a rebuild: the building, its footprint, and any assigned worker all stay exactly as they were, and a worker already assigned just starts producing the new recipe on their next production tick with no interruption. Whatever was sitting in that building's input/output buffers under the old recipe is cleared, not carried over or converted.
+
 ## Saving & Loading
 
 Progress can be saved locally at any time and reloaded later (see [controls.md](controls.md) for the keys). A save captures: the full resource pool, population, water access, storage capacity, every tree in the world (position, maturity, remaining wood — a sapling mid-growth simply regrows from scratch on load rather than resuming at the exact same point), every player-placed building, everything sitting in workstation input/output buffers, and each citizen's skill progress and current work assignment. Loading merges saved resources onto the game's current resource list rather than replacing it wholesale, so an older save made before a resource type existed won't get stuck carrying over a stale value for it. There's no save-slot menu yet — it's a single local save file, overwritten each time.

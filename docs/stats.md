@@ -52,6 +52,8 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 | Fruit Orchard | 2×2 | 8 wood | — | Produces fruit (edible), no input needed — slower but reliable. |
 | Potato Farm | 2×2 | 6 wood | — | Produces potato (edible), no input needed. |
 
+All 8 of the above (Farm through Potato Farm) can be clicked once placed to retool into any other one of the 8, for free, at any time - see [mechanics.md](mechanics.md#building--placement).
+
 ## Workstation Production
 
 | | Farm | Lumber Camp | Stone Mine |

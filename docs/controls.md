@@ -39,6 +39,14 @@
 | Left-click (while placing, on a valid spot) | Confirm placement |
 | Right-click, or Esc (while placing) | Cancel placement |
 
+## Retooling a Farm
+
+| Input | Action |
+|---|---|
+| Left-click an already-placed Farm-family building | Open a panel to retool it into any other Farm-family recipe, free and instant |
+| `1`–`9` (with the retool panel open) | Choose the corresponding recipe |
+| Left-click empty ground, or Esc | Close the retool panel |
+
 ## Save / Load
 
 | Input | Action |

@@ -465,7 +465,74 @@ Implement these next:
       +/-15-40% swings read as noticeable without being punishing) -
       recommend a playtest.
 
-- Be able to select what crop to grow by selecting a farm
+- [DONE] Be able to select what crop to grow by selecting a farm
+    - Clicking any already-placed Farm-family building (the original
+      wood->food Farm, or any Alternative Crop Types building - all share
+      the Farm class, see farm.gd) now opens a new CropPanel (near-exact
+      clone of BuildMenu's icon-grid pattern, see scripts/crop_panel.gd/
+      scenes/ui/CropPanel.tscn) listing every Farm-family catalog option
+      (BuildingCatalog.farm_family_options(), found structurally by which
+      scene an option instantiates rather than a hardcoded id list).
+      Picking one is a free, instant retool - not a rebuild - via
+      Base._apply_crop_option(), reapplying the same
+      _apply_option_properties used at placement time directly onto the
+      existing node (resource_type/input_resource/input_per_tick/
+      output_per_tick/skill_id/sprite_tint/work_interval). An already-
+      assigned worker doesn't need to be interrupted: Character's work
+      loops re-read these fields fresh every loop iteration rather than
+      caching them, so the next production tick just uses the new recipe.
+      output_buffer/input_buffer are cleared on an interactive retool
+      (_on_crop_selected) - whatever was accumulated under the old recipe
+      doesn't carry over (e.g. half a load of grain about to become a
+      Bakery's flour input) - an accepted loss, same spirit as storage
+      overflow being lost elsewhere in this game rather than an accounting
+      bug.
+    - New Workstation.refresh_visual() (scripts/workstation.gd) extracts the
+      sprite texture/tint logic previously inlined in _ready() so it can be
+      re-run after a runtime field change; a new _default_texture/
+      _default_centered/_default_offset captured before the first
+      RESOURCE_VISUALS override lets it correctly revert to the scene's own
+      baked-in sprite when switching to a resource_type with no
+      RESOURCE_VISUALS entry (e.g. "grain"), rather than getting stuck on
+      whatever a previous resource_type happened to pick.
+    - Real gap caught and fixed while implementing this: both save and load
+      rebuild a Farm-family building's fields from a stored catalog
+      option_id, not by reading the live node - a retool would otherwise
+      silently revert on the next save/load round-trip. Fixed two ways: a
+      player-placed building's _placed_buildings entry now has its
+      option_id updated in place on retool (the existing save/load path
+      already rebuilds correctly from there); the one fixed scene-file
+      Farm ($Farm, not tracked in _placed_buildings at all) gets a new,
+      minimal save field (Base._fixed_farm_option_id) reapplied on load
+      before post_buffers are restored (so the load's actual saved buffer
+      values are authoritative, not the empty-buffer reset an interactive
+      retool wants).
+    - Did NOT restrict which Farm-family options are offered based on the
+      clicked building's own current recipe (e.g. a Bakery can be retooled
+      directly into a raw Fruit Orchard, not just other refinement steps) -
+      all 8 share one class and one worker-assignment slot, so any-to-any
+      felt like more player agency than it did a design risk, and scoping
+      it down would need a new "raw crop vs. refinement" catalog
+      distinction that doesn't exist yet. Also did NOT highlight/disable
+      the currently-active option in the panel - every retool (including
+      re-picking the current recipe, a harmless buffer-clearing no-op) is
+      offered uniformly; tracking "which option is this node currently" for
+      display purposes only felt like unnecessary bookkeeping for this pass.
+    - Verified headless: clicking a Farm-family building opens the panel
+      with all 8 options and a valid icon for each; selecting one correctly
+      reconfigures resource_type/input_resource/skill_id/sprite_tint and
+      clears both buffers; the visual-revert case (switching away from a
+      RESOURCE_VISUALS-covered type back to the generic default) was
+      confirmed by direct texture comparison. Separately verified full
+      save/load round-trips for both a retooled fixed $Farm and a retooled
+      player-placed building - both correctly restored the NEW recipe
+      (fields, skill_id) and the saved buffer amounts exactly, not the
+      pre-retool recipe or a cleared buffer. Not verified in-editor for
+      feel (panel positioning/overlap with other bottom-left panels,
+      whether "click a building to reconfigure it" reads intuitively
+      alongside "click a building's worker to assign them" - especially
+      relevant once the planned task-list removal below changes how
+      workstation clicks are otherwise handled) - recommend a playtest.
 
 - Maximum number of citizens per workstation
 

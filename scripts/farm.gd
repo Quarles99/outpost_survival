@@ -1,6 +1,12 @@
 extends Workstation
 class_name Farm
 
+## Base opens the crop-selection panel on this, letting the player retool
+## an already-placed Farm-family building into any other Farm-class recipe
+## (see BuildingCatalog.farm_family_options() and Base._on_farm_clicked) -
+## same clicked-signal pattern as OutpostHall's recruit-panel trigger.
+signal clicked
+
 ## Despite the name, Farm is a generic single-input/single-output converter,
 ## not just crop-growing: the original wood->food Farm and every Alternative
 ## Crop Types building (GrainFarm, Mill, Bakery, HopsFarm, Brewery,
@@ -24,3 +30,14 @@ func get_skill_id() -> String:
 
 func get_input_resource() -> String:
 	return input_resource
+
+
+func _ready() -> void:
+	super._ready()
+	input_event.connect(_on_input_event)
+
+
+func _on_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		get_viewport().set_input_as_handled()
+		clicked.emit()
