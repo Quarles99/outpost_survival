@@ -22,6 +22,8 @@ Every citizen eats continuously, once per second, whether or not they're doing a
 
 Clicking a citizen selects them and opens a skill panel showing all of their skill levels — there's no separate task menu. With a citizen selected, clicking a workstation or wall segment assigns them there (denied with a message if that post is already full); clicking the same, already-selected citizen again unassigns them instead. Dragging a citizen straight onto a post assigns them without selecting first. Either way, assignment doesn't interrupt what a citizen was already doing mid-task beyond the reassignment itself — see Gathering & Hauling below for what happens once they arrive.
 
+The Outpost Hall and any Storage Facility are also valid assignment targets, either by dragging a citizen onto one or selecting them and clicking it. This explicitly designates that citizen as a hauler — the same logistics work an unassigned citizen already does automatically, just as a deliberate, visible, savable assignment (shown as "Hauling" in their status) rather than only ever an implicit fallback for having nothing else to do.
+
 ## Gathering & Hauling
 
 Production isn't instant or teleported — it's a physical loop of walking, working, and hauling.

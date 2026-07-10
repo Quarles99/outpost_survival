@@ -27,8 +27,9 @@ There's no task menu — assignment is drag-and-drop, or select-then-click.
 |---|---|
 | Left-click a citizen | Select them, opening their skill panel |
 | Left-click a workstation/wall while a citizen is selected | Assign them to that post (denied with a HUD message if it's already at its worker cap) |
+| Left-click the Outpost Hall or a Storage Facility while a citizen is selected | Assign them there as a hauler |
 | Left-click the *same*, already-selected citizen again | Unassign them (set them idle) |
-| Left-click-drag a citizen onto a workstation/wall | Assign them to that post directly, without selecting first |
+| Left-click-drag a citizen onto a workstation/wall/Outpost Hall/Storage Facility | Assign them to that post directly, without selecting first |
 | Release a drag off any valid post | Cancels the drag — the citizen returns to their current spot without interrupting their work |
 | Right-click, or Esc, mid-drag | Cancel the drag |
 | Left-click empty ground, or Esc | Deselect the current citizen / close their skill panel |

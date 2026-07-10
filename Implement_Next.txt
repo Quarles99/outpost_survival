@@ -779,4 +779,47 @@ Implement these next:
       "farming" for every one; confirmed RecruitCatalog now only offers
       farming/lumberjacking/mining as recruit specializations.
 
+- [DONE] Drag a citizen onto a storehouse or Outpost Hall to assign as a hauler
+    - The Outpost Hall and Storage Facility now expose the same "post"
+      interface as Workstation/WallSegment (add_worker/remove_worker/
+      get_worker_spot/active_workers/max_workers, plus a pulse tween on
+      the first assigned worker) so both drag-drop and click-then-click
+      assignment work on them exactly like any other post - no special
+      casing needed in Base's generic _post_at()/_post_has_room()/
+      _assign_selected_to() dispatch. StorageFacility had to be converted
+      from a plain Node2D to an Area2D with a real CollisionShape2D first -
+      it had no collision shape at all, so it was never detectable by the
+      physics-point-query drag-drop resolution to begin with. Both cap at
+      10 workers (generous vs. Workstation's default 3 - haulers don't
+      share a production buffer, so there's no throughput reason to
+      bottleneck it, and unassigned/idle citizens already haul with no
+      cap at all today).
+    - Character.assign_to() gained a branch for these two post types that
+      calls _start_hauling() - the exact same coroutine an unassigned
+      citizen already runs by default - so this just makes "hauler" a
+      real, visible, capped, savable assignment (assigned_post actually
+      set, not null) instead of only ever an implicit fallback for having
+      nothing else to do. _update_label() shows "Hauling" for this
+      assignment too (not the raw building name), since the action is
+      what's worth surfacing, not which building they're stationed at.
+      Outpost Hall's own click handler (previously always opening the
+      recruit panel) now checks for a selected citizen first and assigns
+      instead, same priority rule Farm-family buildings already follow
+      for the crop-selection panel.
+    - Outpost Hall is now registered in Base.posts (with a "outpost_hall"
+      save_id, handled in _post_by_save_id like the other two fixed
+      buildings) so save/load round-trips a hauler assignment correctly;
+      a placed Storage Facility already gets a save_id automatically via
+      the existing generic placed-building path, needing no extra wiring.
+    - Verified headless: click-assigning a citizen to the Outpost Hall and
+      drag-equivalent-assigning another to a freshly placed Storage
+      Facility both correctly set assigned_post, incremented
+      active_workers, and showed "Hauling" in the status label; filling
+      the Outpost Hall to its 10-worker cap correctly denied an 11th;
+      a full save/load round-trip correctly restored a citizen's Outpost
+      Hall hauler assignment after manually unassigning them in between.
+      Not verified in-editor for feel (the pulse animation, whether
+      dragging onto these specific buildings reads as intuitively
+      "become a hauler" without any on-screen hint) - recommend a playtest.
+
 - Nothing else queued - add new items above this line to continue.

@@ -135,8 +135,10 @@ func _ready() -> void:
 
 	posts.append($Farm)
 	posts.append($Woodpile)
+	posts.append($OutpostHall)
 	$Farm.set_meta("save_id", "farm")
 	$Woodpile.set_meta("save_id", "woodpile")
+	$OutpostHall.set_meta("save_id", "outpost_hall")
 	_wire_farm_clicks($Farm)
 
 	_reserve_existing_footprint($OutpostHall, BuildingCatalog.get_option("outpost_hall")["grid_size"])
@@ -511,10 +513,15 @@ func _open_system_menu() -> void:
 	system_menu.open()
 
 
+## A citizen selected when the Outpost Hall is clicked assigns them there as
+## a hauler instead of opening the recruit panel - same "clicked posts take
+## priority for assignment over their other click behavior" rule
+## _on_farm_clicked already follows for the crop-selection panel.
 func _on_outpost_hall_clicked() -> void:
-	_cancel_placement()
 	if _selected_character:
-		_deselect()
+		_assign_selected_to($OutpostHall)
+		return
+	_cancel_placement()
 	build_menu.close()
 	crop_panel.close()
 	recruit_panel.open_for(RecruitCatalog.generate_candidates())
@@ -1056,6 +1063,8 @@ func _post_by_save_id(save_id: String) -> Node:
 		return $Farm
 	if save_id == "woodpile":
 		return $Woodpile
+	if save_id == "outpost_hall":
+		return $OutpostHall
 	for entry in _placed_buildings:
 		if entry["save_id"] == save_id:
 			return entry["node"]

@@ -40,6 +40,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Unified farming skill.** Every Farm-family building (including Mill/Bakery/Brewery, which briefly trained their own separate skills) now trains the same "farming" skill regardless of recipe. See [mechanics.md](mechanics.md#skills--leveling).
 
+**Explicit hauler assignment.** The Outpost Hall and any Storage Facility can now be dragged onto (or clicked while a citizen is selected) to explicitly assign that citizen as a hauler - the same logistics work an unassigned citizen already does automatically, now a deliberate, capped, savable assignment instead of only ever an implicit fallback. See [mechanics.md](mechanics.md#assigning-citizens).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.

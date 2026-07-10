@@ -137,6 +137,12 @@ func assign_to(post: Node) -> void:
 		_move_to(post.get_worker_spot() if post.has_method("get_worker_spot") else global_position)
 		if post is Workstation:
 			_start_work(post)
+		elif post is OutpostHall or post is StorageFacility:
+			## Explicitly assigned as a hauler - the same _run_hauler_loop
+			## an unassigned citizen already runs by default, just with a
+			## real assigned_post (savable, capped by max_workers) instead
+			## of only ever happening implicitly.
+			_start_hauling()
 	else:
 		_move_to(_home_position)
 		_start_hauling()
@@ -213,7 +219,12 @@ func _punch() -> void:
 func _update_label() -> void:
 	if not data:
 		return
-	var status: String = assigned_post.display_name if assigned_post else "Hauling"
+	## "Hauling" for no assignment at all, or an explicit hauler assignment
+	## (Outpost Hall/Storage Facility) - both run the exact same
+	## _run_hauler_loop, so the action is what's worth showing, not which
+	## building they're stationed at. Any other post shows its own name.
+	var is_hauler_post := assigned_post is OutpostHall or assigned_post is StorageFacility
+	var status: String = "Hauling" if (not assigned_post or is_hauler_post) else assigned_post.display_name
 	var skill_id := _current_skill_id()
 	if not skill_id.is_empty():
 		status += " · Lv %d" % data.get_skill_level(skill_id)
