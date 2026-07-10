@@ -46,7 +46,7 @@ The map starts with a scattered forest of mature trees around the starting Lumbe
 
 ## Skills & Leveling
 
-Every citizen has independent skill levels per activity (currently **farming**, **lumberjacking**, and **mining** — whatever post trains a skill is decided by the post type; wall-building doesn't train anything). Every Farm-family building trains **farming**, regardless of recipe — a Grain/Hops/Fruit/Potato farmer and someone running a Mill, Bakery, or Brewery are all training the same trade, despite converting completely different resources. Skills run on a classic RuneScape-style 1–99 curve: early levels come fast, but the climb toward 99 is a long, flattening grind, matching the "long grind, many hours" design intent.
+Every citizen has independent skill levels per activity (currently **farming**, **lumberjacking**, **mining**, **milling**, **baking**, and **brewing** — whatever post trains a skill is decided by the post type; wall-building doesn't train anything). The crop-chain buildings deliberately don't all train the same skill despite sharing a class — a Grain/Hops/Fruit/Potato farmer is training "farming," but running a Mill, Bakery, or Brewery is treated as a distinct trade. Skills run on a classic RuneScape-style 1–99 curve: early levels come fast, but the climb toward 99 is a long, flattening grind, matching the "long grind, many hours" design intent.
 
 Every gather action (a production tick, a chop) grants a flat amount of experience regardless of the worker's current level or output — xp rewards time spent working, not skill already gained, so higher levels don't also compound their advantage through faster xp gain.
 

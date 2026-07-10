@@ -38,7 +38,7 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Main menu with save/load UI.** The game now boots into a main menu (Continue / New Game / Load Game / Quit) instead of straight into the base, with 3 numbered save slots shown with their timestamp and population instead of one hidden fixed file. In-game, a new System Menu (`Esc`, or the HUD's Menu button) offers Save/Load/Main Menu/Quit alongside the existing `F5`/`F9` shortcuts. See [mechanics.md](mechanics.md#main-menu--saveload) and [controls.md](controls.md).
 
-**Unified farming skill.** Every Farm-family building (including Mill/Bakery/Brewery, which briefly trained their own separate skills) now trains the same "farming" skill regardless of recipe. See [mechanics.md](mechanics.md#skills--leveling).
+**Distinct crop-chain skills.** Grain/Hops/Fruit/Potato farming trains "farming," but Mill/Bakery/Brewery each train their own distinct skill (milling/baking/brewing) - briefly unified into one "farming" skill and then reverted, since those refinement trades aren't really farming. See [mechanics.md](mechanics.md#skills--leveling).
 
 **Explicit hauler assignment.** The Outpost Hall and any Storage Facility can now be dragged onto (or clicked while a citizen is selected) to explicitly assign that citizen as a hauler - the same logistics work an unassigned citizen already does automatically, now a deliberate, capped, savable assignment instead of only ever an implicit fallback. See [mechanics.md](mechanics.md#assigning-citizens).
 

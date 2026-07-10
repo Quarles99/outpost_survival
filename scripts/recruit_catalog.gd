@@ -9,15 +9,16 @@ const NAMES := [
 ]
 
 ## skill_id -> display label, for showing "Lv 5 Farming" etc. on cards.
-## Every Farm-family building trains "farming" regardless of recipe (see
-## Farm.get_skill_id()) - milling/baking/brewing used to be separate
-## specializations here but were reverted to plain "farming" along with
-## that - plus lumberjacking/mining, the other two trainable trades.
-## Deliberately not "labor", the dead generic Workstation default.
+## Covers every skill a Farm-family Workstation can currently train (see
+## farm.gd) plus lumberjacking/mining - deliberately not "labor", the dead
+## generic Workstation default.
 const SPECIALIZATIONS := {
 	"farming": "Farming",
 	"lumberjacking": "Lumberjacking",
 	"mining": "Mining",
+	"milling": "Milling",
+	"baking": "Baking",
+	"brewing": "Brewing",
 }
 
 ## Starting level in a candidate's specialization - a meaningful head start

@@ -822,4 +822,81 @@ Implement these next:
       dragging onto these specific buildings reads as intuitively
       "become a hauler" without any on-screen hint) - recommend a playtest.
 
+- Unique art for every building aligning with current design standards
+
+- Calculate income per minute for resources constantly looking back at the last minute of income rather than when turn ins happen
+
+- Fix stone miner not returning to mine after drop off at storehouse
+
+- Buildings should show how many of their worker slots are filled in the text field above them
+  - Most buildings should only allow 1 worker max
+
+- Farm efficiency buff when well is built
+  - I'm thinking more production for the same wood cost
+
+- [DONE] Seperate brewing, milling, and baking from farming skill
+    - Reverts last turn's unification (confirmed with user: that was a
+      misunderstanding - milling/baking/brewing aren't really farming).
+      Farm.gd's skill_id export is back, defaulting to "farming";
+      BuildingCatalog's mill/bakery/brewery entries set it back to
+      "milling"/"baking"/"brewing" respectively. Base.BUILDING_PROPERTIES,
+      RecruitCatalog.SPECIALIZATIONS, and SkillPanel.SKILL_DISPLAY_ORDER/
+      SKILL_LABELS all restored to include the 3 refinement skills again.
+    - Verified headless: instantiated Mill/Bakery/Brewery/Grain Farm from
+      their catalog entries and confirmed get_skill_id() returns
+      "milling"/"baking"/"brewing"/"farming" respectively.
+
+- Implement building system
+  - Citizens need to drop off building materials at building site
+  - Then preferring citizens with the highest proficiency in the new construction skill the building must be contructed which requires a certain amount of labor
+
+- Fix citizens not dropping off at storehouse and prefering outpost hall instead
+
+- Save citizens current position with save data
+
+- Citizens assigned to a job who are idle should help with hauling at other work sites
+
+- Replace basic farm with cabbage farm
+
+- Levels should improve efficiency in a skill
+  - ex. Same inputs -> more outputs
+  - exceptions are of course speed and strength which just scale higher
+
+- Track all types of food under the food category in the UI but have a collapsable drop down with individual food types listed as well
+  - Recruiting a new citizen will now offer a choice of citizens each costing one of the types of food with the higher tier foods granting citizens with higher starting levels, the higher level citizens should cost their particular food tier as well as an equal amount of all food from lower tiers, this keeps all food types relevant throughout progression
+
+- Allow the game window to scale with different resolutions
+  - Don't stretch the image
+
+- Implement floating then fading text indicating when a material is gathered, how much was gathered, and how much xp was gained
+  - This should be very minimal so as not to clutter the screen too much
+  - Satisfying feedback for steady progression
+
+- House upgrade with stone to increase capacity
+
+- Implement level 'titles' a citizen can earn for reaching certain levels in a skill
+  - Only one title can be active at a time, the highest one they have earned. If multiple of the same level choose current job title
+  - Shown below their name
+  - Apprentice -> Journeyman -> Master -> Grandmaster -> Legendary
+    - Precedes the job title ex. Legendary Farmer, Master Lumberjack
+
+- Remove starting buildings other than outpost hall
+  - Make sure starting resources are enough to build a lumber camp
+
+- Get rid of manual assignment system
+  - Each pawn should automatically take a job matching whatever their highest stat is
+  - Citizen who can't find a job will become haulers until a job opens up for their skill set
+  - If a citizen has a job but a new citizen arrives that has a higher skill in that job the previous job holder should swap for the better qualified citizen
+
+- Introduce day / night cycle
+  - Citizens need 8 hours of sleep a day
+    - Citizens prefer to sleep at night
+  - 4 hours of free time per day not counting sleep where a citizen doesn't have to work
+    - Get a happiness bonus during this time
+  - Initial 3 citizen can sleep in the outpost hall but others need houses
+  - Citizens eat 2 meals a day
+    - Citizens can carry food on them for their meals that day or pick it up from the storehouse when needed
+  - Economy will need to be rebalanced to take into account this downtime and still allow growth out of the early game
+  - Track current day and current time in the UI
+
 - Nothing else queued - add new items above this line to continue.
