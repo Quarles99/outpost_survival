@@ -833,7 +833,23 @@ Implement these next:
       whatever the nearest discrete sample happens to be. No further
       change needed.
 
-- Fix stone miner not returning to mine after drop off at storehouse
+- [DONE] Fix stone miner not returning to mine after drop off at storehouse
+    - Real bug in Character._run_generic_work_loop (used by StoneMine and
+      any other simple gatherer, not just Farm/LumberCamp which have their
+      own dedicated loops): _haul_to_stockpile() deliberately leaves the
+      character standing at the stockpile afterward (by design, for
+      LumberCamp - heads straight to its next tree rather than detouring
+      back through the camp first), but the generic loop never walked them
+      back to the post afterward the way Farm's loop already does. Once a
+      Stone Mine worker's first haul trip completed, every subsequent
+      production tick "happened" from wherever they were left standing at
+      the stockpile, forever - the mine itself sat empty and unattended.
+      Fixed by adding the same _move_to(post.get_worker_spot()) step
+      Farm's loop already has, right after a successful haul trip.
+    - Verified headless: placed a Stone Mine, forced a haul trip (set
+      carry_limit to 1.0 so it triggers almost immediately), and confirmed
+      the worker's position settled back at the mine's worker spot
+      (within ~1.5px) rather than staying at the stockpile.
 
 - Buildings should show how many of their worker slots are filled in the text field above them
   - Most buildings should only allow 1 worker max

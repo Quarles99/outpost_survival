@@ -477,6 +477,16 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 		if post.output_buffer >= _carry_capacity(post):
 			if not await _haul_to_stockpile(post, session, post.resource_type, ""):
 				return
+			## _haul_to_stockpile leaves the character standing at the
+			## stockpile - fine for a lumberjack (heads to a tree next
+			## anyway) but production for this generic case only happens
+			## back at the post, same as Farm's loop already accounts for.
+			## Without this, a Stone Mine (or any other generic post)
+			## worker would get stranded at the stockpile forever after
+			## their first haul trip, "producing" from there indefinitely.
+			await get_tree().create_timer(_move_to(post.get_worker_spot())).timeout
+			if session != _work_session:
+				return
 			continue
 
 		await get_tree().create_timer(post.work_interval).timeout
