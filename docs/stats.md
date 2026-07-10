@@ -158,6 +158,13 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | Possible specializations | farming, lumberjacking, mining, milling, baking, brewing |
 | Gated on | open population capacity, and affording the food cost |
 
+## Map Size (`IsoGround`, `Base.tscn`)
+
+| | Value |
+|---|---|
+| Playable grid | 28×28 tiles (784 total) |
+| Grid coordinate range | x: -12..15, y: -12..15 |
+
 ## Grid Projection (`IsoUtils`)
 
 | | Value |

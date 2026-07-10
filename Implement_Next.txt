@@ -377,8 +377,26 @@ Implement these next:
       recommend a playtest pass, especially since several buildings will
       look identical or near-identical at a glance (see above).
 
-- Increase the size of the map
+- [DONE] Increase the size of the map
   - At least 4 times current size
+    - Pure data change - WorldGrid's bounds and RtsCamera's pan/edge-scroll
+      limits were already computed dynamically from IsoGround's exported
+      width/depth/start_x/start_y in Base._ready(), so this was just
+      changing IsoGround's overrides in scenes/base/Base.tscn: 14x14 (196
+      tiles) -> 28x28 (784 tiles), exactly 4x the area. start_x/start_y
+      moved from -5/-5 to -12/-12 (not simply left at -5) so the map grows
+      symmetrically around the existing fixed buildings rather than only
+      outward in the positive direction, keeping Outpost Hall/Farm/Lumber
+      Camp centered in the bigger map the same way they were centered in
+      the old one. No code changes anywhere - no script hardcodes the old
+      14/196 size.
+    - Verified headless: tile count is 784, WorldGrid.bounds_min/max read
+      (-12,-12)/(15,15) as expected, and RtsCamera's limit_left/top/right/
+      bottom scaled up accordingly with no errors. Not verified in-editor
+      for feel (camera pan/zoom over the larger area, initial tree scatter
+      density now looking sparser relative to the bigger map) - recommend
+      a playtest, and consider raising INITIAL_TREE_COUNT/scatter radius
+      in a follow-up if the starting area reads too empty.
 
 - Add skills for speed and strength
   - Movement speed and carry weight respectively

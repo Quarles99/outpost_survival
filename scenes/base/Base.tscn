@@ -25,10 +25,10 @@ current = true
 
 [node name="IsoGround" parent="." instance=ExtResource("9")]
 position = Vector2(576, 170)
-start_x = -5
-start_y = -5
-width = 14
-depth = 14
+start_x = -12
+start_y = -12
+width = 28
+depth = 28
 
 [node name="OutpostHall" parent="." instance=ExtResource("13")]
 position = Vector2(576, 298)

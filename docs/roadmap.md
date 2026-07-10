@@ -20,13 +20,16 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Citizen recruitment.** Clicking the Outpost Hall offers 3 candidates, each with a different randomly-chosen specialization pre-trained to a head-start level; recruiting spends food and requires an open House slot. The starting 3 citizens (Aldric, Brenna, Cass) are no longer the whole game's roster — the town can now grow. See [mechanics.md](mechanics.md#citizen-recruitment).
 
+**Resource income/minute.** The HUD's Food/Wood/Stone rows now show a rolling net income-per-minute rate alongside the current amount, computed from a trailing 60-second window of resource-pool snapshots so bursty haul-trip deposits read as a steady rate.
+
+**Condensed build menu.** The build menu is now a grid of square icon buttons (real per-building texture + tint) with small keybind numbers, instead of a vertical list of full-width text buttons — hover an icon for its full name and cost.
+
+**Larger map.** The playable grid is now 28×28 tiles (784 total), 4x the original 14×14 — a pure data change, since bounds/camera limits were already computed dynamically from the ground's size.
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Not yet built. Listed in priority order as currently planned:
 
-- **Resource income/minute on the HUD** — a rate readout, not just the current totals the HUD shows today.
-- **Condensed build menu** — square icons with small keybind text, instead of today's text-list buttons.
-- **Larger map** — at least 4x the current playable area.
 - **Speed and strength skills** — movement speed and carry weight, trained passively by moving and carrying things (rather than a dedicated post).
 - **Happiness-level bonuses/debuffs** — settlement-wide effects tied to happiness bands, beyond today's "sustained low happiness → a citizen leaves."
 - **Per-farm crop selection** — choose what a Farm-family building grows/converts by clicking it, instead of the crop being fixed at build time by which catalog entry was placed.
