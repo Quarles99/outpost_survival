@@ -1,15 +1,11 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://scripts/task_panel.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/skill_panel.gd" id="1"]
 [ext_resource type="Theme" path="res://resources/theme/ui_theme.tres" id="2"]
-[ext_resource type="AudioStream" path="res://sound/ui_click.wav" id="3"]
 
-[node name="TaskPanel" type="CanvasLayer"]
+[node name="SkillPanel" type="CanvasLayer"]
 visible = false
 script = ExtResource("1")
-
-[node name="ClickSound" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("3")
 
 [node name="Control" type="Control" parent="."]
 theme = ExtResource("2")
@@ -18,8 +14,8 @@ anchor_top = 1.0
 anchor_right = 0.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -220.0
-offset_right = 236.0
+offset_top = -320.0
+offset_right = 260.0
 offset_bottom = -16.0
 
 [node name="Panel" type="Panel" parent="Control"]
@@ -37,7 +33,7 @@ offset_bottom = -10.0
 [node name="NameLabel" type="Label" parent="Control/Panel/VBoxContainer"]
 text = "Character"
 
-[node name="ButtonContainer" type="VBoxContainer" parent="Control/Panel/VBoxContainer"]
+[node name="SkillList" type="VBoxContainer" parent="Control/Panel/VBoxContainer"]
 
 [node name="EscLabel" type="Label" parent="Control/Panel/VBoxContainer"]
 modulate = Color(1, 1, 1, 0.6)

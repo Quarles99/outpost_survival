@@ -10,15 +10,17 @@
 
 ## Citizens
 
+There's no task menu — assignment is drag-and-drop, or select-then-click.
+
 | Input | Action |
 |---|---|
-| Left-click a citizen | Select them and open the task menu |
-| Left-click-drag a citizen onto a workstation/wall | Assign them to that post directly (skips the menu) |
+| Left-click a citizen | Select them, opening their skill panel |
+| Left-click a workstation/wall while a citizen is selected | Assign them to that post (denied with a HUD message if it's already at its worker cap) |
+| Left-click the *same*, already-selected citizen again | Unassign them (set them idle) |
+| Left-click-drag a citizen onto a workstation/wall | Assign them to that post directly, without selecting first |
 | Release a drag off any valid post | Cancels the drag — the citizen returns to their current spot without interrupting their work |
 | Right-click, or Esc, mid-drag | Cancel the drag |
-| `1`–`9` (with task menu open) | Assign the selected citizen to the corresponding listed post |
-| `0` (with task menu open) | Unassign the selected citizen (set them idle) |
-| Left-click empty ground, or Esc | Deselect the current citizen / close the task menu |
+| Left-click empty ground, or Esc | Deselect the current citizen / close their skill panel |
 
 ## Recruitment
 
@@ -43,7 +45,8 @@
 
 | Input | Action |
 |---|---|
-| Left-click an already-placed Farm-family building | Open a panel to retool it into any other Farm-family recipe, free and instant |
+| Left-click an already-placed Farm-family building, with no citizen selected | Open a panel to retool it into any other Farm-family recipe, free and instant |
+| Left-click an already-placed Farm-family building, with a citizen selected | Assign that citizen there instead (see Citizens above) — takes priority over retooling |
 | `1`–`9` (with the retool panel open) | Choose the corresponding recipe |
 | Left-click empty ground, or Esc | Close the retool panel |
 

@@ -26,7 +26,7 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Larger map.** The playable grid is now 28×28 tiles (784 total), 4x the original 14×14 — a pure data change, since bounds/camera limits were already computed dynamically from the ground's size.
 
-**Speed and strength skills.** Two universal skills every citizen trains passively regardless of assignment — speed from moving, strength from completing haul trips. Speed multiplies movement speed; strength multiplies how much a citizen can carry per trip beyond a workstation's base carry limit. Not surfaced in any UI yet — that's what the planned per-citizen skill panel below is for. See [mechanics.md](mechanics.md#skills--leveling).
+**Speed and strength skills.** Two universal skills every citizen trains passively regardless of assignment — speed from moving, strength from completing haul trips. Speed multiplies movement speed; strength multiplies how much a citizen can carry per trip beyond a workstation's base carry limit. Visible in the per-citizen skill panel (see below). See [mechanics.md](mechanics.md#skills--leveling).
 
 **Happiness bonuses/debuffs.** Settlement happiness now falls into one of four named bands (Thriving/Content/Unhappy/Miserable, shown on the HUD) each applying a flat production multiplier (1.15x down to 0.6x) on top of every worker's own skill multiplier — the game's first happiness effect beyond "leave if sustained low." See [mechanics.md](mechanics.md#happiness).
 
@@ -34,12 +34,11 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Worker caps.** Every Workstation now caps out at 3 assigned workers (Wall Segments, unchanged, still cap at 1) - generalized from a cap that used to be hardcoded as a WallSegment-only special case. See [mechanics.md](mechanics.md#gathering--hauling).
 
+**Task list removed, skill panel added.** Clicking a citizen no longer opens a menu of assignable posts - it selects them and opens a panel of all their skill levels instead. Assignment is now drag-and-drop, or click-citizen-then-click-post (denied with a message if that post is full); clicking an already-selected citizen again unassigns them. See [mechanics.md](mechanics.md#assigning-citizens).
+
 ## Planned Next (from `Implement_Next.txt`)
 
-Not yet built. Listed in priority order as currently planned:
-
-- **Remove the click-to-open task list** — assignment becomes drag-only, or click-citizen-then-click-workstation, instead of today's menu-of-posts panel.
-- **Per-citizen skill panel** — a condensed view of all of a citizen's skill levels, opened by clicking them (today only the task-assignment menu opens on click).
+Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.
 
 ## Long-Term Design Vision
 

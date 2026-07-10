@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/base.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/workstation/Farm.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/character/Character.tscn" id="3"]
-[ext_resource type="PackedScene" path="res://scenes/ui/TaskPanel.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/ui/SkillPanel.tscn" id="4"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="5"]
 [ext_resource type="Resource" path="res://resources/characters/aldric.tres" id="6"]
 [ext_resource type="Resource" path="res://resources/characters/brenna.tres" id="7"]
@@ -57,7 +57,7 @@ data = ExtResource("7")
 position = Vector2(768, 458)
 data = ExtResource("8")
 
-[node name="TaskPanel" parent="." instance=ExtResource("4")]
+[node name="SkillPanel" parent="." instance=ExtResource("4")]
 
 [node name="BuildMenu" parent="." instance=ExtResource("12")]
 

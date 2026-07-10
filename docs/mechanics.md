@@ -18,6 +18,10 @@ The town has a population count and a population capacity. You start with 3 citi
 
 Every citizen eats continuously, once per second, whether or not they're doing any work — this is the only per-citizen upkeep cost right now. Hunger draws from any eatable resource — **food, then bread, then potato, then fruit**, in that priority order — rather than only plain "food," so a stocked bakery or orchard extends how long the town can go without a farm surplus. Grain, flour, hops, and beer are intermediate or luxury goods and can't be eaten directly; beer in particular is reserved as a future happiness-boosting luxury good rather than a calorie source.
 
+## Assigning Citizens
+
+Clicking a citizen selects them and opens a skill panel showing all of their skill levels — there's no separate task menu. With a citizen selected, clicking a workstation or wall segment assigns them there (denied with a message if that post is already full); clicking the same, already-selected citizen again unassigns them instead. Dragging a citizen straight onto a post assigns them without selecting first. Either way, assignment doesn't interrupt what a citizen was already doing mid-task beyond the reassignment itself — see Gathering & Hauling below for what happens once they arrive.
+
 ## Gathering & Hauling
 
 Production isn't instant or teleported — it's a physical loop of walking, working, and hauling.
@@ -62,7 +66,7 @@ Clicking the Outpost Hall (rather than a citizen or a workstation) opens a recru
 
 ## Building & Placement
 
-The **Build** button opens a menu of buildable options as a grid of square icon buttons (numbered `1`-`9` for the first nine) — hover one to see its full name and cost, since neither fits on the icon itself. Selecting one drops a translucent "ghost" that follows the mouse, snapped to the isometric grid, tinted green if the spot is valid (in bounds, unoccupied, affordable) or red if not. Left-click confirms — spending the resources, reserving the footprint, and applying whatever passive bonus the building grants (population capacity, water access, or storage capacity). Buildings that can hold workers (Farm, Lumber Camp, Stone Mine, wall segments) automatically become assignable from the citizen task menu once placed; passive structures (House, Well, Storage Facility, Outpost Hall) never do.
+The **Build** button opens a menu of buildable options as a grid of square icon buttons (numbered `1`-`9` for the first nine) — hover one to see its full name and cost, since neither fits on the icon itself. Selecting one drops a translucent "ghost" that follows the mouse, snapped to the isometric grid, tinted green if the spot is valid (in bounds, unoccupied, affordable) or red if not. Left-click confirms — spending the resources, reserving the footprint, and applying whatever passive bonus the building grants (population capacity, water access, or storage capacity). Buildings that can hold workers (Farm, Lumber Camp, Stone Mine, wall segments) automatically become assignable once placed (see Assigning Citizens above); passive structures (House, Well, Storage Facility, Outpost Hall) never do.
 
 Only one building occupies any grid cell — buildings and trees share the same occupancy grid, so neither can ever be placed on top of the other.
 

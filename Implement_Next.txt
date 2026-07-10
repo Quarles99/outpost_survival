@@ -533,6 +533,25 @@ Implement these next:
       alongside "click a building's worker to assign them" - especially
       relevant once the planned task-list removal below changes how
       workstation clicks are otherwise handled) - recommend a playtest.
+    - Post-review fix: giving Farm an input_event/clicked handler broke
+      placing any Farm-family building via the build menu (and, as a
+      pre-existing latent bug from the earlier recruitment commit, placing
+      a second Outpost Hall too - it's placeable and has had the same kind
+      of handler since). The placement ghost is a live instance of the
+      real scene, so it follows the cursor and its own Area2D collision
+      shape sits right where a confirming click lands; that click fired the
+      ghost's own input_event first, which calls set_input_as_handled()
+      before Base._unhandled_input() ever sees it to run
+      _confirm_placement() - the same interception mechanism
+      _on_farm_clicked/_on_outpost_hall_clicked rely on to stop a click
+      from also deselecting, working against placement here instead of for
+      it. Headless verification couldn't have caught this - it requires
+      actual physics-picking/mouse input, not just checking the resulting
+      game state. Fixed generically rather than special-casing Farm:
+      Base._on_build_option_selected now sets
+      `ghost.input_pickable = false` for any ghost that's a
+      CollisionObject2D, so a future clickable post type placed via the
+      build menu won't reintroduce this.
 
 - [DONE] Maximum number of citizens per workstation
     - Generalized a pre-existing but hardcoded special case rather than
@@ -574,7 +593,44 @@ Implement these next:
       structurally identical to Workstation's already-verified path. Not
       verified in-editor.
 
-- Remove current task list UI from citizens
+- [DONE] Remove current task list UI from citizens
   - Have to be assigned by clicking and dragging or clicking on the citizen and then the workstation
+- [DONE] Implement skill level UI to citizens, to view all of their skill levels in a condensed layout when clicked on
+    - Implemented together since both change what clicking a citizen does.
+      TaskPanel (scripts/task_panel.gd, scenes/ui/TaskPanel.tscn) is deleted
+      outright, not just unwired - replaced by a new SkillPanel (scripts/
+      skill_panel.gd, scenes/ui/SkillPanel.tscn, near-identical slide/fade
+      shell to the other panels but a plain list of 8 "Skill: Lv N" labels,
+      not buttons - there's nothing to choose here). Clicking a citizen now
+      selects them and opens SkillPanel showing all 8 skills (the 6
+      work skills plus speed/strength), always all 8 including untrained
+      ones at level 1 so the layout doesn't reflow.
+    - Assignment is now: (1) drag-and-drop, unchanged, or (2) click a
+      citizen to select them, then click a workstation/wall to assign them
+      there - denied with a HUD flash if that post is already at its
+      max_workers (see the worker-cap item above). Clicking the *same*,
+      already-selected citizen again unassigns them (sets them idle) -
+      the replacement for the old task menu's "[0] Idle" option.
+    - Resolving "click a post while a citizen is selected" needed two
+      different mechanisms depending on the post: a Farm-family building
+      already intercepts its own click for the crop-selection panel (see
+      the crop-selection item above), so Base._on_farm_clicked now checks
+      _selected_character first and assigns instead of opening that panel
+      when one exists. Every other assignable post type (LumberCamp,
+      StoneMine, WallSegment) has no click handler of its own, so a new
+      generic branch in Base._unhandled_input resolves the click via the
+      same _post_at() physics point query drag-and-drop already uses.
+      Both paths share one new Base._assign_selected_to(post) helper.
+    - Verified headless: selecting a citizen opens the skill panel with
+      the correct name; re-clicking the same selected citizen unassigns
+      and deselects; clicking a non-Farm post (Lumber Camp) while selected
+      assigns correctly; clicking a Farm-family post while selected assigns
+      there instead of opening the crop panel; filling a Farm to its
+      3-worker cap and then selecting-and-clicking a 5th citizen onto it
+      correctly denies the assignment; clicking a Farm-family post with
+      nothing selected still opens the crop panel as before. Not verified
+      in-editor for feel (whether the skill panel's positioning/timing
+      reads well, whether "click twice to unassign" is discoverable without
+      the old menu spelling it out) - recommend a playtest.
 
-- Implement skill level UI to citizens, to view all of their skill levels in a condensed layout when clicked on
+- Nothing else queued - add new items above this line to continue.

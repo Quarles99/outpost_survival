@@ -60,7 +60,7 @@ const DRAG_THRESHOLD := 12.0
 
 const CHARACTER_SCENE := preload("res://scenes/character/Character.tscn")
 
-@onready var task_panel: TaskPanel = $TaskPanel
+@onready var skill_panel: SkillPanel = $SkillPanel
 @onready var build_menu: BuildMenu = $BuildMenu
 @onready var recruit_panel: RecruitPanel = $RecruitPanel
 @onready var crop_panel: CropPanel = $CropPanel
@@ -134,9 +134,6 @@ func _ready() -> void:
 		## indistinguishable from each other for save/load matching.
 		if character.data.id.is_empty():
 			character.data.id = character.name
-
-	task_panel.task_selected.connect(_on_task_selected)
-	task_panel.idle_selected.connect(_on_idle_selected)
 
 	build_menu.option_selected.connect(_on_build_option_selected)
 	hud.build_pressed.connect(_on_build_pressed)
@@ -287,7 +284,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _selected_character == null:
 		return
-	if (event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel"):
+	if event is InputEventMouseButton and event.pressed:
+		## A Farm-family post intercepts its own click before this ever runs
+		## (see _on_farm_clicked) - this only fires for post types with no
+		## click handler of their own (LumberCamp, StoneMine, WallSegment),
+		## resolved the same way a drag-drop already is: a physics point
+		## query against `posts`, not a per-post signal.
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			var post := _post_at(get_global_mouse_position())
+			if post:
+				_assign_selected_to(post)
+				return
+		_deselect()
+	elif event.is_action_pressed("ui_cancel"):
 		_deselect()
 
 
@@ -372,27 +381,37 @@ func _post_has_room(post: Node, for_character: Character = null) -> bool:
 	return post.active_workers < post.max_workers
 
 
+## Clicking a citizen selects them (opening their skill panel) rather than
+## opening a menu of assignable posts - assignment itself now happens by
+## dragging them onto a post, or by clicking a post while they're selected
+## (see _unhandled_input/_on_farm_clicked). Clicking the *same* already-
+## selected citizen again unassigns them instead (set them idle) rather
+## than being a no-op - with the old task menu's "[0] Idle" option gone,
+## this is the replacement gesture for "stop working."
 func _on_character_selected(character: Character) -> void:
 	if _placing_option:
 		return
-	if _selected_character and _selected_character != character:
+	if _selected_character == character:
+		character.assign_to(null)
+		_deselect()
+		return
+	if _selected_character:
 		_selected_character.set_selected(false)
 	_selected_character = character
 	_selected_character.set_selected(true)
-
-	var assignable := posts.filter(func(post: Node) -> bool: return _post_has_room(post, character))
-	task_panel.open_for(character, assignable)
+	skill_panel.open_for(character)
 
 
-func _on_task_selected(post: Node) -> void:
-	if _selected_character:
-		_selected_character.assign_to(post)
-	_deselect()
-
-
-func _on_idle_selected() -> void:
-	if _selected_character:
-		_selected_character.assign_to(null)
+## Assigns _selected_character to `post` if it has room (see
+## _post_has_room), or flashes a denial, then deselects either way -
+## shared by _unhandled_input's generic post click and _on_farm_clicked's
+## "a Farm was clicked while a citizen is selected" branch.
+func _assign_selected_to(post: Node) -> void:
+	var character := _selected_character
+	if _post_has_room(post, character):
+		character.assign_to(post)
+	else:
+		hud.flash_message("%s is full" % post.display_name)
 	_deselect()
 
 
@@ -400,7 +419,7 @@ func _deselect() -> void:
 	if _selected_character:
 		_selected_character.set_selected(false)
 	_selected_character = null
-	task_panel.close()
+	skill_panel.close()
 
 
 func _on_build_pressed() -> void:
@@ -431,10 +450,16 @@ func _wire_farm_clicks(building: Node) -> void:
 		building.clicked.connect(_on_farm_clicked.bind(building))
 
 
+## A Farm's own `clicked` signal (see Farm.gd) always reaches here first,
+## before _unhandled_input's generic post-click handling ever gets a look -
+## so unlike other post types, a Farm has to decide for itself whether a
+## click means "assign the selected citizen here" or "open the crop-
+## selection panel", based on whether a citizen happens to be selected.
 func _on_farm_clicked(farm: Farm) -> void:
-	_cancel_placement()
 	if _selected_character:
-		_deselect()
+		_assign_selected_to(farm)
+		return
+	_cancel_placement()
 	build_menu.close()
 	recruit_panel.close()
 	_crop_target = farm
@@ -538,6 +563,15 @@ func _on_build_option_selected(option: Dictionary) -> void:
 	_apply_option_properties(_ghost, option)
 	if _ghost.has_node("Label"):
 		_ghost.get_node("Label").visible = false
+	## Farm's (and any future clickable post's) input_event handler would
+	## otherwise fire on the ghost too - it follows the cursor, so it's
+	## almost always directly under it - and calls set_input_as_handled()
+	## before Base._unhandled_input() ever sees the click, silently
+	## swallowing the very click meant to confirm placement (see
+	## Base._on_outpost_hall_clicked/_on_farm_clicked for why that call
+	## reliably pre-empts _unhandled_input in this codebase).
+	if _ghost is CollisionObject2D:
+		(_ghost as CollisionObject2D).input_pickable = false
 	add_child(_ghost)
 	_update_ghost(to_local(get_global_mouse_position()))
 
