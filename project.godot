@@ -15,6 +15,23 @@ run/main_scene="res://scenes/menu/MainMenu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/resizable=true
+## "canvas_items" scales the whole 2D scene + UI together (not just a
+## naive stretch of the final image), so resizing the window keeps text/
+## sprites crisp and correctly proportioned at any size rather than
+## distorting them. "expand" (not "keep"/"keep_width"/"keep_height")
+## means a window with a different aspect ratio than the base 1280x720
+## just reveals more world/UI margin at the edges instead of letterboxing
+## or cropping - the closest match to "scale with resolution, don't
+## stretch the image" for a free-scrolling RTS camera that doesn't care
+## how much of the map is visible at once.
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
 [autoload]
 
 GameState="*res://autoload/game_state.gd"

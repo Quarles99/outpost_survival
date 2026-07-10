@@ -201,6 +201,15 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | Playable grid | 28×28 tiles (784 total) |
 | Grid coordinate range | x: -12..15, y: -12..15 |
 
+## Display (`project.godot`)
+
+| | Value |
+|---|---|
+| Base viewport size | 1280×720 |
+| Stretch mode | `canvas_items` (scales 2D scene + UI together) |
+| Stretch aspect | `expand` (extra window space reveals more world/UI margin, never stretches or letterboxes) |
+| Resizable | Yes |
+
 ## Save Slots (`SaveManager`)
 
 | | Value |

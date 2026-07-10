@@ -149,14 +149,17 @@ func snap_to_position(pos: Vector2) -> void:
 	position = pos
 
 
-func assign_to(post: Node) -> void:
+## `grant_move_xp` is false only when Base._restore_characters is about to
+## override this call's own placement with snap_to_position() right after -
+## see _move_to's doc comment for why that move shouldn't earn speed xp.
+func assign_to(post: Node, grant_move_xp: bool = true) -> void:
 	if assigned_post:
 		assigned_post.remove_worker()
 	_stop_work()
 	assigned_post = post
 	if post:
 		post.add_worker()
-		_move_to(post.get_worker_spot() if post.has_method("get_worker_spot") else global_position)
+		_move_to(post.get_worker_spot() if post.has_method("get_worker_spot") else global_position, grant_move_xp)
 		if post is Workstation:
 			_start_work(post)
 		elif post is OutpostHall or post is StorageFacility:
@@ -166,7 +169,7 @@ func assign_to(post: Node) -> void:
 			## of only ever happening implicitly.
 			_start_hauling()
 	else:
-		_move_to(_home_position)
+		_move_to(_home_position, grant_move_xp)
 		_start_hauling()
 	_update_label()
 	_punch()
@@ -219,14 +222,26 @@ func cancel_drag() -> void:
 	_move_to(target)
 
 
-func _move_to(target: Vector2) -> float:
+## `grant_xp` is false only for Base._restore_characters' initial
+## assign_to() call on load - that move is immediately overridden by
+## snap_to_position() right after (to place a loaded citizen exactly where
+## they were saved, not at their post/home spot), so the "movement" here
+## never actually happens and shouldn't earn speed xp. Without this, every
+## quickload would hand every restored citizen a free chunk of speed xp
+## (at least MIN_MOVE_DURATION's worth, more for a citizen far from their
+## post) for a tween that gets killed before it ever plays - repeatable
+## indefinitely via F9 spam, defeating the "reward time spent moving, not
+## just calling _move_to" principle SPEED_XP_PER_SECOND's doc comment
+## already establishes.
+func _move_to(target: Vector2, grant_xp: bool = true) -> float:
 	if _move_tween:
 		_move_tween.kill()
 	var speed_multiplier := data.get_skill_multiplier("speed") if data else 1.0
 	var duration := clampf(_base_position.distance_to(target) / (MOVE_SPEED * speed_multiplier), MIN_MOVE_DURATION, MAX_MOVE_DURATION)
 	_move_tween = create_tween()
 	_move_tween.tween_property(self, "_base_position", target, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_gain_skill_xp("speed", SPEED_XP_PER_SECOND * duration)
+	if grant_xp:
+		_gain_skill_xp("speed", SPEED_XP_PER_SECOND * duration)
 	return duration
 
 

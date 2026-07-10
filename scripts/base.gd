@@ -1048,11 +1048,18 @@ func _restore_characters(entries: Array) -> void:
 		character.data.skill_xp = (entry.get("skill_xp", {}) as Dictionary).duplicate()
 		character.data.happiness = float(entry.get("happiness", character.data.happiness))
 		character.data.unhappy_streak = int(entry.get("unhappy_streak", 0))
-		character.assign_to(_post_by_save_id(entry.get("assigned_save_id", "")))
-		## Overrides assign_to's own _move_to (toward the post/home
-		## position) with wherever this citizen actually was when saved -
-		## older saves without "position" just keep assign_to's placement,
-		## same as before this field existed.
+		## grant_move_xp=false: this call's own _move_to (toward the
+		## post/home position) is about to be overridden by
+		## snap_to_position() below (or just left as-is for an older save
+		## with no "position" field) - either way this placement isn't a
+		## real move the citizen made, so it shouldn't earn speed xp (see
+		## _move_to's doc comment). Without this, every load would hand
+		## every restored citizen a free chunk of speed xp.
+		character.assign_to(_post_by_save_id(entry.get("assigned_save_id", "")), false)
+		## Overrides assign_to's own placement with wherever this citizen
+		## actually was when saved - older saves without "position" just
+		## keep assign_to's post/home placement, same as before this field
+		## existed.
 		if entry.has("position"):
 			var pos_arr: Array = entry["position"]
 			character.snap_to_position(Vector2(pos_arr[0], pos_arr[1]))

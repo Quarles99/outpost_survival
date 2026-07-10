@@ -46,6 +46,10 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Explicit hauler assignment.** The Outpost Hall and any Storage Facility can now be dragged onto (or clicked while a citizen is selected) to explicitly assign that citizen as a hauler - the same logistics work an unassigned citizen already does automatically, now a deliberate, capped, savable assignment instead of only ever an implicit fallback. See [mechanics.md](mechanics.md#assigning-citizens).
 
+**Citizen position persists across save/load**, a blocked dedicated worker now assists hauling elsewhere instead of idling, and skill levels are a real efficiency gain (same input, more output) rather than just more throughput. See [mechanics.md](mechanics.md#saving--loading) and [mechanics.md](mechanics.md#gathering--hauling).
+
+**Resizable game window.** The window can now be resized/scale to different resolutions without stretching or distorting the image - see [stats.md](stats.md).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.

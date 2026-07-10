@@ -929,6 +929,18 @@ Implement these next:
     - Verified headless: moved a citizen to an arbitrary far-off position,
       saved, moved them elsewhere, loaded, and confirmed their position
       matched the saved one exactly.
+    - Post-review fix: assign_to()'s own _move_to call (made right before
+      snap_to_position() overrides it) was granting real "speed" xp for a
+      move that never actually plays - since _restore_characters calls
+      assign_to() for every character on every load, this handed every
+      restored citizen a free chunk of speed xp per load (at least
+      MIN_MOVE_DURATION's worth, more for one far from their post),
+      repeatable indefinitely via F9 spam. Predates this commit (the same
+      unconditional assign_to() call already existed in _restore_characters
+      before position saving did) but only just noticed while reviewing
+      this. Fixed by adding a grant_xp/grant_move_xp parameter threaded
+      through _move_to -> assign_to, defaulting to true everywhere except
+      _restore_characters's restoration call.
 
 - [DONE] Citizens assigned to a job who are idle should help with hauling at other work sites
     - Extracted the actual pickup/delivery execution out of
@@ -993,8 +1005,24 @@ Implement these next:
 - Track all types of food under the food category in the UI but have a collapsable drop down with individual food types listed as well
   - Recruiting a new citizen will now offer a choice of citizens each costing one of the types of food with the higher tier foods granting citizens with higher starting levels, the higher level citizens should cost their particular food tier as well as an equal amount of all food from lower tiers, this keeps all food types relevant throughout progression
 
-- Allow the game window to scale with different resolutions
+- [DONE] Allow the game window to scale with different resolutions
   - Don't stretch the image
+    - Added a [display] section to project.godot (base 1280x720,
+      window/size/resizable=true, previously using Godot's own bare
+      defaults with no explicit stretch settings at all). stretch/
+      mode="canvas_items" scales the whole 2D scene and UI together as
+      one image rather than a naive post-hoc stretch, so text/sprites
+      stay crisp and correctly proportioned at any window size.
+      stretch/aspect="expand" means a window with a different aspect
+      ratio than the base just reveals more world/UI margin at the edges
+      (rather than letterboxing black bars or cropping/distorting) - a
+      good fit for a free-scrolling RTS camera that doesn't care how much
+      of the map is visible at once.
+    - Not verified visually (this environment has no display/GUI to
+      actually resize a window in) - recommend an in-editor check:
+      resize the game window to a few different sizes/aspect ratios and
+      confirm nothing looks stretched or distorted, and that the HUD's
+      anchored corners still read correctly at each size.
 
 - Implement floating then fading text indicating when a material is gathered, how much was gathered, and how much xp was gained
   - This should be very minimal so as not to clutter the screen too much
