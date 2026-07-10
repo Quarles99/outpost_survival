@@ -52,6 +52,14 @@ var storage_capacity := BASE_STORAGE_CAPACITY
 ## exist (0 = no water access) rather than tracking an amount.
 var water_wells := 0
 
+## Settlement-wide production multiplier from the current happiness band -
+## Base recomputes this every happiness tick (see its HAPPINESS_BANDS) and
+## Character's work loops read it directly alongside each worker's own
+## skill multiplier. Lives here rather than on Base since production code
+## in character.gd already reaches into GameState for everything else it
+## needs, and this needs to be readable without a Base reference.
+var happiness_output_multiplier := 1.0
+
 var _consumption_timer: Timer
 
 ## Rolling history of resource-pool snapshots, used to compute an income/min

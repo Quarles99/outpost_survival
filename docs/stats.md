@@ -158,6 +158,15 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | Unhappy threshold | below 20 |
 | Consecutive unhappy ticks before a citizen leaves | 12 (12 × 5 s = 60 s) |
 
+### Happiness Bands (production multiplier)
+
+| Band | Settlement happiness | Output multiplier |
+|---|---|---|
+| Thriving | ≥ 80 | 1.15× |
+| Content | ≥ 50 | 1.0× |
+| Unhappy | ≥ 20 | 0.85× |
+| Miserable | < 20 | 0.6× |
+
 ## Citizen Recruitment (`RecruitCatalog`)
 
 | | Value |

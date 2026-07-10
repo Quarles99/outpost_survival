@@ -467,7 +467,7 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 			return
 
 		var multiplier: float = data.get_skill_multiplier(post.get_skill_id())
-		post.output_buffer += post.output_per_tick * multiplier
+		post.output_buffer += post.output_per_tick * multiplier * GameState.happiness_output_multiplier
 		gather_sound.play()
 		_gain_skill_xp(post.get_skill_id(), XP_PER_GATHER)
 
@@ -514,7 +514,7 @@ func _run_farm_loop(farm: Farm, session: int) -> void:
 			continue
 
 		farm.input_buffer -= input_needed
-		farm.output_buffer += farm.output_per_tick * multiplier
+		farm.output_buffer += farm.output_per_tick * multiplier * GameState.happiness_output_multiplier
 		gather_sound.play()
 		_gain_skill_xp(farm.get_skill_id(), XP_PER_GATHER)
 
@@ -570,7 +570,7 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 				break
 			var gained: float = tree.harvest(camp.wood_per_chop)
 			if gained > 0.0 and data:
-				camp.output_buffer += gained * data.get_skill_multiplier(camp.get_skill_id())
+				camp.output_buffer += gained * data.get_skill_multiplier(camp.get_skill_id()) * GameState.happiness_output_multiplier
 				gather_sound.play()
 				_gain_skill_xp(camp.get_skill_id(), XP_PER_GATHER)
 

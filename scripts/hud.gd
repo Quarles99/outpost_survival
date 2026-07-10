@@ -146,9 +146,12 @@ func _on_storage_capacity_changed(_capacity: float) -> void:
 ## Called directly by Base after each happiness tick, rather than through a
 ## GameState signal - the average is computed from the character roster,
 ## which Base owns and GameState has no reference to (same reasoning as
-## flash_message being a direct call rather than a signal).
-func set_happiness(average: float) -> void:
-	happiness_label.text = "Happiness: %d%%" % roundi(average)
+## flash_message being a direct call rather than a signal). `band_name` is
+## whichever of Base.HAPPINESS_BANDS the average currently falls into
+## ("Thriving"/"Content"/"Unhappy"/"Miserable") - shown so the production
+## bonus/debuff that band applies isn't invisible to the player.
+func set_happiness(average: float, band_name: String) -> void:
+	happiness_label.text = "Happiness: %d%% (%s)" % [roundi(average), band_name]
 	happiness_label.scale = PUNCH_SCALE
 	var tween := create_tween()
 	tween.tween_property(happiness_label, "scale", Vector2.ONE, 0.2).set_ease(Tween.EASE_OUT)

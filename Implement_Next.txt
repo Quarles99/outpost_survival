@@ -438,7 +438,32 @@ Implement these next:
       level-ups from movement alone feel like sound/punch-effect spam) -
       recommend a playtest.
 
-- Add bonuses and debuffs to certain global happiness levels
+- [DONE] Add bonuses and debuffs to certain global happiness levels
+    - Settlement happiness (Base.get_average_happiness()) now falls into one
+      of 4 bands (Base.HAPPINESS_BANDS): Thriving (>=80, 1.15x), Content
+      (>=50, 1.0x - the existing baseline target), Unhappy (>=20, 0.85x),
+      Miserable (<20, 0.6x - same threshold as UNHAPPY_THRESHOLD, where a
+      citizen is already accumulating toward leaving). Recomputed every
+      happiness tick alongside the existing per-citizen easing, and stored
+      as GameState.happiness_output_multiplier - a flat multiplier every
+      Workstation-family work loop in character.gd now applies on top of
+      the worker's own skill multiplier when adding to output_buffer
+      (Farm-class converters, generic loop, lumberjack chopping). Only
+      output is affected, not input consumption - an unhappy worker still
+      draws the same input but wastes more of it producing less, which
+      reads as a productivity/carelessness debuff rather than a hunger
+      change. HUD's happiness label now shows the band name alongside the
+      percentage ("Happiness: 87% (Thriving)") so the effect isn't invisible.
+    - Verified headless: forced settlement happiness to opposite extremes
+      (all citizens to 90, then to 10) a tick apart and confirmed
+      GameState.happiness_output_multiplier and the HUD label both updated
+      to the correct band (1.15x/Thriving at 87% eased-from-90, 0.6x/
+      Miserable at 13% eased-from-10) with no errors. Did not re-verify the
+      actual production-rate change end-to-end (trusted the multiplication
+      itself, already covered by the income/minute and skill-multiplier
+      tests earlier) - not verified in-editor for feel/balance (whether
+      +/-15-40% swings read as noticeable without being punishing) -
+      recommend a playtest.
 
 - Be able to select what crop to grow by selecting a farm
 

@@ -132,10 +132,15 @@ func _get_icon_data(option: Dictionary) -> Dictionary:
 		return _icon_cache[id]
 
 	var data := {"texture": null, "modulate": Color.WHITE}
-	var instance: Node = option["scene"].instantiate()
+	var instance: Node2D = option["scene"].instantiate()
 	for key in Base.BUILDING_PROPERTIES:
 		if option.has(key):
 			instance.set(key, option[key])
+	## Hidden before entering the tree - add_child()/queue_free() in the same
+	## call still leaves the node live for part of a frame, which would
+	## otherwise flash the full-size building at this CanvasLayer's origin
+	## (top-left of screen) for an instant the first time each icon loads.
+	instance.visible = false
 	add_child(instance)
 	if instance.has_node("Sprite2D"):
 		var sprite: Sprite2D = instance.get_node("Sprite2D")

@@ -28,11 +28,12 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Speed and strength skills.** Two universal skills every citizen trains passively regardless of assignment — speed from moving, strength from completing haul trips. Speed multiplies movement speed; strength multiplies how much a citizen can carry per trip beyond a workstation's base carry limit. Not surfaced in any UI yet — that's what the planned per-citizen skill panel below is for. See [mechanics.md](mechanics.md#skills--leveling).
 
+**Happiness bonuses/debuffs.** Settlement happiness now falls into one of four named bands (Thriving/Content/Unhappy/Miserable, shown on the HUD) each applying a flat production multiplier (1.15x down to 0.6x) on top of every worker's own skill multiplier — the game's first happiness effect beyond "leave if sustained low." See [mechanics.md](mechanics.md#happiness).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Not yet built. Listed in priority order as currently planned:
 
-- **Happiness-level bonuses/debuffs** — settlement-wide effects tied to happiness bands, beyond today's "sustained low happiness → a citizen leaves."
 - **Per-farm crop selection** — choose what a Farm-family building grows/converts by clicking it, instead of the crop being fixed at build time by which catalog entry was placed.
 - **Per-workstation worker cap** — a maximum number of citizens assignable to a single post (today's "multiple workers share one post's buffers" is uncapped).
 - **Remove the click-to-open task list** — assignment becomes drag-only, or click-citizen-then-click-workstation, instead of today's menu-of-posts panel.

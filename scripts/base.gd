@@ -38,6 +38,22 @@ const UNHAPPY_THRESHOLD := 20.0
 ## unhappiness before a citizen leaves for good - 12 * 5s = 60s.
 const LEAVE_AFTER_UNHAPPY_TICKS := 12
 
+## Settlement-wide production bonus/debuff bands, keyed by average
+## happiness - the game's first happiness effect beyond "leave if sustained
+## low" (see UNHAPPY_THRESHOLD/LEAVE_AFTER_UNHAPPY_TICKS above), applied as
+## a flat multiplier on top of each worker's own skill multiplier (see
+## GameState.happiness_output_multiplier and Character's work loops).
+## Thresholds line up with the existing HAPPINESS_BASELINE (50, "Content" -
+## the neutral 1.0x band) and UNHAPPY_THRESHOLD (20, where a citizen is
+## already at risk of leaving, and now also least productive). First-pass
+## numbers, not tuned via playtesting.
+const HAPPINESS_BANDS := [
+	{"min": 80.0, "name": "Thriving", "multiplier": 1.15},
+	{"min": 50.0, "name": "Content", "multiplier": 1.0},
+	{"min": 20.0, "name": "Unhappy", "multiplier": 0.85},
+	{"min": 0.0, "name": "Miserable", "multiplier": 0.6},
+]
+
 ## Minimum cursor travel (px) before a character press becomes a drag rather
 ## than a click.
 const DRAG_THRESHOLD := 12.0
@@ -115,7 +131,10 @@ func _ready() -> void:
 	happiness_timer.timeout.connect(_on_happiness_tick)
 	add_child(happiness_timer)
 	happiness_timer.start()
-	hud.set_happiness(get_average_happiness())
+	var initial_average := get_average_happiness()
+	var initial_band := _happiness_band(initial_average)
+	GameState.happiness_output_multiplier = initial_band["multiplier"]
+	hud.set_happiness(initial_average, initial_band["name"])
 
 
 func _configure_camera_limits(min_cell: Vector2i, max_cell: Vector2i) -> void:
@@ -167,7 +186,10 @@ func _on_happiness_tick() -> void:
 		else:
 			data.unhappy_streak = 0
 
-	hud.set_happiness(get_average_happiness())
+	var average := get_average_happiness()
+	var band := _happiness_band(average)
+	GameState.happiness_output_multiplier = band["multiplier"]
+	hud.set_happiness(average, band["name"])
 
 
 ## How many of GameState.FOOD_RESOURCES currently have stock - "food
@@ -178,6 +200,16 @@ func _food_variety_count() -> int:
 		if GameState.resources.get(resource_name, 0.0) > 0.0:
 			count += 1
 	return count
+
+
+## First entry in HAPPINESS_BANDS (highest "min" first) that `average`
+## clears - the bands' own ordering does the sorting, so this is just a
+## linear scan rather than needing them pre-sorted separately.
+func _happiness_band(average: float) -> Dictionary:
+	for band in HAPPINESS_BANDS:
+		if average >= band["min"]:
+			return band
+	return HAPPINESS_BANDS[-1]
 
 
 func get_average_happiness() -> float:
