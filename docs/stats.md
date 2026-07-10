@@ -106,12 +106,22 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 
 | | Value |
 |---|---|
-| Move speed | 140 px/s |
+| Move speed | 140 px/s (before the speed skill's multiplier) |
 | Min move duration (even for very short trips) | 0.3 s |
 | Max move duration (even for very long trips) | 4.0 s |
 | Pause at stockpile per haul trip | 0.3 s |
 | Idle retry delay (no work found / target too empty) | 2.5 s |
 | Minimum buffer amount worth an idle-hauler trip | 1.0 |
+
+## Speed & Strength (`Character`)
+
+| | Value |
+|---|---|
+| Speed xp per second spent moving | 2.5 |
+| Strength xp per haul trip that moved anything | 4.0 (same flat amount as XP_PER_GATHER) |
+| Effect of speed | Multiplies move speed (140 px/s base), same +2%/level curve as any other skill |
+| Effect of strength | Multiplies a workstation's base carry_limit for that character's own haul trips |
+| Trained by | Existing/moving (speed) and completing a haul trip (strength) - regardless of work assignment, unlike every other skill |
 
 ## Camera (`RtsCamera`)
 

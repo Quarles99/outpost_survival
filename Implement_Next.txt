@@ -398,9 +398,45 @@ Implement these next:
       a playtest, and consider raising INITIAL_TREE_COUNT/scatter radius
       in a follow-up if the starting area reads too empty.
 
-- Add skills for speed and strength
+- [DONE] Add skills for speed and strength
   - Movement speed and carry weight respectively
   - Trained by moving and carrying things
+    - Two universal skills every citizen trains passively regardless of
+      assignment (unlike farming/lumberjacking/etc., which only train while
+      working a specific post) - they ride the same SkillCurve/multiplier
+      system, just with different triggers and effects.
+      Character._move_to() now scales MOVE_SPEED by
+      get_skill_multiplier("speed") and grants speed xp proportional to the
+      move's duration (not a flat per-move amount) - this keeps xp/real-
+      time-spent-moving roughly constant regardless of level, the same
+      "reward time, not output" principle XP_PER_GATHER already follows for
+      gathering, applied to movement (a faster mover finishes each trip
+      sooner but makes proportionally more trips in the same time, rather
+      than snowballing).
+    - New Character._carry_capacity(post) = post.carry_limit *
+      get_skill_multiplier("strength") replaces every carry_limit reference
+      inside character.gd's haul/work-loop functions (pickup/delivery
+      amounts, the output-buffer-full haul trigger in all three work loops,
+      and the lumberjack's per-tree carry-out cap) - post.carry_limit itself
+      stays the building's own base stat, unchanged. A stronger character
+      moves more per trip and needs fewer trips to fully service a post;
+      strength xp (flat, like XP_PER_GATHER) is granted once per haul trip
+      that actually moved something, on either leg.
+    - Neither skill is shown in the UI yet (Character's status label only
+      shows the currently-assigned post's trained skill) - surfacing them
+      is exactly what the planned per-citizen skill panel (below) is for.
+    - Verified headless: ran a lumberjack for 90 real seconds and confirmed
+      both xp types accumulate from ordinary play (speed reached level 2
+      from walking alone; strength gained xp per haul trip, correctly not
+      yet enough for level 2 in that window) with no errors. Separately
+      confirmed the multiplier math directly: at a synthetic level 20
+      (1.38x), carry capacity read 8.28 against a base carry_limit of 6.0,
+      and move duration for a fixed 300px trip dropped from ~2.14s to
+      ~1.55s - both matching hand-computed expected values exactly. Not
+      verified in-editor for feel (how noticeable the speed-up/carry boost
+      reads visually at low levels, and whether the new frequent early
+      level-ups from movement alone feel like sound/punch-effect spam) -
+      recommend a playtest.
 
 - Add bonuses and debuffs to certain global happiness levels
 

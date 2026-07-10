@@ -25,6 +25,18 @@ const STOCKPILE_PAUSE := 0.3
 ## Idle haulers ignore a workstation buffer below this - not worth a whole
 ## round trip for a trickle.
 const HAUL_MIN_THRESHOLD := 1.0
+## "speed" and "strength" are universal skills every citizen trains just by
+## moving/carrying, regardless of what post (if any) they're assigned to -
+## unlike XP_PER_GATHER's per-tick skills, which only train while actively
+## working a post. Scaled by duration (not a flat per-move amount) so xp/
+## real-time-spent-moving stays roughly constant regardless of level: a
+## faster mover finishes each trip sooner but makes proportionally more
+## trips in the same time, rather than snowballing - the same "reward time,
+## not output" principle XP_PER_GATHER already follows, applied to movement.
+## Picked to land in the same rough xp/sec ballpark as XP_PER_GATHER's
+## while-working rate (4.0 per ~1.5s tick) - a first pass, not tuned via
+## playtesting.
+const SPEED_XP_PER_SECOND := 2.5
 
 @export var data: CharacterData
 var assigned_post: Node = null
@@ -182,9 +194,11 @@ func cancel_drag() -> void:
 func _move_to(target: Vector2) -> float:
 	if _move_tween:
 		_move_tween.kill()
-	var duration := clampf(_base_position.distance_to(target) / MOVE_SPEED, MIN_MOVE_DURATION, MAX_MOVE_DURATION)
+	var speed_multiplier := data.get_skill_multiplier("speed") if data else 1.0
+	var duration := clampf(_base_position.distance_to(target) / (MOVE_SPEED * speed_multiplier), MIN_MOVE_DURATION, MAX_MOVE_DURATION)
 	_move_tween = create_tween()
 	_move_tween.tween_property(self, "_base_position", target, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_gain_skill_xp("speed", SPEED_XP_PER_SECOND * duration)
 	return duration
 
 
@@ -230,6 +244,15 @@ func _on_skill_level_up() -> void:
 	_punch()
 	_update_label()
 	assign_sound.play()
+
+
+## How much of a post's resource_type/input_resource this specific character
+## can move in one trip - post.carry_limit (the building's own stat) scaled
+## by this character's strength. Used everywhere a haul function decides how
+## much to pick up/carry out/hold before hauling, so a stronger character
+## genuinely moves more per trip instead of strength being purely cosmetic.
+func _carry_capacity(post: Workstation) -> float:
+	return post.carry_limit * (data.get_skill_multiplier("strength") if data else 1.0)
 
 
 func _start_work(post: Node) -> void:
@@ -292,7 +315,8 @@ func _run_hauler_loop(session: int) -> void:
 ## CLAUDE.md's y-sort notes): either hauling a post's output_buffer out to
 ## the stockpile, or delivering its get_input_resource() in from the
 ## stockpile. Compares the two kinds by how much they'd move (both are
-## bounded by the same carry_limit in practice) and just takes the larger -
+## bounded by this character's own _carry_capacity in practice) and just
+## takes the larger -
 ## not a sophisticated priority system, but enough to stop a hauler
 ## fixating on one post type while another starves. Returns {} if nothing
 ## clears HAUL_MIN_THRESHOLD (or, for input jobs, if the stockpile has
@@ -320,7 +344,7 @@ func _find_haul_job() -> Dictionary:
 		var resource: String = post.get_input_resource()
 		if resource.is_empty():
 			continue
-		var deficit: float = post.carry_limit - post.input_buffer
+		var deficit: float = _carry_capacity(post) - post.input_buffer
 		if deficit > best_input_amount and GameState.resources.get(resource, 0.0) > 0.0:
 			best_input = post
 			best_input_amount = deficit
@@ -338,35 +362,45 @@ func _find_haul_job() -> Dictionary:
 ## - if `pickup_resource` is non-empty (Farm's own dedicated worker only; a
 ## generalist hauler delivers input via _deliver_to_post instead) -
 ## withdraws enough of it into post.input_buffer to top the buffer up to
-## carry_limit, further capped by what the stockpile actually has. Leaves
-## the character standing at the stockpile - it does NOT walk back to
-## `post` afterward, since not every caller wants that (a lumberjack should
-## head straight to the next tree, not detour back through the camp first;
-## a farm worker needs to return to keep producing and handles that itself
-## after calling this). Returns false if a reassignment (session change)
-## interrupted the trip, telling the caller to stop rather than keep going.
+## this character's _carry_capacity, further capped by what the stockpile
+## actually has. Leaves the character standing at the stockpile - it does
+## NOT walk back to `post` afterward, since not every caller wants that (a
+## lumberjack should head straight to the next tree, not detour back through
+## the camp first; a farm worker needs to return to keep producing and
+## handles that itself after calling this). Returns false if a reassignment
+## (session change) interrupted the trip, telling the caller to stop rather
+## than keep going. Grants strength xp once per trip that actually moved
+## anything (either leg), not per resource unit - see SPEED_XP_PER_SECOND's
+## doc comment for why xp scales with time/frequency of the activity rather
+## than with quantity carried.
 func _haul_to_stockpile(post: Workstation, session: int, drop_resource: String, pickup_resource: String) -> bool:
 	await get_tree().create_timer(_move_to(WorldGrid.stockpile_spot)).timeout
 	if session != _work_session:
 		return false
 
+	var carried := false
 	if post.output_buffer > 0.0:
 		GameState.add_resource(drop_resource, post.output_buffer)
 		post.output_buffer = 0.0
+		carried = true
 
 	if not pickup_resource.is_empty():
-		var take: float = minf(post.carry_limit - post.input_buffer, GameState.resources.get(pickup_resource, 0.0))
+		var take: float = minf(_carry_capacity(post) - post.input_buffer, GameState.resources.get(pickup_resource, 0.0))
 		if take > 0.0:
 			GameState.spend({pickup_resource: take})
 			post.input_buffer += take
+			carried = true
+
+	if carried:
+		_gain_skill_xp("strength", XP_PER_GATHER)
 
 	await get_tree().create_timer(STOCKPILE_PAUSE).timeout
 	return session == _work_session
 
 
 ## The reverse of _haul_to_stockpile: walks to the stockpile first,
-## withdraws up to post.carry_limit of `resource` (capped by post's
-## remaining input space and what the stockpile actually has), then walks
+## withdraws up to this character's _carry_capacity of `resource` (capped by
+## post's remaining input space and what the stockpile actually has), then walks
 ## the resource out to `post` and deposits it into input_buffer. Used by
 ## idle haulers delivering input a workstation needs; a dedicated worker
 ## (e.g. Farm's own) still self-services its own pickup via
@@ -379,7 +413,7 @@ func _deliver_to_post(post: Workstation, session: int, resource: String) -> bool
 	if session != _work_session:
 		return false
 
-	var take: float = minf(post.carry_limit - post.input_buffer, GameState.resources.get(resource, 0.0))
+	var take: float = minf(_carry_capacity(post) - post.input_buffer, GameState.resources.get(resource, 0.0))
 	if take <= 0.0:
 		return true
 	GameState.spend({resource: take})
@@ -399,26 +433,31 @@ func _deliver_to_post(post: Workstation, session: int, resource: String) -> bool
 	# Re-check post.input_buffer now, not the stale reading from when `take`
 	# was computed - another hauler (or the post's own dedicated worker) may
 	# have topped it up while this trip was in transit. Only unload what
-	# still fits; refund the rest to the stockpile instead of overshooting
-	# carry_limit or destroying it. Without this, multiple idle haulers
-	# converging on the same starved post all carry a full load computed
-	# against the same "empty" snapshot and stack past carry_limit on
-	# arrival.
-	var space: float = maxf(0.0, post.carry_limit - post.input_buffer)
+	# still fits, against THIS character's own _carry_capacity again (not a
+	# fixed post-level cap), so a strong hauler isn't punished with a refund
+	# just for exceeding the post's base carry_limit; refund the rest to the
+	# stockpile instead of overshooting or destroying it. Without this,
+	# multiple idle haulers converging on the same starved post all carry a
+	# full load computed against the same "empty" snapshot and stack past
+	# capacity on arrival.
+	var space: float = maxf(0.0, _carry_capacity(post) - post.input_buffer)
 	var delivered: float = minf(take, space)
 	post.input_buffer += delivered
 	if delivered < take:
 		GameState.add_resource(resource, take - delivered)
+	if delivered > 0.0:
+		_gain_skill_xp("strength", XP_PER_GATHER)
 	return true
 
 
 ## The plain-labor case: no input to manage, no special walking pattern
 ## (LumberCamp) - just produce output_per_tick every work_interval and haul
-## it out once carry_limit is hit. Used for any Workstation that isn't a
-## Farm or LumberCamp (e.g. StoneMine). Runs until reassigned.
+## it out once this character's _carry_capacity is hit (a stronger worker
+## accumulates more before a trip is worth making). Used for any Workstation
+## that isn't a Farm or LumberCamp (e.g. StoneMine). Runs until reassigned.
 func _run_generic_work_loop(post: Workstation, session: int) -> void:
 	while _work_active and session == _work_session:
-		if post.output_buffer >= post.carry_limit:
+		if post.output_buffer >= _carry_capacity(post):
 			if not await _haul_to_stockpile(post, session, post.resource_type, ""):
 				return
 			continue
@@ -446,7 +485,7 @@ func _run_farm_loop(farm: Farm, session: int) -> void:
 		var multiplier: float = data.get_skill_multiplier(farm.get_skill_id())
 		var input_needed: float = farm.input_per_tick * multiplier
 
-		if farm.input_buffer < input_needed or farm.output_buffer >= farm.carry_limit:
+		if farm.input_buffer < input_needed or farm.output_buffer >= _carry_capacity(farm):
 			if not await _haul_to_stockpile(farm, session, farm.resource_type, farm.get_input_resource()):
 				return
 			await get_tree().create_timer(_move_to(farm.get_worker_spot())).timeout
@@ -482,17 +521,18 @@ func _run_farm_loop(farm: Farm, session: int) -> void:
 
 ## Walk to a nearby tree and chop it (accumulating wood in the camp's
 ## output_buffer, not straight into the resource pool) until either the
-## tree runs out or the buffer hits carry_limit, hauling a full buffer to
-## the stockpile whenever it's ready. A tree that still has wood left when
-## carry_limit is hit is released (not depleted) so it - or another
-## worker - can pick it back up later. Before each chopping trip, tops up
-## the local forest toward camp.optimal_tree_count if it's short - this is
-## a shared area target, not a per-worker replant quota, so it plants
-## whether or not this worker is the one who did the chopping. Runs until
-## reassigned (session changes).
+## tree runs out or the buffer hits this character's _carry_capacity,
+## hauling a full buffer to the stockpile whenever it's ready. A tree that
+## still has wood left when capacity is hit is released (not depleted) so
+## it - or another worker - can pick it back up later; a stronger
+## lumberjack carries more per tree visit before that happens. Before each
+## chopping trip, tops up the local forest toward camp.optimal_tree_count if
+## it's short - this is a shared area target, not a per-worker replant
+## quota, so it plants whether or not this worker is the one who did the
+## chopping. Runs until reassigned (session changes).
 func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 	while _work_active and session == _work_session:
-		if camp.output_buffer >= camp.carry_limit:
+		if camp.output_buffer >= _carry_capacity(camp):
 			if not await _haul_to_stockpile(camp, session, "wood", ""):
 				return
 			continue
@@ -522,7 +562,7 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 		if session != _work_session:
 			return
 
-		while _work_active and session == _work_session and is_instance_valid(tree) and tree.wood_remaining > 0.0 and camp.output_buffer < camp.carry_limit:
+		while _work_active and session == _work_session and is_instance_valid(tree) and tree.wood_remaining > 0.0 and camp.output_buffer < _carry_capacity(camp):
 			await get_tree().create_timer(camp.chop_interval).timeout
 			if session != _work_session:
 				return

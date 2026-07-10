@@ -26,11 +26,12 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Larger map.** The playable grid is now 28×28 tiles (784 total), 4x the original 14×14 — a pure data change, since bounds/camera limits were already computed dynamically from the ground's size.
 
+**Speed and strength skills.** Two universal skills every citizen trains passively regardless of assignment — speed from moving, strength from completing haul trips. Speed multiplies movement speed; strength multiplies how much a citizen can carry per trip beyond a workstation's base carry limit. Not surfaced in any UI yet — that's what the planned per-citizen skill panel below is for. See [mechanics.md](mechanics.md#skills--leveling).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Not yet built. Listed in priority order as currently planned:
 
-- **Speed and strength skills** — movement speed and carry weight, trained passively by moving and carrying things (rather than a dedicated post).
 - **Happiness-level bonuses/debuffs** — settlement-wide effects tied to happiness bands, beyond today's "sustained low happiness → a citizen leaves."
 - **Per-farm crop selection** — choose what a Farm-family building grows/converts by clicking it, instead of the crop being fixed at build time by which catalog entry was placed.
 - **Per-workstation worker cap** — a maximum number of citizens assignable to a single post (today's "multiple workers share one post's buffers" is uncapped).
