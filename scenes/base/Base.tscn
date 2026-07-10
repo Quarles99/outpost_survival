@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://scenes/building/OutpostHall.tscn" id="13"]
 [ext_resource type="PackedScene" path="res://scenes/workstation/LumberCamp.tscn" id="14"]
 [ext_resource type="Script" path="res://scripts/rts_camera.gd" id="15"]
+[ext_resource type="PackedScene" path="res://scenes/ui/RecruitPanel.tscn" id="16"]
 
 [node name="Base" type="Node2D"]
 script = ExtResource("1")
@@ -58,5 +59,7 @@ data = ExtResource("8")
 [node name="TaskPanel" parent="." instance=ExtResource("4")]
 
 [node name="BuildMenu" parent="." instance=ExtResource("12")]
+
+[node name="RecruitPanel" parent="." instance=ExtResource("16")]
 
 [node name="HUD" parent="." instance=ExtResource("5")]

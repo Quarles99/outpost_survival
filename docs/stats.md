@@ -124,6 +124,32 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | Edge-scroll speed | 900 px/s (world space, scaled by zoom) |
 | Extra pan room beyond map bounds | 320 world units |
 
+## Happiness (`Base`, `CharacterData`)
+
+| | Value |
+|---|---|
+| Happiness range | 0–100 |
+| Starting happiness | 50 |
+| Happiness re-target tick interval | 5 s |
+| Ease rate (max change per tick) | 3.0 toward target |
+| Baseline target (before bonuses/penalties) | 50 |
+| Water access bonus/penalty | ±15 |
+| Food-in-stock bonus | +15 |
+| Starving (no food at all) penalty | −20 |
+| Bonus per distinct food-equivalent resource in stock | +5 (see food-equivalent list above) |
+| Unhappy threshold | below 20 |
+| Consecutive unhappy ticks before a citizen leaves | 12 (12 × 5 s = 60 s) |
+
+## Citizen Recruitment (`RecruitCatalog`)
+
+| | Value |
+|---|---|
+| Candidates offered per visit | 3 |
+| Recruit cost | 15 food |
+| Starting specialization level | 5 |
+| Possible specializations | farming, lumberjacking, mining, milling, baking, brewing |
+| Gated on | open population capacity, and affording the food cost |
+
 ## Grid Projection (`IsoUtils`)
 
 | | Value |

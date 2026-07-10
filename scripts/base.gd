@@ -18,12 +18,35 @@ const BUILDING_PROPERTIES := [
 const INITIAL_TREE_COUNT := 12
 const INITIAL_TREE_RADIUS := 5.0
 
+## --- Happiness ---------------------------------------------------------
+## Every tick, each citizen's happiness eases toward a target recomputed
+## from current settlement conditions (see _on_happiness_tick) rather than
+## jumping straight to it - HAPPINESS_EASE_RATE caps how much it can move
+## per tick, so a sudden change in conditions takes several ticks to be
+## fully felt. Numbers below are a first pass, not iterated on via
+## playtesting.
+const HAPPINESS_TICK_INTERVAL := 5.0
+const HAPPINESS_EASE_RATE := 3.0
+const HAPPINESS_BASELINE := 50.0
+const HAPPINESS_WATER_BONUS := 15.0
+const HAPPINESS_FOOD_BONUS := 15.0
+const HAPPINESS_STARVING_PENALTY := 20.0
+const HAPPINESS_PER_FOOD_VARIETY := 5.0
+## Below this, a citizen is "unhappy" and starts accumulating toward leaving.
+const UNHAPPY_THRESHOLD := 20.0
+## Consecutive ticks (at HAPPINESS_TICK_INTERVAL each) of sustained
+## unhappiness before a citizen leaves for good - 12 * 5s = 60s.
+const LEAVE_AFTER_UNHAPPY_TICKS := 12
+
 ## Minimum cursor travel (px) before a character press becomes a drag rather
 ## than a click.
 const DRAG_THRESHOLD := 12.0
 
+const CHARACTER_SCENE := preload("res://scenes/character/Character.tscn")
+
 @onready var task_panel: TaskPanel = $TaskPanel
 @onready var build_menu: BuildMenu = $BuildMenu
+@onready var recruit_panel: RecruitPanel = $RecruitPanel
 @onready var hud: HUD = $HUD
 @onready var iso_ground: IsoGround = $IsoGround
 @onready var camera: RtsCamera = $Camera2D
@@ -78,6 +101,16 @@ func _ready() -> void:
 	build_menu.option_selected.connect(_on_build_option_selected)
 	hud.build_pressed.connect(_on_build_pressed)
 
+	recruit_panel.candidate_selected.connect(_on_candidate_selected)
+	$OutpostHall.clicked.connect(_on_outpost_hall_clicked)
+
+	var happiness_timer := Timer.new()
+	happiness_timer.wait_time = HAPPINESS_TICK_INTERVAL
+	happiness_timer.timeout.connect(_on_happiness_tick)
+	add_child(happiness_timer)
+	happiness_timer.start()
+	hud.set_happiness(get_average_happiness())
+
 
 func _configure_camera_limits(min_cell: Vector2i, max_cell: Vector2i) -> void:
 	var corners := [
@@ -103,6 +136,72 @@ func _scatter_initial_trees() -> void:
 		WorldGrid.plant_tree(cell, true)
 
 
+## Recomputes a target happiness from current settlement conditions and
+## eases every citizen toward it (see HAPPINESS_EASE_RATE), rather than
+## setting happiness directly - conditions changing (e.g. the well running
+## dry) should be felt gradually, not as an instant jump. Citizens who've
+## sat below UNHAPPY_THRESHOLD for LEAVE_AFTER_UNHAPPY_TICKS consecutive
+## ticks leave for good.
+func _on_happiness_tick() -> void:
+	var target := HAPPINESS_BASELINE
+	target += HAPPINESS_WATER_BONUS if GameState.has_water() else -HAPPINESS_WATER_BONUS
+	target += HAPPINESS_FOOD_BONUS if GameState.resources.get("food", 0.0) > 0.0 else -HAPPINESS_STARVING_PENALTY
+	target += _food_variety_count() * HAPPINESS_PER_FOOD_VARIETY
+	target = clampf(target, 0.0, 100.0)
+
+	for character in characters.duplicate():
+		if not is_instance_valid(character):
+			continue
+		var data: CharacterData = character.data
+		data.happiness = move_toward(data.happiness, target, HAPPINESS_EASE_RATE)
+		if data.happiness < UNHAPPY_THRESHOLD:
+			data.unhappy_streak += 1
+			if data.unhappy_streak >= LEAVE_AFTER_UNHAPPY_TICKS:
+				_character_leaves(character)
+		else:
+			data.unhappy_streak = 0
+
+	hud.set_happiness(get_average_happiness())
+
+
+## How many of GameState.FOOD_RESOURCES currently have stock - "food
+## variety gives improved happiness" per the design doc.
+func _food_variety_count() -> int:
+	var count := 0
+	for resource_name in GameState.FOOD_RESOURCES:
+		if GameState.resources.get(resource_name, 0.0) > 0.0:
+			count += 1
+	return count
+
+
+func get_average_happiness() -> float:
+	if characters.is_empty():
+		return 0.0
+	var total := 0.0
+	for character in characters:
+		total += character.data.happiness
+	return total / characters.size()
+
+
+## A citizen departing for good - perma-death's sibling for "left rather
+## than died" (see the design doc's Core Systems notes on perma-death).
+## Permanent within THIS session: nothing un-departs them short of loading a
+## save from before they left, same as any other town state a load reverts -
+## _restore_characters recreates whoever's in the save but missing from the
+## live roster (see its own docs), recruits and departed citizens alike.
+func _character_leaves(character: Character) -> void:
+	character.leave()
+	if _selected_character == character:
+		_deselect()
+	if _drag_character == character:
+		_drag_character = null
+		_drag_moved = false
+	characters.erase(character)
+	GameState.population_count = maxi(0, GameState.population_count - 1)
+	GameState.population_changed.emit(GameState.population_count, GameState.population_capacity)
+	character.queue_free()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F5:
@@ -121,6 +220,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if build_menu.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
 		build_menu.close()
+		return
+	if recruit_panel.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
+		recruit_panel.close()
 		return
 	if _selected_character == null:
 		return
@@ -230,7 +332,54 @@ func _on_build_pressed() -> void:
 	_cancel_placement()
 	if _selected_character:
 		_deselect()
+	recruit_panel.close()
 	build_menu.open_for(BuildingCatalog.placeable_options())
+
+
+func _on_outpost_hall_clicked() -> void:
+	_cancel_placement()
+	if _selected_character:
+		_deselect()
+	build_menu.close()
+	recruit_panel.open_for(RecruitCatalog.generate_candidates())
+
+
+func _on_candidate_selected(candidate: Dictionary) -> void:
+	if GameState.population_count >= GameState.population_capacity:
+		hud.flash_message("No housing available")
+		return
+	if not GameState.can_afford(RecruitCatalog.RECRUIT_COST):
+		hud.flash_message("Not enough food")
+		return
+	GameState.spend(RecruitCatalog.RECRUIT_COST)
+
+	var character := _spawn_character(candidate["name"], $OutpostHall.get_stockpile_spot())
+	character.data.skill_xp[candidate["skill_id"]] = candidate["starting_xp"]
+
+	GameState.population_count += 1
+	GameState.population_changed.emit(GameState.population_count, GameState.population_capacity)
+	hud.flash_message("%s joined the outpost" % character.data.character_name)
+
+
+## Instantiates a fresh Character with a fresh CharacterData (not a shared
+## .tres like Aldric/Brenna/Cass - recruits are procedurally generated, not
+## hand-authored) and registers it exactly like the 3 starting citizens are
+## in _ready(): added as a direct child of Base (required for y-sorting -
+## see CLAUDE.md), appended to `characters`, wired to drag_started. Does NOT
+## touch GameState.population_count or spend anything - callers decide
+## whether that applies (a fresh recruit does both; _restore_characters
+## recreating a missing citizen from a save does neither, since the saved
+## population_count already accounts for them).
+func _spawn_character(character_name: String, spawn_position: Vector2) -> Character:
+	var data := CharacterData.new()
+	data.character_name = character_name
+	var character: Character = CHARACTER_SCENE.instantiate()
+	character.data = data
+	character.position = spawn_position
+	add_child(character)
+	characters.append(character)
+	character.drag_started.connect(_on_character_drag_started)
+	return character
 
 
 func _on_build_option_selected(option: Dictionary) -> void:
@@ -428,6 +577,16 @@ func _load_game() -> void:
 	_restore_post_buffers(data.get("post_buffers", {}))
 	_restore_characters(data.get("characters", []))
 
+	## Reconcile against reality rather than trusting the saved number: a
+	## citizen who left (permanently) during the current session can't be
+	## un-departed by loading an older save that still had them, so
+	## `characters` may now be smaller than data["population_count"]. With
+	## no recruitment system yet, every citizen is exactly one Character
+	## node, so population_count should always equal characters.size().
+	if GameState.population_count != characters.size():
+		GameState.population_count = characters.size()
+		GameState.population_changed.emit(GameState.population_count, GameState.population_capacity)
+
 	hud.flash_message("Loaded")
 
 
@@ -535,23 +694,35 @@ func _serialize_characters() -> Array:
 		out.append({
 			"name": character.data.character_name,
 			"skill_xp": character.data.skill_xp.duplicate(),
+			"happiness": character.data.happiness,
+			"unhappy_streak": character.data.unhappy_streak,
 			"assigned_save_id": save_id,
 		})
 	return out
 
 
-## Matched by character_name against the fixed Aldric/Brenna/Cass nodes -
-## there's no recruitment system yet that could add or remove a character.
+## Matched by character_name against whoever's currently in `characters`. A
+## saved entry with no live match is recreated via _spawn_character rather
+## than silently dropped - this covers both a recruit that doesn't exist yet
+## on a fresh game boot (only Aldric/Brenna/Cass start in the scene file)
+## and a citizen who left after the save being loaded was made (loading is
+## reverting to that point in time, so they should come back, same as any
+## other town state a load reverts). _spawn_character deliberately doesn't
+## touch population_count/spend anything - the save's wholesale
+## population_count already accounts for every entry being restored here.
 func _restore_characters(entries: Array) -> void:
 	var by_name := {}
 	for character in characters:
 		by_name[character.data.character_name] = character
 
 	for entry in entries:
-		var character: Character = by_name.get(entry.get("name", ""))
+		var entry_name: String = entry.get("name", "")
+		var character: Character = by_name.get(entry_name)
 		if not character:
-			continue
+			character = _spawn_character(entry_name, $OutpostHall.get_stockpile_spot())
 		character.data.skill_xp = (entry.get("skill_xp", {}) as Dictionary).duplicate()
+		character.data.happiness = float(entry.get("happiness", character.data.happiness))
+		character.data.unhappy_streak = int(entry.get("unhappy_streak", 0))
 		character.assign_to(_post_by_save_id(entry.get("assigned_save_id", "")))
 
 

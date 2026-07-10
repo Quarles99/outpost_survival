@@ -16,13 +16,23 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Alternative crop types.** The full grain→flour→bread and hops→beer refinement chains, plus fruit and potato as simple no-input crops, are all buildable now (Grain Farm, Mill, Bakery, Hops Farm, Brewery, Fruit Orchard, Potato Farm — see [stats.md](stats.md#workstation-production) for the full chain). Rather than seven new subclasses, the `Farm` class was generalized into a configurable single-input/single-output converter that all seven (and the original wood→food Farm) share. Bread, potato, and fruit count toward hunger like plain food does; grain, flour, hops, and beer are intermediate/luxury goods that don't feed anyone directly — beer specifically is reserved for the happiness system below. The 7 new resource types aren't individually shown on the HUD yet (only Food/Wood/Stone/Water have rows there) — they're fully functional, just not surfaced in the compact corner panel.
 
+**Happiness system.** Each citizen has individual happiness (0–100) that eases toward a target recomputed from water access, food stock, and food variety, rather than jumping instantly. Settlement happiness (shown on the HUD) is the average across all citizens. A citizen whose happiness stays below threshold for a sustained stretch leaves the settlement for good — the game's first mechanic where a resource shortfall costs more than stalled production. This is what finally makes the Well's water access and food variety matter mechanically. See [mechanics.md](mechanics.md#happiness).
+
+**Citizen recruitment.** Clicking the Outpost Hall offers 3 candidates, each with a different randomly-chosen specialization pre-trained to a head-start level; recruiting spends food and requires an open House slot. The starting 3 citizens (Aldric, Brenna, Cass) are no longer the whole game's roster — the town can now grow. See [mechanics.md](mechanics.md#citizen-recruitment).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Not yet built. Listed in priority order as currently planned:
 
-- **Happiness system** — each citizen has individual happiness, averaged into settlement-wide happiness. Access to water/food raises it, shortages lower it, food variety raises it further. Sustained low happiness risks a citizen leaving. This will be the game's first mechanic with a *negative* consequence for resource shortfalls — today, running out of any resource just stalls production, nothing worse. This is also what will finally make the Well's water access and beer matter mechanically.
-- **Citizen recruitment** — spend food at the Outpost Hall to recruit a new citizen, choosing between 3 candidates with different starting skills. Today's 3 citizens (Aldric, Brenna, Cass) are fixed for the whole game — there's no way to grow the roster.
 - **Resource income/minute on the HUD** — a rate readout, not just the current totals the HUD shows today.
+- **Condensed build menu** — square icons with small keybind text, instead of today's text-list buttons.
+- **Larger map** — at least 4x the current playable area.
+- **Speed and strength skills** — movement speed and carry weight, trained passively by moving and carrying things (rather than a dedicated post).
+- **Happiness-level bonuses/debuffs** — settlement-wide effects tied to happiness bands, beyond today's "sustained low happiness → a citizen leaves."
+- **Per-farm crop selection** — choose what a Farm-family building grows/converts by clicking it, instead of the crop being fixed at build time by which catalog entry was placed.
+- **Per-workstation worker cap** — a maximum number of citizens assignable to a single post (today's "multiple workers share one post's buffers" is uncapped).
+- **Remove the click-to-open task list** — assignment becomes drag-only, or click-citizen-then-click-workstation, instead of today's menu-of-posts panel.
+- **Per-citizen skill panel** — a condensed view of all of a citizen's skill levels, opened by clicking them (today only the task-assignment menu opens on click).
 
 ## Long-Term Design Vision
 

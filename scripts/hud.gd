@@ -11,6 +11,7 @@ const PUNCH_SCALE := Vector2(1.15, 1.15)
 @onready var stone_label: Label = $Control/StoneLabel
 @onready var water_label: Label = $Control/WaterLabel
 @onready var population_label: Label = $Control/PopulationLabel
+@onready var happiness_label: Label = $Control/HappinessLabel
 @onready var build_button: Button = $Control/BuildButton
 @onready var save_indicator: Label = $SaveIndicator
 
@@ -27,6 +28,7 @@ func _ready() -> void:
 	stone_label.resized.connect(func() -> void: stone_label.pivot_offset = stone_label.size / 2)
 	water_label.resized.connect(func() -> void: water_label.pivot_offset = water_label.size / 2)
 	population_label.resized.connect(func() -> void: population_label.pivot_offset = population_label.size / 2)
+	happiness_label.resized.connect(func() -> void: happiness_label.pivot_offset = happiness_label.size / 2)
 	GameState.resources_changed.connect(_on_resources_changed)
 	GameState.population_changed.connect(_on_population_changed)
 	GameState.water_changed.connect(_on_water_changed)
@@ -115,3 +117,14 @@ func _set_water(available: bool) -> void:
 func _on_storage_capacity_changed(_capacity: float) -> void:
 	for resource_name in _resource_labels:
 		_set_display(resource_name, _displayed[resource_name])
+
+
+## Called directly by Base after each happiness tick, rather than through a
+## GameState signal - the average is computed from the character roster,
+## which Base owns and GameState has no reference to (same reasoning as
+## flash_message being a direct call rather than a signal).
+func set_happiness(average: float) -> void:
+	happiness_label.text = "Happiness: %d%%" % roundi(average)
+	happiness_label.scale = PUNCH_SCALE
+	var tween := create_tween()
+	tween.tween_property(happiness_label, "scale", Vector2.ONE, 0.2).set_ease(Tween.EASE_OUT)

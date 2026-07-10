@@ -12,7 +12,7 @@ Every resource is clamped independently between 0 and the town's **storage capac
 
 ## Population & Housing
 
-The town has a population count and a population capacity. You start with 3 citizens and capacity for 3. Building a **House** raises capacity (not headcount) — there's no way to grow the population yet beyond the 3 starting citizens; capacity just gates future recruitment/growth systems that don't exist yet.
+The town has a population count and a population capacity. You start with 3 citizens and capacity for 3. Building a **House** raises capacity (not headcount); growing the population itself happens through Citizen Recruitment (see below), which is gated on having open capacity to grow into.
 
 Every citizen eats continuously, once per second, whether or not they're doing any work — this is the only per-citizen upkeep cost right now. Hunger draws from any eatable resource — **food, then bread, then potato, then fruit**, in that priority order — rather than only plain "food," so a stocked bakery or orchard extends how long the town can go without a farm surplus. Grain, flour, hops, and beer are intermediate or luxury goods and can't be eaten directly; beer in particular is reserved as a future happiness-boosting luxury good rather than a calorie source.
 
@@ -43,6 +43,16 @@ Every citizen has independent skill levels per activity (currently **farming**, 
 Every gather action (a production tick, a chop) grants a flat amount of experience regardless of the worker's current level or output — xp rewards time spent working, not skill already gained, so higher levels don't also compound their advantage through faster xp gain.
 
 A higher skill level increases a worker's **output multiplier** at that activity — a maxed-level worker produces roughly 3x a level-1 worker. For a converter like the Farm, this multiplier applies equally to the output produced *and* the input consumed, so a more skilled worker moves more resources through the post each tick, but the input-to-output ratio never changes regardless of who's assigned.
+
+## Happiness
+
+Every citizen has a personal happiness value that continuously eases toward a target recomputed from current settlement conditions — it doesn't jump instantly, so a sudden change (the well running dry, a farm running out of food) is felt gradually over several ticks rather than all at once. The target rises with water access, rises further with food-equivalent stock on hand, rises again with food *variety* (more distinct edible resource types in stock), and drops sharply if the town has no food at all. Settlement happiness (shown on the HUD) is simply the average across every citizen.
+
+A citizen whose happiness stays below the "unhappy" threshold for a sustained stretch leaves the settlement for good — this is the game's first mechanic where a resource shortfall has a consequence worse than production merely stalling. A citizen who leaves is a permanent loss for the current playthrough; nothing un-departs them short of reloading a save from before they left, same as any other town state a load reverts (loading a save is reverting to that point in time — a citizen who left *after* the loaded save was made reappears on load, since from the save's perspective they hadn't left yet).
+
+## Citizen Recruitment
+
+Clicking the Outpost Hall (rather than a citizen or a workstation) opens a recruitment panel offering 3 candidates, each with a name and a random specialization already trained to a meaningful starting level — a head start over a brand-new level-1 worker, not enough to out-level what's earned through play. Recruiting spends food and requires an open House slot (population capacity above the current population count); it's denied with a HUD message if either condition isn't met. A recruited citizen is added to the town exactly like the 3 starting citizens — same save/load handling, same happiness system, same eligibility for any post.
 
 ## Building & Placement
 

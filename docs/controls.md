@@ -20,6 +20,14 @@
 | `0` (with task menu open) | Unassign the selected citizen (set them idle) |
 | Left-click empty ground, or Esc | Deselect the current citizen / close the task menu |
 
+## Recruitment
+
+| Input | Action |
+|---|---|
+| Left-click the Outpost Hall | Open the recruitment panel (3 candidates) |
+| `1`–`3` (with recruitment panel open) | Recruit the corresponding candidate |
+| Left-click empty ground, or Esc | Close the recruitment panel |
+
 ## Building
 
 | Input | Action |

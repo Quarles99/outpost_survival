@@ -102,6 +102,19 @@ func set_selected(value: bool) -> void:
 	tween.tween_property(selection_outline, "modulate:a", 1.0 if value else 0.0, 0.15)
 
 
+## Called by Base when this citizen departs the settlement for good
+## (sustained low happiness). Unassigns from any post and stops every
+## active coroutine so none of them try to touch this node after Base
+## frees it - deliberately not routed through assign_to(null), which would
+## also kick off a pointless idle-hauling session and replay assignment
+## juice (sound/tween) right before the node disappears.
+func leave() -> void:
+	if assigned_post:
+		assigned_post.remove_worker()
+		assigned_post = null
+	_stop_work()
+
+
 func assign_to(post: Node) -> void:
 	if assigned_post:
 		assigned_post.remove_worker()
