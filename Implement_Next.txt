@@ -349,7 +349,33 @@ Implement these next:
       layout - recommend a quick playtest to confirm the widened panel and
       appended rate text read well against the existing punch/tween juice.
 
-- Condense build menu into square icons with small keybind text
+- [DONE] Condense build menu into square icons with small keybind text
+    - ButtonContainer switched from a VBoxContainer of full-width text
+      buttons to a 3-column GridContainer of fixed 64x64 square buttons
+      (scenes/ui/BuildMenu.tscn); the whole panel was resized to fit 5 rows
+      (14 placeable options today). Each button shows a TextureRect icon
+      (stretched/centered to fit) plus a small keybind number label pinned
+      to the top-left corner (only for the first 9 options, matching the
+      existing 1-9 shortcut limit) - full building name + cost moved to
+      the button's tooltip_text since neither fits at this size.
+    - Icons are read directly off a throwaway instance of each option's own
+      scene (scripts/build_menu.gd's _get_icon_data/_icon_cache) - the
+      instance gets Base.BUILDING_PROPERTIES applied exactly like a real
+      ghost/placement does, is added to the tree just long enough for its
+      _ready() to pick the correct RESOURCE_VISUALS texture and sprite_tint,
+      then is immediately freed - rather than hand-duplicating that
+      texture-selection logic here, which would silently drift if the
+      catalog ever changed. Cached per option id so this only happens once
+      per building type, not once per menu open. Several buildings
+      currently share the same generic silhouette texture underneath their
+      tint (pre-existing art reuse, not introduced by this change) - the
+      icons accurately reflect that, they're not meant to paper over it.
+    - Verified headless: opened the build menu programmatically and
+      confirmed all 14 placeable options resolved a non-null icon texture
+      with no errors. Not verified in-editor for visual quality (icon
+      legibility at 64px, keybind label contrast, tooltip readability) -
+      recommend a playtest pass, especially since several buildings will
+      look identical or near-identical at a glance (see above).
 
 - Increase the size of the map
   - At least 4 times current size

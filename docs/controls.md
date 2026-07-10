@@ -33,6 +33,7 @@
 | Input | Action |
 |---|---|
 | Click the **Build** button (HUD) | Open the build menu |
+| Hover a building icon (with build menu open) | Show its full name and cost (icons are condensed and don't fit that text directly) |
 | `1`–`9` (with build menu open) | Choose the corresponding building |
 | Move mouse (while placing) | Move the placement ghost, snapped to the grid — green means the spot is valid, red means it isn't (out of bounds, occupied, or unaffordable) |
 | Left-click (while placing, on a valid spot) | Confirm placement |

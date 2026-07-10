@@ -58,7 +58,7 @@ Clicking the Outpost Hall (rather than a citizen or a workstation) opens a recru
 
 ## Building & Placement
 
-The **Build** button opens a menu of buildable options, each with a resource cost and a grid footprint. Selecting one drops a translucent "ghost" that follows the mouse, snapped to the isometric grid, tinted green if the spot is valid (in bounds, unoccupied, affordable) or red if not. Left-click confirms — spending the resources, reserving the footprint, and applying whatever passive bonus the building grants (population capacity, water access, or storage capacity). Buildings that can hold workers (Farm, Lumber Camp, Stone Mine, wall segments) automatically become assignable from the citizen task menu once placed; passive structures (House, Well, Storage Facility, Outpost Hall) never do.
+The **Build** button opens a menu of buildable options as a grid of square icon buttons (numbered `1`-`9` for the first nine) — hover one to see its full name and cost, since neither fits on the icon itself. Selecting one drops a translucent "ghost" that follows the mouse, snapped to the isometric grid, tinted green if the spot is valid (in bounds, unoccupied, affordable) or red if not. Left-click confirms — spending the resources, reserving the footprint, and applying whatever passive bonus the building grants (population capacity, water access, or storage capacity). Buildings that can hold workers (Farm, Lumber Camp, Stone Mine, wall segments) automatically become assignable from the citizen task menu once placed; passive structures (House, Well, Storage Facility, Outpost Hall) never do.
 
 Only one building occupies any grid cell — buildings and trees share the same occupancy grid, so neither can ever be placed on top of the other.
 
