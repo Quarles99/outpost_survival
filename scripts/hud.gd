@@ -15,10 +15,13 @@ const PUNCH_SCALE := Vector2(1.15, 1.15)
 @onready var build_button: Button = $Control/BuildButton
 @onready var save_indicator: Label = $SaveIndicator
 
+const RATE_REFRESH_INTERVAL := 1.0
+
 var _resource_labels: Dictionary = {}
 var _displayed := {"food": 0.0, "wood": 0.0, "stone": 0.0}
 var _count_tweens := {}
 var _save_indicator_tween: Tween
+var _rate_timer: Timer
 
 
 func _ready() -> void:
@@ -39,6 +42,12 @@ func _ready() -> void:
 	_set_population(GameState.population_count, GameState.population_capacity)
 	_set_water(GameState.has_water())
 	save_indicator.modulate.a = 0.0
+
+	_rate_timer = Timer.new()
+	_rate_timer.wait_time = RATE_REFRESH_INTERVAL
+	_rate_timer.timeout.connect(_refresh_rates)
+	add_child(_rate_timer)
+	_rate_timer.start()
 
 
 ## Transient status text (e.g. "Saved"/"Loaded") - fades in, holds, fades out.
@@ -74,10 +83,25 @@ func _on_resources_changed(resource_name: String, total: float) -> void:
 
 func _set_display(resource_name: String, value: float) -> void:
 	_displayed[resource_name] = value
+	_update_label_text(resource_name)
+
+
+## Rebuilds a resource label's full text (amount + rate) without touching
+## _displayed - called both when the amount changes (_set_display) and on
+## the independent per-second rate refresh, so the rate updates smoothly
+## even while the amount itself is momentarily unchanged.
+func _update_label_text(resource_name: String) -> void:
 	var label: Label = _resource_labels.get(resource_name)
 	if not label:
 		return
-	label.text = "%s: %d/%d" % [resource_name.capitalize(), value, GameState.storage_capacity]
+	var value: float = _displayed[resource_name]
+	var rate := GameState.get_income_per_minute(resource_name)
+	label.text = "%s: %d/%d (%s%.1f/min)" % [resource_name.capitalize(), value, GameState.storage_capacity, "+" if rate >= 0.0 else "", rate]
+
+
+func _refresh_rates() -> void:
+	for resource_name in _resource_labels:
+		_update_label_text(resource_name)
 
 
 func _punch(resource_name: String) -> void:

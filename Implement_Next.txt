@@ -310,8 +310,44 @@ Implement these next:
       the live roster without touching the save (simulating a closed-and-
       reopened game), reloaded, and confirmed they were recreated with their
       correct skill_xp intact.
+    - Post-review fix: the first pass only ever *added* missing citizens on
+      load and matched by character_name, which had two real gaps -
+      1) loading an older save never removed a citizen recruited *after*
+      that save was made (they'd stay in the world and population_count
+      would silently follow characters.size() instead of the save), and
+      2) RecruitCatalog's small name pool meant two live citizens could
+      collide on the same name, which name-based matching would silently
+      mismatch on load. Fixed by giving CharacterData a stable `id` (backfilled
+      for Aldric/Brenna/Cass from their node name, generated fresh for every
+      recruit) and matching save entries on id instead of name; a live
+      citizen with no matching save entry is now removed on load, symmetric
+      to a saved entry with no live match being recreated. Saves without an
+      "id" field (pre-fix) fall back to name matching for one-time migration.
 
-- Show resource income per minute on the HUD
+- [DONE] Show resource income per minute on the HUD
+    - GameState.get_income_per_minute(resource_name) is computed from a
+      rolling history of resource-pool snapshots (GameState._income_history,
+      one sample/second, trimmed to the trailing 60s) rather than watching
+      individual add_resource() calls - production arrives in bursty
+      haul-trip chunks (a lumberjack/hauler dumps several units at once,
+      then nothing for seconds), so a per-call rate would spike and drop
+      instead of reading as a steady number. The rate is net change over
+      however much of that 60s window has actually elapsed (shorter right
+      after boot), i.e. net income actually reaching the stockpile - a
+      workstation losing output to a full storage cap won't show up here,
+      since nothing reached the resource pool to measure.
+    - HUD.gd's existing Food/Wood/Stone labels now append "(+N.N/min)" (or
+      "-N.N/min") alongside the amount, refreshed on its own 1s timer
+      independent of the amount-change tween, so the rate keeps updating
+      even during a stretch with no resource change events. Widened the
+      whole HUD corner panel (196->260px) and its labels to fit the longer
+      text without clipping/overflowing.
+    - Verified headless: assigned a citizen to the starting Lumber Camp,
+      let it run 25 real seconds, and confirmed get_income_per_minute("wood")
+      matched the actual measured delta/elapsed*60 exactly (wood rose 10->14,
+      reported rate ~9.6/min). Not verified in-editor for the visual/label
+      layout - recommend a quick playtest to confirm the widened panel and
+      appended rate text read well against the existing punch/tween juice.
 
 - Condense build menu into square icons with small keybind text
 

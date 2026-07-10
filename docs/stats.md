@@ -124,6 +124,14 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | Edge-scroll speed | 900 px/s (world space, scaled by zoom) |
 | Extra pan room beyond map bounds | 320 world units |
 
+## Income Rate (`GameState`)
+
+| | Value |
+|---|---|
+| History sample interval | 1 s |
+| Rolling window | 60 s (shorter just after boot) |
+| Displayed for | Food, Wood, Stone (the HUD's dedicated resource rows) |
+
 ## Happiness (`Base`, `CharacterData`)
 
 | | Value |

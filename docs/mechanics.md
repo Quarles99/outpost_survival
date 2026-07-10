@@ -8,6 +8,8 @@ The town has a shared resource pool of many tracked resource types: **food, wood
 
 Every resource is clamped independently between 0 and the town's **storage capacity** — filling up on food doesn't crowd out wood or stone, each has its own ceiling at the same shared value. There's a baseline capacity even with no storage buildings; a **Storage Facility** raises it further (see [stats.md](stats.md)). Hauling more into a full stockpile simply loses the overflow rather than refunding it — that's the intended cost of running out of storage, not a bug.
 
+Each displayed resource also shows a rolling **income/minute** rate next to its amount — net change over roughly the last minute (shorter right after boot), not an instantaneous snapshot, so a single big haul-trip deposit doesn't make the rate spike and vanish a second later. It measures what actually reached the stockpile, so a workstation whose output is being lost to a full storage cap won't show a positive rate for it.
+
 **Water** works differently: it isn't a depletable stockpile at all. A **Well** grants unlimited access rather than producing units of water, so the game just tracks whether at least one Well has been built (water available or not), not an amount.
 
 ## Population & Housing

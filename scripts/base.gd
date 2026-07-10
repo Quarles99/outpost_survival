@@ -94,6 +94,12 @@ func _ready() -> void:
 
 	for character in characters:
 		character.drag_started.connect(_on_character_drag_started)
+		## The 3 starting citizens' .tres resources predate the id field -
+		## backfill a stable one (their node name is unique and never
+		## changes) rather than leaving it empty, which would make them
+		## indistinguishable from each other for save/load matching.
+		if character.data.id.is_empty():
+			character.data.id = character.name
 
 	task_panel.task_selected.connect(_on_task_selected)
 	task_panel.idle_selected.connect(_on_idle_selected)
@@ -370,9 +376,14 @@ func _on_candidate_selected(candidate: Dictionary) -> void:
 ## whether that applies (a fresh recruit does both; _restore_characters
 ## recreating a missing citizen from a save does neither, since the saved
 ## population_count already accounts for them).
-func _spawn_character(character_name: String, spawn_position: Vector2) -> Character:
+## `id` lets a caller pin the save/load identity (used when recreating a
+## citizen from a save entry); left empty, a fresh one is generated - two
+## recruits can share a display name (RecruitCatalog's pool is small) but
+## must never share an id, since save/load matches on id, not name.
+func _spawn_character(character_name: String, spawn_position: Vector2, id: String = "") -> Character:
 	var data := CharacterData.new()
 	data.character_name = character_name
+	data.id = id if not id.is_empty() else "citizen_%d_%d" % [Time.get_ticks_usec(), randi()]
 	var character: Character = CHARACTER_SCENE.instantiate()
 	character.data = data
 	character.position = spawn_position
@@ -577,12 +588,11 @@ func _load_game() -> void:
 	_restore_post_buffers(data.get("post_buffers", {}))
 	_restore_characters(data.get("characters", []))
 
-	## Reconcile against reality rather than trusting the saved number: a
-	## citizen who left (permanently) during the current session can't be
-	## un-departed by loading an older save that still had them, so
-	## `characters` may now be smaller than data["population_count"]. With
-	## no recruitment system yet, every citizen is exactly one Character
-	## node, so population_count should always equal characters.size().
+	## Safety net, not the primary source of truth: _restore_characters
+	## above already adds/removes citizens to exactly match the save's
+	## entries, so characters.size() should already equal the saved
+	## population_count. This just keeps the count honest if the two ever
+	## disagree (e.g. a hand-edited save file).
 	if GameState.population_count != characters.size():
 		GameState.population_count = characters.size()
 		GameState.population_changed.emit(GameState.population_count, GameState.population_capacity)
@@ -692,6 +702,7 @@ func _serialize_characters() -> Array:
 		if character.assigned_post and character.assigned_post.has_meta("save_id"):
 			save_id = character.assigned_post.get_meta("save_id")
 		out.append({
+			"id": character.data.id,
 			"name": character.data.character_name,
 			"skill_xp": character.data.skill_xp.duplicate(),
 			"happiness": character.data.happiness,
@@ -701,29 +712,53 @@ func _serialize_characters() -> Array:
 	return out
 
 
-## Matched by character_name against whoever's currently in `characters`. A
-## saved entry with no live match is recreated via _spawn_character rather
+## Matched by CharacterData.id, not character_name - RecruitCatalog draws
+## from a small procedural name pool, so two live citizens can end up
+## sharing a display name, and name-based matching would silently misapply
+## one citizen's saved data to the other. Saves written before `id` existed
+## have no "id" field; those fall back to matching by name (best-effort
+## one-time migration, not relied on going forward).
+## A saved entry with no live match is recreated via _spawn_character rather
 ## than silently dropped - this covers both a recruit that doesn't exist yet
 ## on a fresh game boot (only Aldric/Brenna/Cass start in the scene file)
 ## and a citizen who left after the save being loaded was made (loading is
 ## reverting to that point in time, so they should come back, same as any
-## other town state a load reverts). _spawn_character deliberately doesn't
-## touch population_count/spend anything - the save's wholesale
+## other town state a load reverts). Symmetrically, a *live* citizen with no
+## matching save entry didn't exist yet at the point this save was made
+## (e.g. recruited after it) and is removed. _spawn_character deliberately
+## doesn't touch population_count/spend anything - the save's wholesale
 ## population_count already accounts for every entry being restored here.
 func _restore_characters(entries: Array) -> void:
+	var by_id := {}
 	var by_name := {}
 	for character in characters:
+		by_id[character.data.id] = character
 		by_name[character.data.character_name] = character
 
+	var matched_ids := {}
 	for entry in entries:
+		var entry_id: String = entry.get("id", "")
 		var entry_name: String = entry.get("name", "")
-		var character: Character = by_name.get(entry_name)
+		var character: Character = by_id.get(entry_id) if not entry_id.is_empty() else by_name.get(entry_name)
 		if not character:
-			character = _spawn_character(entry_name, $OutpostHall.get_stockpile_spot())
+			character = _spawn_character(entry_name, $OutpostHall.get_stockpile_spot(), entry_id)
+		if not entry_id.is_empty():
+			character.data.id = entry_id
+		character.data.character_name = entry_name
 		character.data.skill_xp = (entry.get("skill_xp", {}) as Dictionary).duplicate()
 		character.data.happiness = float(entry.get("happiness", character.data.happiness))
 		character.data.unhappy_streak = int(entry.get("unhappy_streak", 0))
 		character.assign_to(_post_by_save_id(entry.get("assigned_save_id", "")))
+		matched_ids[character.data.id] = true
+
+	## Any live citizen not accounted for above didn't exist at the point
+	## this save was made - remove them so loading actually reverts state
+	## rather than only ever adding citizens back.
+	for character in characters.duplicate():
+		if not matched_ids.has(character.data.id):
+			character.leave()
+			characters.erase(character)
+			character.queue_free()
 
 
 func _post_by_save_id(save_id: String) -> Node:

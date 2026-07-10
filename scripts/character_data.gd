@@ -1,6 +1,11 @@
 extends Resource
 class_name CharacterData
 
+## Stable save/load identity, distinct from character_name - recruited
+## citizens are drawn from a small procedural name pool (see RecruitCatalog)
+## so two live citizens can end up sharing a display name. Empty for the 3
+## hand-authored .tres characters until Base._ready() backfills one.
+@export var id: String = ""
 @export var character_name: String = ""
 ## skill_id (e.g. "farming", "lumberjacking") -> cumulative xp earned in it.
 ## Untracked skills default to 0 xp / level 1 rather than needing an entry.

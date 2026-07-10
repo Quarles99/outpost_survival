@@ -54,6 +54,16 @@ var water_wells := 0
 
 var _consumption_timer: Timer
 
+## Rolling history of resource-pool snapshots, used to compute an income/min
+## readout for the HUD. Sampled on its own timer rather than piggybacking on
+## every add_resource() call, since production arrives in bursty haul-trip
+## chunks (see character.gd) - what matters for a "rate" reading is the net
+## change over a real time window, not the size of any single deposit.
+const INCOME_SAMPLE_INTERVAL := 1.0
+const INCOME_WINDOW_SECONDS := 60.0
+var _income_history: Array[Dictionary] = []
+var _income_sample_timer: Timer
+
 
 func _ready() -> void:
 	_consumption_timer = Timer.new()
@@ -61,6 +71,13 @@ func _ready() -> void:
 	_consumption_timer.timeout.connect(_on_consumption_timeout)
 	add_child(_consumption_timer)
 	_consumption_timer.start()
+
+	_income_sample_timer = Timer.new()
+	_income_sample_timer.wait_time = INCOME_SAMPLE_INTERVAL
+	_income_sample_timer.timeout.connect(_sample_income_history)
+	add_child(_income_sample_timer)
+	_income_sample_timer.start()
+	_sample_income_history()
 
 
 func _on_consumption_timeout() -> void:
@@ -117,3 +134,26 @@ func has_water() -> bool:
 func add_storage_capacity(amount: float) -> void:
 	storage_capacity += amount
 	storage_capacity_changed.emit(storage_capacity)
+
+
+func _sample_income_history() -> void:
+	_income_history.append({"time": Time.get_ticks_msec() / 1000.0, "resources": resources.duplicate()})
+	while _income_history.size() > 1 and Time.get_ticks_msec() / 1000.0 - _income_history[0]["time"] > INCOME_WINDOW_SECONDS:
+		_income_history.pop_front()
+
+
+## Net change in `resource_name` per minute, measured over however much of
+## the trailing INCOME_WINDOW_SECONDS window has elapsed so far (shorter
+## just after boot). This is net income into the stockpile, not gross
+## production - a workstation whose output is being lost to a full storage
+## cap (see storage_capacity docs above) won't show up here, since nothing
+## actually reached the resource pool.
+func get_income_per_minute(resource_name: String) -> float:
+	if _income_history.is_empty():
+		return 0.0
+	var oldest: Dictionary = _income_history[0]
+	var elapsed: float = Time.get_ticks_msec() / 1000.0 - oldest["time"]
+	if elapsed <= 0.0:
+		return 0.0
+	var delta: float = resources.get(resource_name, 0.0) - (oldest["resources"] as Dictionary).get(resource_name, 0.0)
+	return delta / elapsed * 60.0
