@@ -327,20 +327,43 @@ func _run_hauler_loop(session: int) -> void:
 		if job.is_empty():
 			await get_tree().create_timer(IDLE_RETRY_DELAY).timeout
 			continue
+		if not await _execute_haul_job(job, session):
+			return
 
-		var post: Workstation = job["post"]
 
-		if job["type"] == "output":
-			await get_tree().create_timer(_move_to(post.get_worker_spot())).timeout
-			if session != _work_session:
-				return
-			if post.output_buffer < HAUL_MIN_THRESHOLD:
-				continue
-			if not await _haul_to_stockpile(post, session, post.resource_type, ""):
-				return
-		else:
-			if not await _deliver_to_post(post, session, job["resource"]):
-				return
+## The actual pickup/delivery for a job from _find_haul_job - shared by
+## _run_hauler_loop (an idle/unassigned citizen's whole job) and
+## _assist_haul_or_wait (a dedicated worker helping out during a moment
+## their own post has nothing for them to do). Returns false if a
+## reassignment interrupted the trip.
+func _execute_haul_job(job: Dictionary, session: int) -> bool:
+	var post: Workstation = job["post"]
+
+	if job["type"] == "output":
+		await get_tree().create_timer(_move_to(post.get_worker_spot())).timeout
+		if session != _work_session:
+			return false
+		if post.output_buffer < HAUL_MIN_THRESHOLD:
+			return true
+		return await _haul_to_stockpile(post, session, post.resource_type, "")
+	else:
+		return await _deliver_to_post(post, session, job["resource"])
+
+
+## Called from a dedicated work loop's own "blocked, nothing useful to do
+## right now" moments (Farm waiting on an input restock, LumberCamp finding
+## no available tree in range) instead of just standing around idle -
+## looks for the single most valuable haul job across every post (the same
+## search an idle/unassigned citizen already runs) and does it once before
+## the caller re-checks its own post. Falls back to the same
+## IDLE_RETRY_DELAY wait if there's nothing worth hauling either. Returns
+## false if reassigned mid-trip.
+func _assist_haul_or_wait(session: int) -> bool:
+	var job := _find_haul_job()
+	if job.is_empty():
+		await get_tree().create_timer(IDLE_RETRY_DELAY).timeout
+		return session == _work_session
+	return await _execute_haul_job(job, session)
 
 
 ## Picks the single most valuable haul job across every Workstation post
@@ -536,10 +559,10 @@ func _run_farm_loop(farm: Farm, session: int) -> void:
 			if session != _work_session:
 				return
 			if farm.input_buffer < input_needed:
-				# Stockpile didn't have enough input to fully restock - wait
-				# rather than immediately making another empty-handed trip.
-				await get_tree().create_timer(IDLE_RETRY_DELAY).timeout
-				if session != _work_session:
+				# Stockpile didn't have enough input to fully restock -
+				# help haul somewhere else useful in the meantime rather
+				# than just standing around waiting.
+				if not await _assist_haul_or_wait(session):
 					return
 				continue
 
@@ -598,7 +621,10 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 		var tree: WorldTree = WorldGrid.find_available_tree(camp_cell, camp.search_radius)
 
 		if not tree:
-			await get_tree().create_timer(IDLE_RETRY_DELAY).timeout
+			# No tree in range right now - help haul somewhere else useful
+			# in the meantime rather than just standing around waiting.
+			if not await _assist_haul_or_wait(session):
+				return
 			continue
 
 		tree.claimed = true

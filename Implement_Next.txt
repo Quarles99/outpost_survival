@@ -930,7 +930,26 @@ Implement these next:
       saved, moved them elsewhere, loaded, and confirmed their position
       matched the saved one exactly.
 
-- Citizens assigned to a job who are idle should help with hauling at other work sites
+- [DONE] Citizens assigned to a job who are idle should help with hauling at other work sites
+    - Extracted the actual pickup/delivery execution out of
+      _run_hauler_loop into a new shared _execute_haul_job(job, session),
+      and added _assist_haul_or_wait(session) (finds the single most
+      valuable haul job across every post via the same _find_haul_job an
+      idle citizen already uses, executes it if found, else falls back to
+      the same IDLE_RETRY_DELAY wait as before). Wired into the two
+      "blocked, nothing useful to do here right now" moments that
+      previously just idled: _run_farm_loop's post-haul-trip "input still
+      didn't restock" wait, and _run_lumberjack_loop's "no tree available
+      in range" wait. assigned_post is untouched throughout - this is a
+      one-off assist, not a reassignment, so the worker's own dedicated
+      loop resumes normally afterward. _run_generic_work_loop (StoneMine
+      etc.) has no equivalent blocked-wait moment to begin with (no input
+      dependency), so nothing to change there.
+    - Verified headless: starved a Farm worker of wood (so their input
+      never restocks) while a separately-placed Stone Mine sat with a full
+      output buffer, and confirmed the Farm worker hauled the mine's stone
+      to the stockpile during the wait while remaining assigned to the
+      Farm throughout.
 
 - Replace basic farm with cabbage farm
 
