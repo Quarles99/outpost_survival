@@ -22,7 +22,10 @@ const CONSUMPTION_INTERVAL := 1.0
 ## stock, per the design doc's "food variety gives improved happiness".
 const FOOD_RESOURCES := ["food", "bread", "potato", "fruit"]
 
-var resources := {
+## Kept as a const (rather than inlining the dict literal into `resources`
+## below) so reset_to_defaults() can restore exactly this without a second,
+## driftable copy of the same starting values.
+const DEFAULT_RESOURCES := {
 	"food": 10.0,
 	"wood": 10.0,
 	"stone": 0.0,
@@ -34,9 +37,11 @@ var resources := {
 	"fruit": 0.0,
 	"potato": 0.0,
 }
+var resources := DEFAULT_RESOURCES.duplicate()
 
-var population_count := 3
-var population_capacity := 3
+const DEFAULT_POPULATION := 3
+var population_count := DEFAULT_POPULATION
+var population_capacity := DEFAULT_POPULATION
 
 ## Ceiling each individual resource in `resources` is clamped to - not a
 ## shared pool split across resource types, a full cap that applies to each
@@ -141,6 +146,28 @@ func has_water() -> bool:
 
 func add_storage_capacity(amount: float) -> void:
 	storage_capacity += amount
+	storage_capacity_changed.emit(storage_capacity)
+
+
+## Restores every mutable field to its starting value and re-emits the
+## signals that depend on them - for starting a brand new game without
+## restarting the process. Unlike Base (freed and recreated whole every
+## time MainMenu switches into Base.tscn), this autoload is created once
+## and never destroyed, so nothing resets it on its own; Base._ready()
+## calls this whenever it's about to start fresh rather than load a save.
+func reset_to_defaults() -> void:
+	resources = DEFAULT_RESOURCES.duplicate()
+	population_count = DEFAULT_POPULATION
+	population_capacity = DEFAULT_POPULATION
+	storage_capacity = BASE_STORAGE_CAPACITY
+	water_wells = 0
+	happiness_output_multiplier = 1.0
+	_income_history.clear()
+
+	for resource_name in resources:
+		resources_changed.emit(resource_name, resources[resource_name])
+	population_changed.emit(population_count, population_capacity)
+	water_changed.emit(has_water())
 	storage_capacity_changed.emit(storage_capacity)
 
 

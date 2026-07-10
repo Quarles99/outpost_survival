@@ -1,5 +1,16 @@
 # Controls
 
+## Main Menu
+
+| Input | Action |
+|---|---|
+| **Continue** | Load whichever of the 3 save slots was saved most recently |
+| **New Game** | Choose a slot to start a fresh game in |
+| **Load Game** | Choose a slot to load |
+| **Quit** | Exit the game |
+| `1`–`3` (with the slot picker open) | Choose the corresponding slot |
+| Esc (with the slot picker open) | Cancel and return to the main menu |
+
 ## Camera
 
 | Input | Action |
@@ -50,11 +61,22 @@ There's no task menu — assignment is drag-and-drop, or select-then-click.
 | `1`–`9` (with the retool panel open) | Choose the corresponding recipe |
 | Left-click empty ground, or Esc | Close the retool panel |
 
+## System Menu (in-game)
+
+| Input | Action |
+|---|---|
+| Esc, when nothing else is selected/open | Open the System Menu |
+| Click the **Menu** button (HUD) | Open the System Menu |
+| **Resume** | Close the menu |
+| **Save Game** / **Load Game** | Open the slot picker (see Main Menu above) to save into, or load from, any of the 3 slots |
+| **Main Menu** | Return to the main menu (progress since the last save is lost unless saved first) |
+| **Quit to Desktop** | Exit the game |
+
 ## Save / Load
 
 | Input | Action |
 |---|---|
-| `F5` | Quicksave (writes to the single local save file) |
-| `F9` | Quickload (reloads from the single local save file) |
+| `F5` | Quicksave to the active slot (whichever was last saved/loaded, via the main menu or System Menu) |
+| `F9` | Quickload from the active slot |
 
-There is no save/load menu yet — both keys act on one fixed local save slot, with a brief on-screen "Saved"/"Loaded" flash as the only feedback.
+Both keys act on the active slot, with a brief on-screen "Saved"/"Loaded" flash as feedback — use the System Menu's Save/Load buttons instead to pick a different slot.

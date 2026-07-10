@@ -64,6 +64,8 @@ const CHARACTER_SCENE := preload("res://scenes/character/Character.tscn")
 @onready var build_menu: BuildMenu = $BuildMenu
 @onready var recruit_panel: RecruitPanel = $RecruitPanel
 @onready var crop_panel: CropPanel = $CropPanel
+@onready var system_menu: SystemMenu = $SystemMenu
+@onready var slot_panel: SlotPanel = $SlotPanel
 @onready var hud: HUD = $HUD
 @onready var iso_ground: IsoGround = $IsoGround
 @onready var camera: RtsCamera = $Camera2D
@@ -76,6 +78,12 @@ var posts: Array[Node] = []
 ## can be open at a time (opening a new one closes any other panel first,
 ## same as recruit/build), so a single field is enough - no stack needed.
 var _crop_target: Farm = null
+
+## Which SystemMenu button opened slot_panel ("save" or "load") - slot_panel
+## itself is purely presentational and just reports back which slot number
+## was picked (see SlotPanel.slot_chosen), so this is where that gets
+## turned into an actual save-to-slot or load-from-slot.
+var _slot_panel_purpose := ""
 
 ## Buildings placed at runtime via the build menu (not the fixed scene-file
 ## ones), tracked so a save can rebuild them and a load can wipe/replace
@@ -108,6 +116,15 @@ var _drag_moved := false
 func _ready() -> void:
 	get_viewport().physics_object_picking = true
 
+	## GameState is an autoload - unlike Base itself, it's never destroyed
+	## when MainMenu switches scenes into Base.tscn, so a second (or third)
+	## playthrough in the same process run would otherwise start with
+	## whatever resources/population/etc. the *previous* game ended with.
+	## Safe to do unconditionally, even when about to load a save right
+	## below - _load_game() overwrites every one of these fields from the
+	## save data regardless of what they were reset to first.
+	GameState.reset_to_defaults()
+
 	var min_cell := Vector2i(iso_ground.start_x, iso_ground.start_y)
 	var max_cell := Vector2i(iso_ground.start_x + iso_ground.width - 1, iso_ground.start_y + iso_ground.depth - 1)
 	WorldGrid.configure(iso_ground.position, min_cell, max_cell, self)
@@ -128,6 +145,18 @@ func _ready() -> void:
 
 	for character in characters:
 		character.drag_started.connect(_on_character_drag_started)
+		## Aldric/Brenna/Cass are hand-authored .tres resources loaded once
+		## and shared by every instantiation of Base.tscn in this process -
+		## unlike a fresh CharacterData for a recruit, their skill/happiness
+		## progress from a *previous* playthrough (MainMenu -> New Game
+		## again, in the same process run) would otherwise still be sitting
+		## on the resource when this new game starts. Reset unconditionally,
+		## same reasoning as GameState.reset_to_defaults() above -
+		## _restore_characters() overwrites these fields anyway if a save
+		## is about to be loaded on top.
+		character.data.skill_xp = {}
+		character.data.happiness = HAPPINESS_BASELINE
+		character.data.unhappy_streak = 0
 		## The 3 starting citizens' .tres resources predate the id field -
 		## backfill a stable one (their node name is unique and never
 		## changes) rather than leaving it empty, which would make them
@@ -137,11 +166,18 @@ func _ready() -> void:
 
 	build_menu.option_selected.connect(_on_build_option_selected)
 	hud.build_pressed.connect(_on_build_pressed)
+	hud.menu_pressed.connect(_open_system_menu)
 
 	recruit_panel.candidate_selected.connect(_on_candidate_selected)
 	$OutpostHall.clicked.connect(_on_outpost_hall_clicked)
 
 	crop_panel.option_selected.connect(_on_crop_selected)
+
+	system_menu.save_pressed.connect(func() -> void: _open_slot_panel("save"))
+	system_menu.load_pressed.connect(func() -> void: _open_slot_panel("load"))
+	system_menu.main_menu_pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/menu/MainMenu.tscn"))
+	system_menu.quit_pressed.connect(func() -> void: get_tree().quit())
+	slot_panel.slot_chosen.connect(_on_slot_panel_chosen)
 
 	var happiness_timer := Timer.new()
 	happiness_timer.wait_time = HAPPINESS_TICK_INTERVAL
@@ -153,6 +189,14 @@ func _ready() -> void:
 	GameState.happiness_output_multiplier = initial_band["multiplier"]
 	hud.set_happiness(initial_average, initial_band["name"])
 
+	## MainMenu's "Continue"/"Load Game" set this before switching into this
+	## scene; "New Game" leaves it false so this boot stays on the fresh
+	## state everything above just set up. Consumed once and cleared so a
+	## later F9/in-game load doesn't re-trigger this on some future scene
+	## reload (e.g. Main Menu -> Continue again).
+	if SaveManager.should_load_on_start:
+		SaveManager.should_load_on_start = false
+		_load_game()
 
 func _configure_camera_limits(min_cell: Vector2i, max_cell: Vector2i) -> void:
 	var corners := [
@@ -267,6 +311,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			_load_game()
 			return
+	## SystemMenu/SlotPanel handle their own Esc-to-close via their own
+	## _input() (which always runs before _unhandled_input regardless of
+	## tree order - see CLAUDE.md's RtsCamera note for the same mechanism),
+	## so nothing to do here for that. What's missing without this check is
+	## mouse clicks: neither panel intercepts those, so without swallowing
+	## them here a click while either is open would fall all the way
+	## through to whatever's underneath (selecting a citizen, deselecting,
+	## assigning to a post...) instead of being absorbed by the modal menu
+	## on top of it.
+	if (system_menu.visible or slot_panel.visible) and event is InputEventMouseButton and event.pressed:
+		return
 	if _drag_character:
 		_handle_drag_input(event)
 		return
@@ -283,6 +338,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		crop_panel.close()
 		return
 	if _selected_character == null:
+		## Esc only reaches here once nothing else above had anything to
+		## back out of - deselecting a citizen (below) takes priority over
+		## opening the system menu, so Esc backs out one layer at a time
+		## rather than jumping straight to the menu while something's
+		## still selected.
+		if event.is_action_pressed("ui_cancel"):
+			get_viewport().set_input_as_handled()
+			_open_system_menu()
 		return
 	if event is InputEventMouseButton and event.pressed:
 		## A Farm-family post intercepts its own click before this ever runs
@@ -429,6 +492,20 @@ func _on_build_pressed() -> void:
 	recruit_panel.close()
 	crop_panel.close()
 	build_menu.open_for(BuildingCatalog.placeable_options())
+
+
+## Shared by the HUD's Menu button and Esc (see _unhandled_input) - closes
+## whatever else might be open first, same as every other panel-opening
+## entry point in this file, so SystemMenu never ends up stacked on top of
+## an unrelated selection/panel.
+func _open_system_menu() -> void:
+	_cancel_placement()
+	if _selected_character:
+		_deselect()
+	build_menu.close()
+	recruit_panel.close()
+	crop_panel.close()
+	system_menu.open()
 
 
 func _on_outpost_hall_clicked() -> void:
@@ -700,11 +777,30 @@ func _footprint_free(origin: Vector2i, size: Vector2i) -> bool:
 	return true
 
 
-## --- Save / load (F5 quicksave, F9 quickload) ------------------------------
+## --- Save / load (F5 quicksave, F9 quickload, or the in-game System Menu) --
+
+func _open_slot_panel(purpose: String) -> void:
+	_slot_panel_purpose = purpose
+	slot_panel.open_for(purpose)
+
+
+## slot_panel itself doesn't know or care why it was opened - see
+## _slot_panel_purpose's doc comment. Either way, the chosen slot becomes
+## SaveManager.active_slot going forward, so a subsequent F5/F9 (or picking
+## "Save"/"Load" again without specifying a slot) keeps acting on whichever
+## one the player most recently interacted with here.
+func _on_slot_panel_chosen(slot: int) -> void:
+	SaveManager.active_slot = slot
+	if _slot_panel_purpose == "save":
+		_save_game()
+	elif _slot_panel_purpose == "load":
+		_load_game()
+
 
 func _save_game() -> void:
 	var data := {
 		"version": 1,
+		"saved_at": int(Time.get_unix_time_from_system()),
 		"resources": GameState.resources.duplicate(),
 		"population_count": GameState.population_count,
 		"population_capacity": GameState.population_capacity,
@@ -716,12 +812,12 @@ func _save_game() -> void:
 		"characters": _serialize_characters(),
 		"fixed_farm_option_id": _fixed_farm_option_id,
 	}
-	SaveManager.save_game(data)
+	SaveManager.save_game(SaveManager.active_slot, data)
 	hud.flash_message("Saved")
 
 
 func _load_game() -> void:
-	var data := SaveManager.load_game()
+	var data := SaveManager.load_game(SaveManager.active_slot)
 	if data.is_empty():
 		hud.flash_message("No save found")
 		return

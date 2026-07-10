@@ -660,4 +660,60 @@ Implement these next:
       reads well, whether "click twice to unassign" is discoverable without
       the old menu spelling it out) - recommend a playtest.
 
+- [DONE] Main menu with save/load UI (ad-hoc request, not from the list above)
+    - The game now boots into a new MainMenu scene (scenes/menu/MainMenu.tscn,
+      project.godot's run/main_scene) instead of straight into Base.tscn:
+      Continue (loads whichever save has the newest timestamp, skipping the
+      slot picker), New Game, Load Game, and Quit. New Game/Load Game open
+      a new shared SlotPanel (scenes/ui/SlotPanel.tscn) listing 3 save
+      slots with a status line each ("Empty" or timestamp + population);
+      picking one sets SaveManager.active_slot/should_load_on_start and
+      switches to Base.tscn via change_scene_to_file.
+    - SaveManager (autoload/save_manager.gd) went from one fixed save path
+      to SLOT_COUNT (3) numbered files under user://saves/, plus
+      has_any_save()/most_recent_slot() for MainMenu's Continue button;
+      SlotPanel reuses has_save()/load_game() directly to build each
+      slot's preview text rather than needing a dedicated summary API.
+      One-time migration: an existing pre-slot-system user://savegame.json
+      is moved into slot 1 on first boot after this change, rather than
+      becoming silently unreadable.
+    - In-game, save/load is no longer only F5/F9: a new SystemMenu panel
+      (Resume/Save Game/Load Game/Main Menu/Quit to Desktop) opens via Esc
+      - when nothing else is selected/open, so Esc still backs out of a
+      selection/panel first like before - or a new "Menu" button on the
+      HUD. Save/Load from here open the same SlotPanel (in "save"/"load"
+      mode); whichever slot gets picked also becomes
+      SaveManager.active_slot, so a subsequent F5/F9 keeps acting on it.
+      F5/F9 themselves are unchanged in spirit, just now parameterized by
+      active_slot instead of a single hardcoded path.
+    - Real cross-scene correctness gap this surfaced and fixed: GameState
+      and the three fixed citizens' (Aldric/Brenna/Cass) CharacterData are
+      not part of Base's node tree - they're an autoload and shared .tres
+      resources respectively, so nothing about switching MainMenu <-> Base
+      resets them on its own the way recreating Base itself resets
+      Base's own instance vars. Without an explicit reset, starting a
+      second "New Game" in the same process run would have silently kept
+      the first playthrough's resources/population/skill progress. Added
+      GameState.reset_to_defaults() and an unconditional reset of the 3
+      fixed characters' skill_xp/happiness/unhappy_streak at the top of
+      Base._ready(), both called before any load-on-start check - safe
+      even when a load *is* about to happen, since _load_game()/
+      _restore_characters() overwrite every one of these fields from the
+      save regardless of what they were reset to first.
+    - Verified headless throughout: SaveManager's per-slot save/load/
+      migration; GameState + fixed-character reset actually taking effect
+      across a real scene reload (mutated both, reloaded the scene,
+      confirmed both back to pristine defaults); MainMenu's button
+      enabled/disabled states and SlotPanel wiring; the in-game System
+      Menu -> SlotPanel -> save/load round-trip (save to slot 2, mutate,
+      load slot 2, confirmed restored). Also ran a standalone external
+      SceneTree-script driver (not tied to either scene, so it survives
+      the scene changes it's testing - a coroutine on MainMenu/Base itself
+      can't outlive its own node's replacement) exercising the complete
+      real flow end-to-end: New Game -> save -> Quit to Main Menu ->
+      Continue -> confirmed the saved value came back correctly. Not
+      verified in-editor for feel/layout (SlotPanel and SystemMenu's
+      centered positioning, MainMenu's visual polish, whether "Esc opens
+      the system menu" reads as expected) - recommend a playtest.
+
 - Nothing else queued - add new items above this line to continue.

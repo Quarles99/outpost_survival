@@ -2,6 +2,7 @@ extends CanvasLayer
 class_name HUD
 
 signal build_pressed
+signal menu_pressed
 
 const COUNT_DURATION := 0.35
 const PUNCH_SCALE := Vector2(1.15, 1.15)
@@ -13,6 +14,7 @@ const PUNCH_SCALE := Vector2(1.15, 1.15)
 @onready var population_label: Label = $Control/PopulationLabel
 @onready var happiness_label: Label = $Control/HappinessLabel
 @onready var build_button: Button = $Control/BuildButton
+@onready var menu_button: Button = $Control/MenuButton
 @onready var save_indicator: Label = $SaveIndicator
 
 const RATE_REFRESH_INTERVAL := 1.0
@@ -37,6 +39,7 @@ func _ready() -> void:
 	GameState.water_changed.connect(_on_water_changed)
 	GameState.storage_capacity_changed.connect(_on_storage_capacity_changed)
 	build_button.pressed.connect(func() -> void: build_pressed.emit())
+	menu_button.pressed.connect(func() -> void: menu_pressed.emit())
 	for resource_name in _resource_labels:
 		_set_display(resource_name, GameState.resources[resource_name])
 	_set_population(GameState.population_count, GameState.population_capacity)

@@ -13,7 +13,7 @@ anchor_right = 1.0
 offset_left = -260.0
 offset_top = 16.0
 offset_right = -16.0
-offset_bottom = 272.0
+offset_bottom = 312.0
 grow_horizontal = 0
 
 [node name="Panel" type="Panel" parent="Control"]
@@ -74,6 +74,13 @@ offset_top = 224.0
 offset_right = 232.0
 offset_bottom = 256.0
 text = "Build"
+
+[node name="MenuButton" type="Button" parent="Control"]
+offset_left = 12.0
+offset_top = 264.0
+offset_right = 232.0
+offset_bottom = 296.0
+text = "Menu"
 
 [node name="SaveIndicator" type="Label" parent="."]
 anchor_left = 0.5

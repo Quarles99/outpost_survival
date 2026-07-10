@@ -4,7 +4,7 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 ## Implemented
 
-**Save & load.** Local save/load (see [controls.md](controls.md) for `F5`/`F9`) covering resources, population, water access, storage capacity, every tree, every player-placed building, workstation buffers, and each citizen's skill progress and current job. One fixed local slot, no menu yet. Cloud sync is a stated future goal, not started.
+**Save & load.** Local save/load (see [controls.md](controls.md) for `F5`/`F9`, or the in-game System Menu) covering resources, population, water access, storage capacity, every tree, every player-placed building, workstation buffers, and each citizen's skill progress and current job. 3 numbered local slots (see Main menu below), no cloud sync yet.
 
 **Realistic travel & labor.** Gathering is no longer instant/passive — citizens physically walk to workstations and haul goods to and from the stockpile (the Outpost Hall), with buffered output/input and per-post carry limits. Movement and work speed were deliberately slowed to read as "slow but consistent" rather than twitchy. Trees are a shared, sustainably-managed resource (Lumber Camps replant toward an area-wide target) rather than a one-time deposit. Idle citizens double as general haulers, picking whichever job (an output pickup or an input delivery) moves the most material across every workstation, with overshoot protection when multiple haulers converge on the same starved post. See [mechanics.md](mechanics.md#gathering--hauling) for the full loop.
 
@@ -35,6 +35,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 **Worker caps.** Every Workstation now caps out at 3 assigned workers (Wall Segments, unchanged, still cap at 1) - generalized from a cap that used to be hardcoded as a WallSegment-only special case. See [mechanics.md](mechanics.md#gathering--hauling).
 
 **Task list removed, skill panel added.** Clicking a citizen no longer opens a menu of assignable posts - it selects them and opens a panel of all their skill levels instead. Assignment is now drag-and-drop, or click-citizen-then-click-post (denied with a message if that post is full); clicking an already-selected citizen again unassigns them. See [mechanics.md](mechanics.md#assigning-citizens).
+
+**Main menu with save/load UI.** The game now boots into a main menu (Continue / New Game / Load Game / Quit) instead of straight into the base, with 3 numbered save slots shown with their timestamp and population instead of one hidden fixed file. In-game, a new System Menu (`Esc`, or the HUD's Menu button) offers Save/Load/Main Menu/Quit alongside the existing `F5`/`F9` shortcuts. See [mechanics.md](mechanics.md#main-menu--saveload) and [controls.md](controls.md).
 
 ## Planned Next (from `Implement_Next.txt`)
 

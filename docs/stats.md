@@ -194,6 +194,14 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | Playable grid | 28×28 tiles (784 total) |
 | Grid coordinate range | x: -12..15, y: -12..15 |
 
+## Save Slots (`SaveManager`)
+
+| | Value |
+|---|---|
+| Number of slots | 3 |
+| Save location | `user://saves/slot_N.json` |
+| Legacy migration | A pre-slot-system `user://savegame.json`, if found, is moved into slot 1 on first boot |
+
 ## Grid Projection (`IsoUtils`)
 
 | | Value |
