@@ -62,6 +62,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Crop-chain art fix.** Every Alternative Crop Type (Grain Farm, Mill, Bakery, Hops Farm, Brewery, Fruit Orchard, Potato Farm) now actually displays the Cabbage Farm's building art, tinted per its existing catalog color, instead of a tiny mis-proportioned placeholder icon. See [stats.md](stats.md#buildings).
 
+**Automatic job assignment.** Manual assignment (click/drag a citizen onto a post) is gone entirely - every citizen now automatically takes whichever job post trains the job skill they're currently best at, with a new citizen displacing a weaker incumbent on arrival and a citizen with no matching open post hauling instead until one opens up. Any job post can be right-clicked to temporarily disable it, evicting its worker on the spot. The unrelated, never-actually-used Wall Segment/Gate/corner defender system (dead code, never instantiated in any real game) was removed at the same time, along with the Outpost Hall/Storage Facility's old explicit-hauler-assignment option. See [mechanics.md](mechanics.md#assigning-citizens).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.

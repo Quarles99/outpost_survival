@@ -21,18 +21,19 @@
 
 ## Citizens
 
-There's no task menu — assignment is drag-and-drop, or select-then-click.
+Job assignment is fully automatic — there's no way to manually assign a citizen anymore (see [mechanics.md](mechanics.md#assigning-citizens)). Clicking a citizen is purely informational.
 
 | Input | Action |
 |---|---|
-| Left-click a citizen | Select them, opening their skill panel |
-| Left-click a workstation/wall while a citizen is selected | Assign them to that post (denied with a HUD message if it's already at its worker cap) |
-| Left-click the Outpost Hall or a Storage Facility while a citizen is selected | Assign them there as a hauler |
-| Left-click the *same*, already-selected citizen again | Unassign them (set them idle) |
-| Left-click-drag a citizen onto a workstation/wall/Outpost Hall/Storage Facility | Assign them to that post directly, without selecting first |
-| Release a drag off any valid post | Cancels the drag — the citizen returns to their current spot without interrupting their work |
-| Right-click, or Esc, mid-drag | Cancel the drag |
+| Left-click a citizen | Select them, opening their (view-only) skill panel |
+| Left-click the *same*, already-selected citizen again | Deselect them (same as clicking elsewhere) |
 | Left-click empty ground, or Esc | Deselect the current citizen / close their skill panel |
+
+## Disabling a post
+
+| Input | Action |
+|---|---|
+| Right-click an already-placed job post (Farm-family, Lumber Camp, Stone Mine) | Toggle it disabled/re-enabled — disabling immediately evicts its current worker (back to hauling) and blocks automatic assignment from staffing it until re-enabled |
 
 ## Recruitment
 
@@ -57,8 +58,8 @@ There's no task menu — assignment is drag-and-drop, or select-then-click.
 
 | Input | Action |
 |---|---|
-| Left-click an already-placed Farm-family building, with no citizen selected | Open a panel to retool it into any other Farm-family recipe, free and instant |
-| Left-click an already-placed Farm-family building, with a citizen selected | Assign that citizen there instead (see Citizens above) — takes priority over retooling |
+| Left-click an already-placed Farm-family building | Open a panel to retool it into any other Farm-family recipe, free and instant |
+| Right-click an already-placed Farm-family building | Toggle it disabled/re-enabled (see Disabling a post above) — doesn't open the retool panel |
 | `1`–`9` (with the retool panel open) | Choose the corresponding recipe |
 | Left-click empty ground, or Esc | Close the retool panel |
 

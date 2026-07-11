@@ -1214,10 +1214,96 @@ Implement these next:
       early game reads as too slow now that literally everything must be
       built from scratch) - recommend a playtest.
 
-- Get rid of manual assignment system
+- [DONE] Get rid of manual assignment system
   - Each pawn should automatically take a job matching whatever their highest stat is
   - Citizen who can't find a job will become haulers until a job opens up for their skill set
   - If a citizen has a job but a new citizen arrives that has a higher skill in that job the previous job holder should swap for the better qualified citizen
+    - Scope decision (asked the user first): the spec only mentioned job
+      posts and hauling, not Wall Segments or the Outpost Hall/Storage
+      Facility's old explicit-hauler-assignment option. The user chose to
+      remove Wall Segments entirely rather than keep them manual or leave
+      them unhandled - turned out to be pure upside, since a repo-wide
+      grep found WallSegment/Gate/WallCornerPeak/WallCornerPoint were
+      100% dead code already (never instantiated by Base.tscn or any
+      BuildingCatalog entry, every reference to "WallSegment" anywhere
+      in scripts/ was in a doc comment, not real code) - removed
+      scripts/wall_segment.gd, scripts/gate.gd, scenes/wall/*.tscn, and
+      their 4 art SVGs entirely. (scripts/perimeter_wall.gd and
+      scenes/world/PerimeterWall.tscn are a separate, unrelated dead
+      system CLAUDE.md already documents as intentionally kept as
+      history - left alone.)
+    - All manual assignment removed: Character no longer supports
+      dragging at all (start_drag/update_drag/end_drag/cancel_drag/
+      drag_started deleted); clicking a citizen now only selects them and
+      opens their skill panel (view-only) - clicking the same citizen
+      again just deselects, and there's no more "click a post while a
+      citizen is selected" or "drag onto a post" path anywhere. Base's
+      _post_at/_post_has_room/_assign_selected_to/_on_character_drag_started/
+      _handle_drag_input/_end_character_drag/_cancel_character_drag are
+      all gone. Outpost Hall's click now always opens the recruit panel
+      (no more "assign selected citizen as hauler" branch); a Farm-family
+      click now always opens the crop panel the same way. OutpostHall/
+      StorageFacility lost their add_worker/remove_worker/active_workers/
+      max_workers/get_worker_spot entirely (nothing calls them anymore -
+      a citizen is never explicitly "assigned" to either again) and their
+      labels reverted to plain names, since a permanently-stuck "0/10"
+      count would've been worse than no count at all.
+    - New Base._run_job_assignment() (called on every citizen recruited/
+      departed, job post built/disabled/re-enabled, and game load/boot)
+      implements the matching as citizen-proposing Gale-Shapley deferred
+      acceptance generalized to multi-worker posts: each citizen ranks
+      the 6 job skills by their own level (new
+      SkillTitles.skill_preference_order, sharing TITLE_SKILLS/JOB_NOUNS
+      with the skill-titles feature), then repeatedly proposes to their
+      best not-yet-rejected skill's shared post pool (posts of the same
+      skill_id pool their capacity together); a pool under capacity
+      accepts immediately, a full pool evicts its weakest occupant only
+      on a *strict* level improvement (a tie changes nothing - no
+      thrashing between equally-qualified citizens) - this eviction step
+      *is* "swap for the better-qualified citizen," not a separate code
+      path. Whoever exhausts every preference without landing a post
+      stays unassigned, which Character.assign_to(null) already turns
+      into hauling automatically.
+    - Caught and fixed a real design bug before it ever shipped: an
+      earlier version of this grouped each citizen into a single
+      precomputed "best skill" bucket before matching. Every fresh
+      citizen ties at level 1 across all six skills, so a fixed tie-break
+      put literally everyone's "best skill" at TITLE_SKILLS[0]
+      ("farming") - if the player's first building happened to be a
+      Lumber Camp rather than a Farm, nobody would ever be eligible to
+      work it. Fixed by having skill_preference_order return a citizen's
+      *full* ranked preference list rather than a single skill, so the
+      matching algorithm falls through to a citizen's 2nd/3rd/etc. choice
+      when their 1st has no room (or doesn't exist yet) - caught by a
+      headless test that specifically builds a Lumber Camp before any
+      Farm exists.
+    - Bonus feature (explicitly requested mid-task, not in the original
+      backlog line): any placed job post can now be right-clicked to
+      toggle it disabled/re-enabled (Workstation.disabled, gated by a new
+      _on_workstation_input_event handler - deliberately a different
+      method name than Farm's own _on_input_event override, since
+      connecting a same-named method from Workstation's _ready() would
+      resolve virtually to Farm's override instead and silently skip
+      this handler on every Farm-family post). Disabling immediately
+      evicts the current worker (Base._on_post_disabled_changed) and
+      excludes the post from _run_job_assignment (0 effective capacity)
+      until re-enabled, when a fresh assignment pass gives it a chance to
+      be staffed again right away. Shows "(Disabled)" in the post's label
+      and dims its sprite (DISABLED_TINT multiplied onto sprite_tint, so
+      a crop's own color is dimmed rather than replaced). Persisted
+      through save/load as a new "disabled" flag on placed-building save
+      entries, same pattern as House's "upgraded" flag.
+    - Verified headless end to end: fresh boot leaves all 3 starting
+      citizens hauling (no posts exist yet); building a Lumber Camp
+      *before* any Farm still gets it staffed (the tie-break bug fix,
+      above); building a Farm afterward staffs it too, leaving the third
+      citizen hauling; recruiting a level-50-farming citizen correctly
+      displaces the existing (untrained) farm worker, who becomes a
+      hauler; disabling the Lumber Camp evicts its worker and its label
+      reads "Lumber Camp (Disabled) 0/1"; it stays empty through a
+      repeat assignment pass while still disabled; re-enabling gets it
+      restaffed; and a full save/reload round-trip correctly restored
+      the disabled flag with 0 workers on the reloaded node.
 
 - Introduce day / night cycle
   - Citizens need 8 hours of sleep a day

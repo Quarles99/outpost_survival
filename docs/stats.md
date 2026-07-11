@@ -69,15 +69,23 @@ All 8 of the above (Farm through Potato Farm) can be clicked once placed to reto
 | Skill trained | `farming` | `lumberjacking` | `mining` |
 | Max workers assigned at once | 1 | 1 | 1 |
 
-## Worker Caps (`Workstation`, `WallSegment`, `OutpostHall`, `StorageFacility`)
+## Worker Caps (`Workstation`)
 
 | | Value |
 |---|---|
 | Max workers per Workstation (Farm-family, Lumber Camp, Stone Mine) | 1 |
-| Max workers per Wall Segment | 1 |
-| Max haulers per Outpost Hall or Storage Facility | 10 (generous rather than matching Workstation's 1 - haulers don't share a production buffer, so there's no throughput reason to bottleneck it) |
 
-Each post's status label shows live occupancy as `"<name>\n<active_workers>/<max_workers>"` (e.g. `"Lumber Camp 1/1"`), refreshed on every assignment/unassignment.
+Each post's status label shows live occupancy as `"<name>\n<active_workers>/<max_workers>"` (e.g. `"Lumber Camp 1/1"`), refreshed on every automatic assignment/unassignment. The Outpost Hall and Storage Facilities are never job posts - haulers are never explicitly "assigned" to either (see Automatic Job Assignment below), so they carry no worker count.
+
+## Automatic Job Assignment (`Base`, `SkillTitles`)
+
+| | Value |
+|---|---|
+| Job skills eligible for auto-assignment | farming, lumberjacking, mining, milling, baking, brewing (`SkillTitles.TITLE_SKILLS`) |
+| Matching algorithm | Citizen-proposing deferred acceptance (generalized Gale-Shapley), recomputed from scratch on every trigger |
+| Triggers | Game boot/load, citizen recruited/departed, job post built/disabled/re-enabled |
+| Swap condition | Strictly higher level in the contested skill only - ties never swap |
+| Post disable toggle | Right-click any placed job post - evicts its current worker immediately, excluded from matching (0 capacity) until re-enabled |
 
 The **Farm** class is a generic single-input/single-output converter (exported `input_per_tick`, `input_resource`, `skill_id`, `sprite_tint`) — the row above is its default configuration (wood → food, "farming"). The full Alternative Crop Types chain is built from the same class, sharing one scene (`CropStation.tscn`) and distinguished only by catalog configuration:
 

@@ -1,6 +1,17 @@
 extends Area2D
 class_name Workstation
 
+## Fired whenever `disabled` changes (see its own doc comment) - Base
+## listens (see _wire_workstation_disable/_on_post_disabled_changed) to
+## evict any current worker the moment a post is disabled, and to re-run
+## job assignment either direction.
+signal disabled_changed(is_disabled: bool)
+
+## Multiplied onto sprite_tint (not a replacement) so a disabled post still
+## reads as "the same building, dimmed" rather than losing its crop/
+## resource-specific color entirely.
+const DISABLED_TINT := Color(0.55, 0.55, 0.55)
+
 const RESOURCE_VISUALS := {
 	"food": {
 		"texture": preload("res://art/iso_workstation_farm.svg"),
@@ -27,17 +38,23 @@ const RESOURCE_VISUALS := {
 ## How many citizens can be assigned here at once - most Workstations only
 ## have room for one at a time now (a first-pass default, not tuned via
 ## playtesting - a handful of catalog entries may still want to override it
-## upward for genuine parallel-throughput cases). Checked by Base
-## (_post_has_room) before allowing a new assignment via drag or click,
-## alongside WallSegment/OutpostHall/StorageFacility's own max_workers
-## (duck-typed the same way add_worker/remove_worker/get_worker_spot/
-## display_name already are).
+## upward for genuine parallel-throughput cases). Enforced by
+## Base._run_job_assignment's per-skill capacity accounting, not by any
+## per-post check anymore - job assignment is fully automatic now (see
+## CLAUDE.md's rewritten Character/post interaction pattern).
 @export var max_workers: int = 1
 ## Lets several BuildingCatalog entries share one placeholder scene (e.g.
 ## every crop/refinement building in the Farm family) while still reading
 ## visually distinct - applied over whatever RESOURCE_VISUALS or the scene's
 ## own sprite picked. Identity tint (WHITE) leaves it untouched.
 @export var sprite_tint: Color = Color.WHITE
+## Right-click toggles this (see _on_input_event) - lets the player
+## temporarily pull a post out of automatic job assignment (see
+## Base._run_job_assignment) to send its worker elsewhere, without having
+## to demolish/rebuild it. A disabled post immediately evicts its current
+## worker (Base._on_post_disabled_changed) and is treated as zero capacity
+## until re-enabled.
+var disabled := false
 
 @onready var label: Label = $Label
 @onready var sprite: Sprite2D = $Sprite2D
@@ -69,12 +86,41 @@ func _ready() -> void:
 	_default_centered = sprite.centered
 	_default_offset = sprite.offset
 	refresh_visual()
+	input_event.connect(_on_workstation_input_event)
 
 
 ## "Farm\n1/1" - shows how full this post's worker slots are, not just its
 ## name, refreshed on every add_worker()/remove_worker() so it stays live.
+## A disabled post appends " (Disabled)" to the name line (compare House's
+## " (Upgraded)" suffix).
 func _update_label() -> void:
-	label.text = "%s\n%d/%d" % [display_name, active_workers, max_workers]
+	var suffix := " (Disabled)" if disabled else ""
+	label.text = "%s%s\n%d/%d" % [display_name, suffix, active_workers, max_workers]
+
+
+## Right-click toggles `disabled` - left-click is already spoken for on a
+## Farm-family post (opens the crop panel, see Farm._on_input_event), so
+## this uses the other button rather than competing with it. Godot calls
+## every connected input_event listener for a given event regardless of
+## button, so Farm's own left-click handler and this one coexist fine on
+## the same Area2D. Deliberately a different method name than Farm's own
+## _on_input_event override - connecting a same-named method from this
+## base class's _ready() would resolve virtually to Farm's override
+## instead (GDScript has no way to bind "this class's implementation,
+## even from a subclass"), silently skipping this handler entirely and
+## double-connecting Farm's.
+func _on_workstation_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		get_viewport().set_input_as_handled()
+		set_disabled(not disabled)
+
+
+func set_disabled(value: bool) -> void:
+	if disabled == value:
+		return
+	disabled = value
+	refresh_visual()
+	disabled_changed.emit(disabled)
 
 
 ## Re-applies resource_type/sprite_tint to the sprite (and display_name to
@@ -93,7 +139,7 @@ func refresh_visual() -> void:
 		sprite.texture = _default_texture
 		sprite.centered = _default_centered
 		sprite.offset = _default_offset
-	sprite.modulate = sprite_tint
+	sprite.modulate = sprite_tint * (DISABLED_TINT if disabled else Color.WHITE)
 
 
 func get_worker_spot() -> Vector2:

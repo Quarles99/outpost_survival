@@ -54,10 +54,6 @@ const HAPPINESS_BANDS := [
 	{"min": 0.0, "name": "Miserable", "multiplier": 0.6},
 ]
 
-## Minimum cursor travel (px) before a character press becomes a drag rather
-## than a click.
-const DRAG_THRESHOLD := 12.0
-
 const CHARACTER_SCENE := preload("res://scenes/character/Character.tscn")
 
 @onready var skill_panel: SkillPanel = $SkillPanel
@@ -101,10 +97,6 @@ var _ghost: Node2D = null
 var _ghost_origin := Vector2i.ZERO
 var _ghost_valid := false
 
-var _drag_character: Character = null
-var _drag_start_mouse := Vector2.ZERO
-var _drag_moved := false
-
 
 func _ready() -> void:
 	get_viewport().physics_object_picking = true
@@ -128,7 +120,8 @@ func _ready() -> void:
 	## used to be fixed starting buildings too, but the player now has to
 	## build everything else themselves (starting resources - 10 food, 10
 	## wood - comfortably cover a Lumber Camp's 5 wood cost to get going).
-	posts.append($OutpostHall)
+	## Not appended to `posts` - it's never a job post (see _job_posts), only
+	## a stockpile drop-off point.
 	$OutpostHall.set_meta("save_id", "outpost_hall")
 
 	_reserve_existing_footprint($OutpostHall, BuildingCatalog.get_option("outpost_hall")["grid_size"])
@@ -136,7 +129,7 @@ func _ready() -> void:
 	_scatter_initial_trees()
 
 	for character in characters:
-		character.drag_started.connect(_on_character_drag_started)
+		character.clicked.connect(_on_character_selected)
 		## Aldric/Brenna/Cass are hand-authored .tres resources loaded once
 		## and shared by every instantiation of Base.tscn in this process -
 		## unlike a fresh CharacterData for a recruit, their skill/happiness
@@ -189,6 +182,12 @@ func _ready() -> void:
 	if SaveManager.should_load_on_start:
 		SaveManager.should_load_on_start = false
 		_load_game()
+	else:
+		## _load_game() already ends with its own _run_job_assignment() call
+		## (covering boot-load and any later F9/menu load) - this covers the
+		## fresh "New Game" path, which never calls _load_game() at all.
+		_run_job_assignment()
+
 
 
 func _configure_camera_limits(min_cell: Vector2i, max_cell: Vector2i) -> void:
@@ -287,13 +286,11 @@ func _character_leaves(character: Character) -> void:
 	character.leave()
 	if _selected_character == character:
 		_deselect()
-	if _drag_character == character:
-		_drag_character = null
-		_drag_moved = false
 	characters.erase(character)
 	GameState.population_count = maxi(0, GameState.population_count - 1)
 	GameState.population_changed.emit(GameState.population_count, GameState.population_capacity)
 	character.queue_free()
+	_run_job_assignment()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -316,9 +313,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	## assigning to a post...) instead of being absorbed by the modal menu
 	## on top of it.
 	if (system_menu.visible or slot_panel.visible) and event is InputEventMouseButton and event.pressed:
-		return
-	if _drag_character:
-		_handle_drag_input(event)
 		return
 	if _placing_option:
 		_handle_placement_input(event)
@@ -343,114 +337,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			_open_system_menu()
 		return
 	if event is InputEventMouseButton and event.pressed:
-		## A Farm-family post intercepts its own click before this ever runs
-		## (see _on_farm_clicked) - this only fires for post types with no
-		## click handler of their own (LumberCamp, StoneMine, WallSegment),
-		## resolved the same way a drag-drop already is: a physics point
-		## query against `posts`, not a per-post signal.
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			var post := _post_at(get_global_mouse_position())
-			if post:
-				_assign_selected_to(post)
-				return
 		_deselect()
 	elif event.is_action_pressed("ui_cancel"):
 		_deselect()
 
 
-func _on_character_drag_started(character: Character) -> void:
-	if _placing_option or _drag_character:
-		return
-	_drag_character = character
-	_drag_start_mouse = get_global_mouse_position()
-	_drag_moved = false
-
-
-func _handle_drag_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion:
-		var mouse_pos := get_global_mouse_position()
-		if not _drag_moved and mouse_pos.distance_to(_drag_start_mouse) >= DRAG_THRESHOLD:
-			_drag_moved = true
-			if _selected_character:
-				_deselect()
-			_drag_character.start_drag()
-		if _drag_moved:
-			_drag_character.update_drag(mouse_pos)
-	elif event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		get_viewport().set_input_as_handled()
-		_end_character_drag()
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
-		get_viewport().set_input_as_handled()
-		_cancel_character_drag()
-	elif event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()
-		_cancel_character_drag()
-
-
-func _end_character_drag() -> void:
-	var character := _drag_character
-	var moved := _drag_moved
-	_drag_character = null
-	_drag_moved = false
-
-	if not moved:
-		_on_character_selected(character)
-		return
-
-	var post := _post_at(get_global_mouse_position())
-	if _post_has_room(post, character):
-		character.end_drag()
-		character.assign_to(post)
-	else:
-		character.cancel_drag()
-
-
-func _cancel_character_drag() -> void:
-	var character := _drag_character
-	var moved := _drag_moved
-	_drag_character = null
-	_drag_moved = false
-	if moved:
-		character.cancel_drag()
-
-
-func _post_at(global_pos: Vector2) -> Node:
-	var query := PhysicsPointQueryParameters2D.new()
-	query.position = global_pos
-	query.collide_with_areas = true
-	query.collide_with_bodies = false
-	for result in get_world_2d().direct_space_state.intersect_point(query, 8):
-		if result["collider"] in posts:
-			return result["collider"]
-	return null
-
-
-## Whether `for_character` could be assigned to `post` right now - false for
-## a null post, or one already at its max_workers (duck-typed on Workstation
-## and WallSegment, which each set their own default - see their max_workers
-## doc comments). Always true for a post `for_character` is already assigned
-## to: re-dropping them back onto their current post shouldn't be blocked
-## just because they themselves count toward its own occupancy.
-func _post_has_room(post: Node, for_character: Character = null) -> bool:
-	if not post:
-		return false
-	if for_character and for_character.assigned_post == post:
-		return true
-	return post.active_workers < post.max_workers
-
-
-## Clicking a citizen selects them (opening their skill panel) rather than
-## opening a menu of assignable posts - assignment itself now happens by
-## dragging them onto a post, or by clicking a post while they're selected
-## (see _unhandled_input/_on_farm_clicked). Clicking the *same* already-
-## selected citizen again unassigns them instead (set them idle) rather
-## than being a no-op - with the old task menu's "[0] Idle" option gone,
-## this is the replacement gesture for "stop working."
+## Clicking a citizen selects them and opens their (view-only) skill panel -
+## job assignment is fully automatic (see _run_job_assignment), so this is
+## purely informational. Clicking the same already-selected citizen again
+## just deselects them, same as clicking elsewhere.
 func _on_character_selected(character: Character) -> void:
 	if _placing_option:
 		return
 	if _selected_character == character:
-		character.assign_to(null)
 		_deselect()
 		return
 	if _selected_character:
@@ -458,19 +357,6 @@ func _on_character_selected(character: Character) -> void:
 	_selected_character = character
 	_selected_character.set_selected(true)
 	skill_panel.open_for(character)
-
-
-## Assigns _selected_character to `post` if it has room (see
-## _post_has_room), or flashes a denial, then deselects either way -
-## shared by _unhandled_input's generic post click and _on_farm_clicked's
-## "a Farm was clicked while a citizen is selected" branch.
-func _assign_selected_to(post: Node) -> void:
-	var character := _selected_character
-	if _post_has_room(post, character):
-		character.assign_to(post)
-	else:
-		hud.flash_message("%s is full" % post.display_name)
-	_deselect()
 
 
 func _deselect() -> void:
@@ -503,14 +389,7 @@ func _open_system_menu() -> void:
 	system_menu.open()
 
 
-## A citizen selected when the Outpost Hall is clicked assigns them there as
-## a hauler instead of opening the recruit panel - same "clicked posts take
-## priority for assignment over their other click behavior" rule
-## _on_farm_clicked already follows for the crop-selection panel.
 func _on_outpost_hall_clicked() -> void:
-	if _selected_character:
-		_assign_selected_to($OutpostHall)
-		return
 	_cancel_placement()
 	build_menu.close()
 	crop_panel.close()
@@ -548,20 +427,168 @@ func _on_house_clicked(house: House) -> void:
 	hud.flash_message("%s upgraded (+%d capacity)" % [house.display_name, House.UPGRADE_CAPACITY_BONUS])
 
 
-## A Farm's own `clicked` signal (see Farm.gd) always reaches here first,
-## before _unhandled_input's generic post-click handling ever gets a look -
-## so unlike other post types, a Farm has to decide for itself whether a
-## click means "assign the selected citizen here" or "open the crop-
-## selection panel", based on whether a citizen happens to be selected.
 func _on_farm_clicked(farm: Farm) -> void:
-	if _selected_character:
-		_assign_selected_to(farm)
-		return
 	_cancel_placement()
 	build_menu.close()
 	recruit_panel.close()
 	_crop_target = farm
 	crop_panel.open_for(BuildingCatalog.farm_family_options(), farm.display_name)
+
+
+## Right-click toggles any job post (Farm/LumberCamp/StoneMine/CropStation -
+## every Workstation subclass) disabled/re-enabled - see Workstation.disabled's
+## doc comment. Left-click on a Farm-family post is already spoken for
+## (opens the crop panel, see _on_farm_clicked), so this deliberately uses
+## the other mouse button rather than competing with it.
+func _wire_workstation_disable(building: Node) -> void:
+	if building is Workstation:
+		building.disabled_changed.connect(_on_post_disabled_changed.bind(building))
+
+
+## A post going disabled evicts whoever's currently working it (back to
+## hauling) so "temporarily disable a building to send its worker
+## elsewhere" - the actual point of the feature - takes effect immediately
+## rather than only the next time assignment happens to run. Either
+## direction (disabling or re-enabling) then re-runs the full assignment
+## pass: disabling may free up a more-qualified worker who was previously
+## displaced elsewhere, and re-enabling gives the post a chance to be
+## staffed again straight away rather than waiting for some other trigger.
+func _on_post_disabled_changed(is_disabled: bool, post: Workstation) -> void:
+	if is_disabled:
+		for citizen in characters:
+			if citizen.assigned_post == post:
+				citizen.assign_to(null)
+	_run_job_assignment()
+
+
+## Every placed post that trains one of the six job skills (see
+## SkillTitles.TITLE_SKILLS) - the Outpost Hall and Storage Facilities
+## never appear here (they're not in `posts` at all - see _ready's doc
+## comment on the Outpost Hall), and a disabled post is excluded too (its
+## effective capacity is 0 - see _run_job_assignment).
+func _job_posts() -> Array:
+	var result: Array = []
+	for post in posts:
+		if post is Workstation and post.get_skill_id() in SkillTitles.TITLE_SKILLS:
+			result.append(post)
+	return result
+
+
+## Matches every citizen to whichever job post trains the skill they're
+## currently best at - "Each pawn should automatically take a job matching
+## whatever their highest stat is" - with no player-driven assignment at
+## all anymore (see CLAUDE.md's rewritten Character/post interaction
+## pattern). Recomputed from scratch on every relevant trigger (a citizen
+## recruited/departed, a post built/disabled/re-enabled, a save loaded)
+## rather than incrementally patched - simplest way to guarantee the result
+## is always the same regardless of history, and cheap enough at this
+## game's scale (a handful of citizens/posts) to just redo in full.
+##
+## This is citizen-proposing Gale-Shapley deferred acceptance, generalized
+## to multi-worker posts: each citizen ranks the 6 job skills by their own
+## level in them (SkillTitles.skill_preference_order - stable, so a
+## citizen tied at level 1 in everything doesn't get stuck only ever
+## proposing to their nominal #1 pick when a *different* skill's post is
+## the only one with room - see that function's doc comment for the bug
+## this specifically avoids), then repeatedly proposes to their best
+## not-yet-rejected skill's post pool. A pool under capacity accepts
+## immediately; a full pool compares the proposer against its current
+## weakest occupant (by level in that specific skill) and evicts/accepts on
+## a *strict* improvement only (a tie changes nothing - no thrashing
+## between equally-qualified citizens). This is exactly "if a citizen has a
+## job but a new citizen arrives with higher skill in that job, the
+## previous job holder should swap for the better qualified citizen" -
+## implicit in the eviction step, not a separate code path. Whoever
+## exhausts every preference without landing a post stays unassigned,
+## which Character.assign_to(null) already turns into hauling automatically
+## - "a citizen who can't find a job becomes a hauler until one opens up".
+##
+## Finally applies the result with a diff against each citizen's *current*
+## assigned_post: assign_to() is only called for citizens whose target
+## actually changed, so an already-correctly-placed citizen (the common
+## case on a repeat call) is left completely alone rather than having their
+## work loop restarted for no reason - this is also what makes restoring a
+## citizen's exact saved position (Base._restore_characters) survive the
+## _run_job_assignment() call _load_game() makes right after: if the save
+## was already stable under this same algorithm (the normal case), nothing
+## about it changes.
+func _run_job_assignment() -> void:
+	var job_posts := _job_posts()
+	var posts_by_skill: Dictionary = {}
+	for post in job_posts:
+		var skill_id: String = post.get_skill_id()
+		if not posts_by_skill.has(skill_id):
+			posts_by_skill[skill_id] = []
+		posts_by_skill[skill_id].append(post)
+
+	var capacity_by_skill: Dictionary = {}
+	for skill_id in posts_by_skill:
+		var capacity := 0
+		for post in posts_by_skill[skill_id]:
+			if not post.disabled:
+				capacity += post.max_workers
+		capacity_by_skill[skill_id] = capacity
+
+	var preferences: Dictionary = {}
+	var next_pref_index: Dictionary = {}
+	for citizen in characters:
+		preferences[citizen] = SkillTitles.skill_preference_order(citizen.data)
+		next_pref_index[citizen] = 0
+
+	## skill_id -> Array[Character] tentatively accepted into that skill's
+	## shared pool (bounded by capacity_by_skill[skill_id]).
+	var accepted: Dictionary = {}
+	for skill_id in posts_by_skill:
+		accepted[skill_id] = []
+
+	var queue: Array = characters.duplicate()
+	while not queue.is_empty():
+		var citizen: Character = queue.pop_front()
+		var prefs: Array = preferences[citizen]
+		var idx: int = next_pref_index[citizen]
+		if idx >= prefs.size():
+			continue
+		next_pref_index[citizen] = idx + 1
+		var skill_id: String = prefs[idx]
+		var capacity: int = capacity_by_skill.get(skill_id, 0)
+		if capacity == 0:
+			queue.append(citizen)
+			continue
+		var pool: Array = accepted[skill_id]
+		if pool.size() < capacity:
+			pool.append(citizen)
+			continue
+		var weakest: Character = pool[0]
+		for candidate in pool:
+			if candidate.data.get_skill_level(skill_id) < weakest.data.get_skill_level(skill_id):
+				weakest = candidate
+		if citizen.data.get_skill_level(skill_id) > weakest.data.get_skill_level(skill_id):
+			pool.erase(weakest)
+			pool.append(citizen)
+			queue.append(weakest)
+		else:
+			queue.append(citizen)
+
+	## Distribute each skill's accepted pool across that skill's posts (in
+	## `posts` order - stable/deterministic, not meaningful beyond that) up
+	## to each post's own max_workers, then diff-apply against reality.
+	var target_post: Dictionary = {}
+	for skill_id in accepted:
+		var pool: Array = accepted[skill_id]
+		var pool_index := 0
+		for post in posts_by_skill[skill_id]:
+			if post.disabled:
+				continue
+			for _i in range(post.max_workers):
+				if pool_index >= pool.size():
+					break
+				target_post[pool[pool_index]] = post
+				pool_index += 1
+
+	for citizen in characters:
+		var target: Node = target_post.get(citizen, null)
+		if citizen.assigned_post != target:
+			citizen.assign_to(target)
 
 
 ## Reconfigures _crop_target in place with `option`'s Farm-family fields
@@ -627,17 +654,23 @@ func _on_candidate_selected(candidate: Dictionary) -> void:
 	GameState.population_count += 1
 	GameState.population_changed.emit(GameState.population_count, GameState.population_capacity)
 	hud.flash_message("%s joined the outpost" % character.data.character_name)
+	## A new arrival might out-qualify whoever currently holds a matching
+	## job - see _run_job_assignment's doc comment.
+	_run_job_assignment()
 
 
 ## Instantiates a fresh Character with a fresh CharacterData (not a shared
 ## .tres like Aldric/Brenna/Cass - recruits are procedurally generated, not
 ## hand-authored) and registers it exactly like the 3 starting citizens are
 ## in _ready(): added as a direct child of Base (required for y-sorting -
-## see CLAUDE.md), appended to `characters`, wired to drag_started. Does NOT
+## see CLAUDE.md), appended to `characters`, wired to `clicked`. Does NOT
 ## touch GameState.population_count or spend anything - callers decide
 ## whether that applies (a fresh recruit does both; _restore_characters
 ## recreating a missing citizen from a save does neither, since the saved
-## population_count already accounts for them).
+## population_count already accounts for them). Also deliberately doesn't
+## call _run_job_assignment() itself - callers differ on timing (a fresh
+## recruit needs it once, right after; _restore_characters needs every
+## citizen spawned first, then one assignment pass at the very end).
 ## `id` lets a caller pin the save/load identity (used when recreating a
 ## citizen from a save entry); left empty, a fresh one is generated - two
 ## recruits can share a display name (RecruitCatalog's pool is small) but
@@ -651,7 +684,7 @@ func _spawn_character(character_name: String, spawn_position: Vector2, id: Strin
 	character.position = spawn_position
 	add_child(character)
 	characters.append(character)
-	character.drag_started.connect(_on_character_drag_started)
+	character.clicked.connect(_on_character_selected)
 	return character
 
 
@@ -720,6 +753,7 @@ func _confirm_placement() -> void:
 	add_child(building)
 	_wire_farm_clicks(building)
 	_wire_house_clicks(building)
+	_wire_workstation_disable(building)
 
 	if option.has("population_capacity"):
 		GameState.add_population_capacity(option["population_capacity"])
@@ -735,6 +769,11 @@ func _confirm_placement() -> void:
 	_placed_buildings.append({"save_id": save_id, "option_id": option["id"], "origin": origin, "node": building})
 
 	_cancel_placement()
+	## A freshly built job post might open a slot a hauler's been waiting on
+	## - see _run_job_assignment's doc comment. Harmless no-op for a passive
+	## building (House/Well/Storage Facility) since it never appears in
+	## _job_posts().
+	_run_job_assignment()
 
 
 func _cancel_placement() -> void:
@@ -847,8 +886,6 @@ func _load_game() -> void:
 		return
 
 	_cancel_placement()
-	if _drag_character:
-		_cancel_character_drag()
 	_deselect()
 	build_menu.close()
 
@@ -892,6 +929,12 @@ func _load_game() -> void:
 		GameState.population_changed.emit(GameState.population_count, GameState.population_capacity)
 
 	hud.flash_message("Loaded")
+	## Normalizes assignments against the current automatic system - a no-op
+	## diff in the common case (the save was itself produced under this same
+	## system), but self-heals an older save's stale/now-invalid assignment
+	## (e.g. a citizen saved as an explicit Outpost Hall hauler, back when
+	## that was a manual option - see _post_by_save_id's doc comment).
+	_run_job_assignment()
 
 
 func _serialize_trees() -> Array:
@@ -923,6 +966,8 @@ func _serialize_placed_buildings() -> Array:
 		var out_entry := {"save_id": entry["save_id"], "option_id": entry["option_id"], "origin": [origin.x, origin.y]}
 		if entry["node"] is House and entry["node"].upgraded:
 			out_entry["upgraded"] = true
+		if entry["node"] is Workstation and entry["node"].disabled:
+			out_entry["disabled"] = true
 		out.append(out_entry)
 	return out
 
@@ -962,8 +1007,11 @@ func _restore_placed_buildings(entries: Array) -> void:
 		add_child(building)
 		_wire_farm_clicks(building)
 		_wire_house_clicks(building)
+		_wire_workstation_disable(building)
 		if building is House and entry.get("upgraded", false):
 			building.mark_upgraded()
+		if building is Workstation and entry.get("disabled", false):
+			building.disabled = true
 		if building.has_method("add_worker"):
 			posts.append(building)
 		if building.has_method("get_stockpile_spot"):
@@ -1081,15 +1129,15 @@ func _restore_characters(entries: Array) -> void:
 			character.queue_free()
 
 
-## "farm"/"woodpile" are no longer valid - the fixed starting Cabbage Farm
-## and Lumber Camp are gone, so an old save referencing a citizen assigned
-## to either just falls through to null (unassigned) rather than crashing
-## on a node that doesn't exist anymore.
+## "farm"/"woodpile" (the old fixed starting Cabbage Farm/Lumber Camp) and
+## "outpost_hall" (the old explicit-hauler-assignment target, before job
+## assignment became fully automatic) are none of them valid job posts
+## anymore - an old save referencing a citizen assigned to any of them just
+## falls through to null (unassigned/hauling) rather than crashing on a
+## node that either doesn't exist, or (Outpost Hall) simply isn't a post.
 func _post_by_save_id(save_id: String) -> Node:
 	if save_id.is_empty():
 		return null
-	if save_id == "outpost_hall":
-		return $OutpostHall
 	for entry in _placed_buildings:
 		if entry["save_id"] == save_id:
 			return entry["node"]

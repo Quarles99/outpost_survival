@@ -56,3 +56,33 @@ static func _tier_for_level(level: int) -> String:
 		if level >= entry[0]:
 			tier = entry[1]
 	return tier
+
+
+## Every job skill, ranked by this citizen's own level in it, descending -
+## used by Base._run_job_assignment as each citizen's ordered list of which
+## post to try proposing to first. Ties (including the common "level 1 in
+## everything" case for a brand-new citizen) are broken by TITLE_SKILLS'
+## fixed order via a total-order comparator rather than relying on
+## Array.sort_custom being stable (it isn't guaranteed to be in Godot) -
+## deterministic regardless of engine sort implementation.
+##
+## Deliberately NOT grouping citizens by a single precomputed "best skill"
+## before matching (an earlier design of this function did, and had a real
+## bug): every fresh citizen ties at level 1 across all six skills, so a
+## fixed tie-break would put literally everyone's "best skill" at
+## TITLE_SKILLS[0] ("farming") - if the player's first building happens to
+## be a Lumber Camp rather than a Farm, nobody would ever be eligible to
+## work it, no matter how idle they are, since none of them would have
+## "lumberjacking" as their nominal favorite. Returning a full ranked list
+## instead lets the matching algorithm fall through to a citizen's 2nd,
+## 3rd, etc. choice when their 1st has no room (or doesn't exist yet).
+static func skill_preference_order(data: CharacterData) -> Array:
+	var order := TITLE_SKILLS.duplicate()
+	order.sort_custom(func(a: String, b: String) -> bool:
+		var level_a: int = data.get_skill_level(a) if data else 1
+		var level_b: int = data.get_skill_level(b) if data else 1
+		if level_a != level_b:
+			return level_a > level_b
+		return TITLE_SKILLS.find(a) < TITLE_SKILLS.find(b)
+	)
+	return order

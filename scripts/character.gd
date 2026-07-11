@@ -1,9 +1,10 @@
 extends Area2D
 class_name Character
 
-## Fired on every left-press, before it's known whether this becomes a plain
-## click or a real drag — Base resolves that and calls back in accordingly.
-signal drag_started(character: Character)
+## Fired on left-click - Base selects this citizen and opens their skill
+## panel (view-only; job assignment is fully automatic, see
+## Base._run_job_assignment).
+signal clicked(character: Character)
 
 const BOB_AMPLITUDE := 2.5
 const BOB_SPEED := 1.4
@@ -14,7 +15,6 @@ const MOVE_SPEED := 140.0
 const MIN_MOVE_DURATION := 0.3
 const MAX_MOVE_DURATION := 4.0
 const IDLE_RETRY_DELAY := 2.5
-const DRAG_SCALE := Vector2(1.15, 1.15)
 ## Flat xp granted per gather tick/chop, regardless of skill or output -
 ## xp is for time-worked, not scaled by level (which would make high levels
 ## snowball even faster on top of their output multiplier).
@@ -69,8 +69,6 @@ var _work_active := false
 var _work_session := 0
 var _claimed_tree: WorldTree = null
 
-var _is_dragging := false
-
 
 func _ready() -> void:
 	input_event.connect(_on_input_event)
@@ -85,8 +83,6 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if _is_dragging:
-		return
 	_bob_phase += delta * BOB_SPEED
 	position = _base_position + Vector2(0, sin(_bob_phase) * BOB_AMPLITUDE)
 
@@ -95,20 +91,16 @@ func _on_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> voi
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		get_viewport().set_input_as_handled()
 		select_sound.play()
-		drag_started.emit(self)
+		clicked.emit(self)
 
 
 func _on_mouse_entered() -> void:
-	if _is_dragging:
-		return
 	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
 	var tween := create_tween()
 	tween.tween_property(sprite, "modulate", Color(1.25, 1.25, 1.25), 0.12)
 
 
 func _on_mouse_exited() -> void:
-	if _is_dragging:
-		return
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	var tween := create_tween()
 	tween.tween_property(sprite, "modulate", Color.WHITE, 0.15)
@@ -159,67 +151,14 @@ func assign_to(post: Node, grant_move_xp: bool = true) -> void:
 	assigned_post = post
 	if post:
 		post.add_worker()
-		_move_to(post.get_worker_spot() if post.has_method("get_worker_spot") else global_position, grant_move_xp)
-		if post is Workstation:
-			_start_work(post)
-		elif post is OutpostHall or post is StorageFacility:
-			## Explicitly assigned as a hauler - the same _run_hauler_loop
-			## an unassigned citizen already runs by default, just with a
-			## real assigned_post (savable, capped by max_workers) instead
-			## of only ever happening implicitly.
-			_start_hauling()
+		_move_to(post.get_worker_spot(), grant_move_xp)
+		_start_work(post)
 	else:
 		_move_to(_home_position, grant_move_xp)
 		_start_hauling()
 	_update_label()
 	_punch()
 	assign_sound.play()
-
-
-## Picked up by Base once a press crosses the drag threshold. The character's
-## origin tracks the cursor directly via update_drag(); _process()'s idle bob
-## is suspended for the duration so the two don't fight over `position`.
-func start_drag() -> void:
-	_is_dragging = true
-	Input.set_default_cursor_shape(Input.CURSOR_DRAG)
-	if _move_tween:
-		_move_tween.kill()
-	if _scale_tween:
-		_scale_tween.kill()
-	_scale_tween = create_tween()
-	_scale_tween.tween_property(self, "scale", DRAG_SCALE, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
-func update_drag(global_pos: Vector2) -> void:
-	if _is_dragging:
-		global_position = global_pos
-
-
-## Ends the drag and syncs _base_position to wherever it was dropped, so
-## whatever runs next (assign_to's _move_to, or cancel_drag's) animates
-## smoothly from the drop point instead of snapping back to a stale position.
-## Kills/replaces the shared _scale_tween rather than starting an independent
-## one, since assign_to's _punch() runs right after on a successful drop and
-## would otherwise fight this tween over the same scale property.
-func end_drag() -> void:
-	_is_dragging = false
-	_base_position = global_position
-	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
-	if _scale_tween:
-		_scale_tween.kill()
-	_scale_tween = create_tween()
-	_scale_tween.tween_property(self, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
-## Dropped somewhere invalid: settle back to the current assignment's spot
-## without touching assigned_post/worker counts/lumberjack state, so an
-## accidental drag-and-miss can't interrupt work in progress.
-func cancel_drag() -> void:
-	end_drag()
-	var target := _home_position
-	if assigned_post and assigned_post.has_method("get_worker_spot"):
-		target = assigned_post.get_worker_spot()
-	_move_to(target)
 
 
 ## `grant_xp` is false only for Base._restore_characters' initial
@@ -256,12 +195,10 @@ func _punch() -> void:
 func _update_label() -> void:
 	if not data:
 		return
-	## "Hauling" for no assignment at all, or an explicit hauler assignment
-	## (Outpost Hall/Storage Facility) - both run the exact same
-	## _run_hauler_loop, so the action is what's worth showing, not which
-	## building they're stationed at. Any other post shows its own name.
-	var is_hauler_post := assigned_post is OutpostHall or assigned_post is StorageFacility
-	var status: String = "Hauling" if (not assigned_post or is_hauler_post) else assigned_post.display_name
+	## "Hauling" for no job assignment - job assignment is fully automatic
+	## (see Base._run_job_assignment), so this is every citizen without an
+	## open matching post right now, not a manual idle state.
+	var status: String = "Hauling" if not assigned_post else assigned_post.display_name
 	var skill_id := _current_skill_id()
 	if not skill_id.is_empty():
 		status += " · Lv %d" % data.get_skill_level(skill_id)
@@ -270,7 +207,7 @@ func _update_label() -> void:
 
 
 ## Maps the current assignment to the skill it trains. Empty string for no
-## assignment or a post type that doesn't train anything (e.g. WallSegment).
+## assignment (unassigned citizens haul instead).
 func _current_skill_id() -> String:
 	if assigned_post and assigned_post.has_method("get_skill_id"):
 		return assigned_post.get_skill_id()
