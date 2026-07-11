@@ -1072,7 +1072,41 @@ Implement these next:
       1.5s tick, to avoid the next tick's own label confusing the check)
       and confirmed it was gone (queue_free'd).
 
-- House upgrade with stone to increase capacity
+- [DONE] House upgrade with stone to increase capacity
+  - House converted from a plain Node2D to an Area2D (mirroring
+    OutpostHall's click pattern - same CollisionShape2D size/position,
+    since both are 2x2 footprints sharing the same iso art proportions),
+    emitting a `clicked` signal on left-click.
+    - House.UPGRADE_COST (15 stone) and UPGRADE_CAPACITY_BONUS (+2) are
+      constants on House; House.mark_upgraded() only flips the `upgraded`
+      flag and refreshes the label (to "House (Upgraded)") - spending the
+      cost and granting the capacity bonus live in
+      Base._on_house_clicked, since only Base/GameState know whether the
+      player can currently afford it. A second click on an already-
+      upgraded House is denied with a HUD message rather than double-
+      spending.
+    - Base._wire_house_clicks (parallel to the existing
+      _wire_farm_clicks) connects the signal at both of a House's two
+      construction paths - fresh placement (_confirm_placement) and
+      save-file rebuild (_restore_placed_buildings).
+    - Persistence: _serialize_placed_buildings now includes an
+      "upgraded": true entry for any House that's been upgraded (omitted
+      otherwise, so old saves round-trip with no field at all);
+      _restore_placed_buildings calls building.mark_upgraded() when that
+      flag is set. The actual capacity bonus itself doesn't need
+      separate restoration - GameState.population_capacity is already
+      saved/loaded as a raw total (see Base._restore_placed_buildings'
+      pre-existing doc comment on why placed buildings never re-grant
+      capacity on load).
+    - Verified headless: placed a House, confirmed an upgrade attempt
+      with 0 stone was denied (upgraded stays false, capacity
+      unchanged); granted 20 stone and confirmed upgrading succeeded
+      (upgraded=true, label reads "House (Upgraded)", population
+      capacity +2, stone spent down to 5); confirmed a second upgrade
+      attempt on the same House was denied and capacity didn't change
+      again; saved and reloaded and confirmed the reloaded House
+      instance still read upgraded=true with the correct label and the
+      capacity bonus intact.
 
 - Replace placeholder farm art with recolored cabagge farm art
 

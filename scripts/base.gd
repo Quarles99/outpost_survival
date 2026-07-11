@@ -527,6 +527,27 @@ func _wire_farm_clicks(building: Node) -> void:
 		building.clicked.connect(_on_farm_clicked.bind(building))
 
 
+func _wire_house_clicks(building: Node) -> void:
+	if building is House:
+		building.clicked.connect(_on_house_clicked.bind(building))
+
+
+## A House's `clicked` signal always means "try to upgrade" - unlike a
+## Farm, a House isn't assignable, so there's no citizen-selection branch
+## to check first (compare _on_farm_clicked).
+func _on_house_clicked(house: House) -> void:
+	if house.upgraded:
+		hud.flash_message("%s is already upgraded" % house.display_name)
+		return
+	if not GameState.can_afford(House.UPGRADE_COST):
+		hud.flash_message("Not enough stone")
+		return
+	GameState.spend(House.UPGRADE_COST)
+	house.mark_upgraded()
+	GameState.add_population_capacity(House.UPGRADE_CAPACITY_BONUS)
+	hud.flash_message("%s upgraded (+%d capacity)" % [house.display_name, House.UPGRADE_CAPACITY_BONUS])
+
+
 ## A Farm's own `clicked` signal (see Farm.gd) always reaches here first,
 ## before _unhandled_input's generic post-click handling ever gets a look -
 ## so unlike other post types, a Farm has to decide for itself whether a
@@ -698,6 +719,7 @@ func _confirm_placement() -> void:
 	building.set_meta("save_id", save_id)
 	add_child(building)
 	_wire_farm_clicks(building)
+	_wire_house_clicks(building)
 
 	if option.has("population_capacity"):
 		GameState.add_population_capacity(option["population_capacity"])
@@ -898,7 +920,10 @@ func _serialize_placed_buildings() -> Array:
 	var out := []
 	for entry in _placed_buildings:
 		var origin: Vector2i = entry["origin"]
-		out.append({"save_id": entry["save_id"], "option_id": entry["option_id"], "origin": [origin.x, origin.y]})
+		var out_entry := {"save_id": entry["save_id"], "option_id": entry["option_id"], "origin": [origin.x, origin.y]}
+		if entry["node"] is House and entry["node"].upgraded:
+			out_entry["upgraded"] = true
+		out.append(out_entry)
 	return out
 
 
@@ -936,6 +961,9 @@ func _restore_placed_buildings(entries: Array) -> void:
 		building.set_meta("save_id", save_id)
 		add_child(building)
 		_wire_farm_clicks(building)
+		_wire_house_clicks(building)
+		if building is House and entry.get("upgraded", false):
+			building.mark_upgraded()
 		if building.has_method("add_worker"):
 			posts.append(building)
 		if building.has_method("get_stockpile_spot"):

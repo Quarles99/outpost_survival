@@ -14,7 +14,7 @@ Each displayed resource also shows a rolling **income/minute** rate next to its 
 
 ## Population & Housing
 
-The town has a population count and a population capacity. You start with 3 citizens and capacity for 3. Building a **House** raises capacity (not headcount); growing the population itself happens through Citizen Recruitment (see below), which is gated on having open capacity to grow into.
+The town has a population count and a population capacity. You start with 3 citizens and capacity for 3. Building a **House** raises capacity (not headcount); growing the population itself happens through Citizen Recruitment (see below), which is gated on having open capacity to grow into. A placed House can also be clicked once for a one-time upgrade — 15 stone for +2 more capacity — shown as "House (Upgraded)" afterward; clicking again is denied rather than spending stone twice.
 
 Every citizen eats continuously, once per second, whether or not they're doing any work — this is the only per-citizen upkeep cost right now. Hunger draws from any eatable resource — **food, then bread, then potato, then fruit**, in that priority order — rather than only plain "food," so a stocked bakery or orchard extends how long the town can go without a farm surplus. Grain, flour, hops, and beer are intermediate or luxury goods and can't be eaten directly; beer in particular is reserved as a future happiness-boosting luxury good rather than a calorie source.
 

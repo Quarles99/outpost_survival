@@ -56,6 +56,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Floating gather feedback.** Every production tick now spawns a small "+1.2 Food  +4 xp" text that floats up and fades at the worker's feet - minimal, one line, no screen clutter even with several citizens working. See [mechanics.md](mechanics.md#gathering--hauling).
 
+**House upgrade.** A placed House can now be clicked for a one-time stone-funded upgrade (+2 more population capacity on top of its base +2), persisted through save/load. See [mechanics.md](mechanics.md#population--housing).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.

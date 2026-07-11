@@ -40,7 +40,7 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 | Outpost Hall | 2×2 | 20 wood | — | A stockpile drop-off/pickup point - haulers use whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest. |
 | Cabbage Farm | 2×2 | 6 wood | — | Converts wood → food. See production table below. |
 | Lumber Camp | 1×1 | 5 wood | — | Produces wood by chopping trees. See production table below. |
-| House | 2×2 | 10 wood | +2 population capacity | Passive — no worker slot. |
+| House | 2×2 | 10 wood | +2 population capacity | Passive — no worker slot. Clickable once placed for a one-time upgrade: 15 stone for +2 more population capacity (denied if already upgraded or unaffordable). |
 | Stone Mine | 1×1 | 8 wood | — | Produces stone, no input needed. See production table below. |
 | Well | 1×1 | 10 stone + 4 wood | +1 to water-well count (unlocks water access) | Passive — no worker slot. |
 | Storage Facility | 2×4 | 15 wood + 10 stone | +30 storage capacity (all resources) | Also a stockpile drop-off/pickup point, same as the Outpost Hall, and assignable as a hauler post (see Assigning Citizens). Not upgradeable in place yet; build another for more capacity. |
