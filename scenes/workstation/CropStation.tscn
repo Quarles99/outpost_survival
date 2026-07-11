@@ -1,10 +1,10 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/farm.gd" id="1"]
-[ext_resource type="Texture2D" path="res://art/iso_workstation_generic.svg" id="2"]
+[ext_resource type="Texture2D" path="res://art/iso_workstation_farm.svg" id="2"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
-size = Vector2(140, 70)
+size = Vector2(240, 120)
 
 [node name="CropStation" type="Area2D"]
 script = ExtResource("1")
@@ -16,7 +16,7 @@ shape = SubResource("RectangleShape2D_1")
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture = ExtResource("2")
 centered = false
-offset = Vector2(-55, -100)
+offset = Vector2(-138, -106)
 
 [node name="WorkSpot" type="Marker2D" parent="."]
 position = Vector2(0, 30)

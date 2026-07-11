@@ -60,6 +60,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Skill titles.** Every citizen now carries an earned title below their name (Apprentice → Journeyman → Master → Grandmaster → Legendary, paired with whichever job skill they've trained highest, e.g. "Master Lumberjack"). See [mechanics.md](mechanics.md#skills--leveling).
 
+**Crop-chain art fix.** Every Alternative Crop Type (Grain Farm, Mill, Bakery, Hops Farm, Brewery, Fruit Orchard, Potato Farm) now actually displays the Cabbage Farm's building art, tinted per its existing catalog color, instead of a tiny mis-proportioned placeholder icon. See [stats.md](stats.md#buildings).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.

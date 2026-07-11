@@ -1108,7 +1108,41 @@ Implement these next:
       instance still read upgraded=true with the correct label and the
       capacity bonus intact.
 
-- Replace placeholder farm art with recolored cabagge farm art
+- [DONE] Replace placeholder farm art with recolored cabagge farm art
+  - CropStation.tscn (the shared scene behind every Alternative Crop Type
+    - Grain Farm, Mill, Bakery, Hops Farm, Brewery, Fruit Orchard, Potato
+    Farm) was baking in `iso_workstation_generic.svg` as its own default
+    sprite, undersized/mis-proportioned for a 2x2 footprint - since none
+    of these buildings' resource_type values ("grain", "flour", "bread",
+    etc.) match a Workstation.RESOURCE_VISUALS key, refresh_visual()
+    always fell through to that baked default rather than ever picking up
+    the real Cabbage Farm art. Each one's existing `sprite_tint` (already
+    defined per catalog entry - golden for Grain Farm, green for Hops
+    Farm, etc.) was recoloring the wrong, tiny placeholder icon instead of
+    an actual farm building.
+  - Fixed by pointing CropStation.tscn's Sprite2D at
+    `iso_workstation_farm.svg` with the same offset/centered
+    Workstation.RESOURCE_VISUALS already uses for "food" (Vector2(-138,
+    -106), centered=false), and widening its CollisionShape2D from
+    140x70 to 240x120 to actually cover a 2x2 footprint instead of
+    something closer to 1x1.
+  - Farm.tscn (literal "Cabbage Farm") got the identical fix, even though
+    its own resource_type ("food") already resolves through
+    RESOURCE_VISUALS at runtime and so already displayed correctly -
+    otherwise retooling a placed Cabbage Farm into any Alternative Crop
+    Type via the crop panel (a supported, documented interaction) would
+    have fallen back to Farm.tscn's own stale baked default the moment
+    refresh_visual() couldn't find the new resource_type in
+    RESOURCE_VISUALS, undoing this same fix for that one building.
+  - Verified headless (comparing resolved Sprite2D.texture.resource_path,
+    since there's no display to eyeball the art in this environment -
+    same caveat as the earlier resizable-window item; recommend an
+    in-editor check to confirm it actually looks right tinted): a placed
+    Cabbage Farm and a placed Grain Farm both resolved to
+    `res://art/iso_workstation_farm.svg` (Grain Farm's sprite modulate
+    confirmed as its catalog-defined golden tint); retooling the Cabbage
+    Farm into a Mill via _apply_crop_option kept that same texture
+    rather than reverting to the old placeholder.
 
 - [DONE] Implement level 'titles' a citizen can earn for reaching certain levels in a skill
   - Only one title can be active at a time, the highest one they have earned. If multiple of the same level choose current job title
