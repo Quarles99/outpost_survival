@@ -115,6 +115,20 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 | Multiplier at level 99 | ~2.96× a level-1 worker |
 | XP granted per gather action (chop or production tick) | 4.0 flat, regardless of level or output |
 
+## Skill Titles (`SkillTitles`)
+
+Only the six job skills (farming, lumberjacking, mining, milling, baking, brewing) count - speed/strength are excluded, since they train passively and don't represent a trade.
+
+| Level | Tier |
+|---|---|
+| 1 | Apprentice |
+| 25 | Journeyman |
+| 50 | Master |
+| 75 | Grandmaster |
+| 99 | Legendary |
+
+Title = tier word (by whichever job skill is trained highest) + that skill's job noun (Farmer, Lumberjack, Miner, Miller, Baker, Brewer) - e.g. "Master Lumberjack". A tie at the same max level goes to whichever skill matches the citizen's current assignment, if any.
+
 ## Movement & Work Timing (`Character`)
 
 | | Value |

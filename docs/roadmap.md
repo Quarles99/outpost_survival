@@ -58,6 +58,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **House upgrade.** A placed House can now be clicked for a one-time stone-funded upgrade (+2 more population capacity on top of its base +2), persisted through save/load. See [mechanics.md](mechanics.md#population--housing).
 
+**Skill titles.** Every citizen now carries an earned title below their name (Apprentice → Journeyman → Master → Grandmaster → Legendary, paired with whichever job skill they've trained highest, e.g. "Master Lumberjack"). See [mechanics.md](mechanics.md#skills--leveling).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.

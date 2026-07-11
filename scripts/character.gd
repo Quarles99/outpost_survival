@@ -265,7 +265,8 @@ func _update_label() -> void:
 	var skill_id := _current_skill_id()
 	if not skill_id.is_empty():
 		status += " · Lv %d" % data.get_skill_level(skill_id)
-	label.text = "%s\n(%s)" % [data.character_name, status]
+	var title := SkillTitles.get_title(data, skill_id)
+	label.text = "%s\n%s\n(%s)" % [data.character_name, title, status]
 
 
 ## Maps the current assignment to the skill it trains. Empty string for no

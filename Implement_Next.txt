@@ -1110,11 +1110,45 @@ Implement these next:
 
 - Replace placeholder farm art with recolored cabagge farm art
 
-- Implement level 'titles' a citizen can earn for reaching certain levels in a skill
+- [DONE] Implement level 'titles' a citizen can earn for reaching certain levels in a skill
   - Only one title can be active at a time, the highest one they have earned. If multiple of the same level choose current job title
   - Shown below their name
   - Apprentice -> Journeyman -> Master -> Grandmaster -> Legendary
     - Precedes the job title ex. Legendary Farmer, Master Lumberjack
+    - New scripts/skill_titles.gd (SkillTitles, static RefCounted utility
+      like SkillCurve/BuildingCatalog). TITLE_SKILLS restricts titles to
+      the six job skills (farming/lumberjacking/mining/milling/baking/
+      brewing) - speed/strength are excluded since they train passively
+      just by existing rather than representing a trade, so there's no
+      natural job noun to pair a tier word with. TIER_THRESHOLDS is
+      [1,"Apprentice"], [25,"Journeyman"], [50,"Master"],
+      [75,"Grandmaster"], [99,"Legendary"] - 99 (SkillCurve.MAX_LEVEL) is
+      its own top tier rather than folded into Grandmaster, so
+      "Legendary" stays a rare payoff for actually maxing a skill out.
+    - SkillTitles.get_title(data, current_skill_id) finds the job skill
+      with this citizen's highest level, ties broken toward
+      current_skill_id if it's one of the tied skills (otherwise stable,
+      first-in-TITLE_SKILLS-order), and returns "<tier> <job noun>" (e.g.
+      "Master Lumberjack"). A citizen with nothing trained yet (every
+      skill at level 1) still gets a baseline "Apprentice <first skill>"
+      title rather than going title-less.
+    - Wired into Character._update_label(), which already computes
+      `skill_id` (the current assignment's trained skill, or "" if
+      unassigned/hauling) to use as the tiebreak - the in-world label
+      gained a new middle line: "<name>\n<title>\n(<status>)".
+    - Verified headless (calling SkillTitles.get_title directly against
+      fresh CharacterData resources, not needing a live scene): a fresh
+      character reads "Apprentice Farmer"; level 50 farming reads "Master
+      Farmer"; level 99 lumberjacking (with farming still at 50) reads
+      "Legendary Lumberjack"; two skills tied at level 50 correctly
+      picked the current-job skill's noun when given a matching
+      current_skill_id, and fell back to first-in-order (farming) when
+      given an empty one; baking's tier word was checked at every
+      threshold boundary (24/25/74/75/99) and landed exactly on
+      Apprentice/Journeyman/Master/Grandmaster/Legendary respectively;
+      and a live Character's label.text was confirmed to read "Aldric |
+      Master Farmer | (Hauling)" after setting their farming xp to
+      level 50.
 
 - [DONE] Remove starting buildings other than outpost hall
   - Make sure starting resources are enough to build a lumber camp
