@@ -39,6 +39,8 @@ Production isn't instant or teleported — it's a physical loop of walking, work
 
 Multiple citizens can be assigned to the same workstation — they share that post's buffers and work in parallel rather than needing one dedicated hauler each — up to a per-post worker cap (see [stats.md](stats.md)); once full, that post no longer shows up as an assignment option for another citizen. Most workstations and wall segments cap at a single worker; the Outpost Hall and Storage Facilities are the exception, at 10. Every post's status label shows live occupancy as its name plus "filled/max" underneath (e.g. "Lumber Camp 1/1"), updating immediately on assignment or unassignment.
 
+Every individual production tick (across all three work-loop flavors above) also spawns a small floating "+1.2 Food  +4 xp" text at the worker's feet that rises and fades out over a second — deliberately minimal, one line and brief, so it reads as steady feedback rather than clutter even with several citizens working at once.
+
 ## Sustainable Forestry
 
 A Lumber Camp doesn't just deplete trees — it maintains a **target forest size** in the area around it. Before heading out to chop, a lumberjack checks whether the number of trees (mature or still growing) within the camp's search radius is under that target; if it is, they plant a sapling on open ground instead of chopping. This is a shared, area-wide target — any worker at the camp will top up the forest regardless of who personally chopped what down. Saplings take real time to grow to maturity (visibly scaling up) before they can be harvested. If a tree still has wood left when a chopper's carry limit caps out, it's left standing (not clear-cut) so someone can finish it later.

@@ -54,6 +54,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Live worker-slot labels.** Every post's status label now shows filled/max occupancy (e.g. "Lumber Camp 1/1"), updating immediately on assignment/unassignment, alongside the drop to a 1-worker default cap above. See [mechanics.md](mechanics.md#gathering--hauling).
 
+**Floating gather feedback.** Every production tick now spawns a small "+1.2 Food  +4 xp" text that floats up and fades at the worker's feet - minimal, one line, no screen clutter even with several citizens working. See [mechanics.md](mechanics.md#gathering--hauling).
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.

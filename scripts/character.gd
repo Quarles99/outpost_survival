@@ -294,6 +294,15 @@ func _on_skill_level_up() -> void:
 	assign_sound.play()
 
 
+## Floating "+1.2 Food  +4 xp" feedback for a single gather tick - see
+## GatherFeedback.spawn's doc comment. get_parent() is Base itself (every
+## Character is a direct child of it, per CLAUDE.md's y-sort convention),
+## so `position` is already in the right local coordinate space with no
+## global/local conversion needed.
+func _show_gather_feedback(resource_type: String, amount: float, xp: float) -> void:
+	GatherFeedback.spawn(get_parent(), position, resource_type, amount, xp)
+
+
 ## How much of a post's resource_type/input_resource this specific character
 ## can move in one trip - post.carry_limit (the building's own stat) scaled
 ## by this character's strength. Used everywhere a haul function decides how
@@ -549,9 +558,11 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 			return
 
 		var multiplier: float = data.get_skill_multiplier(post.get_skill_id())
-		post.output_buffer += post.output_per_tick * multiplier * GameState.happiness_output_multiplier
+		var amount: float = post.output_per_tick * multiplier * GameState.happiness_output_multiplier
+		post.output_buffer += amount
 		gather_sound.play()
 		_gain_skill_xp(post.get_skill_id(), XP_PER_GATHER)
+		_show_gather_feedback(post.resource_type, amount, XP_PER_GATHER)
 
 
 ## Converts input_resource into resource_type: consumes input_per_tick from
@@ -605,9 +616,11 @@ func _run_farm_loop(farm: Farm, session: int) -> void:
 
 		var water_bonus: float = WATER_FARM_OUTPUT_BONUS if GameState.has_water() else 1.0
 		farm.input_buffer -= input_needed
-		farm.output_buffer += farm.output_per_tick * multiplier * GameState.happiness_output_multiplier * water_bonus
+		var amount: float = farm.output_per_tick * multiplier * GameState.happiness_output_multiplier * water_bonus
+		farm.output_buffer += amount
 		gather_sound.play()
 		_gain_skill_xp(farm.get_skill_id(), XP_PER_GATHER)
+		_show_gather_feedback(farm.resource_type, amount, XP_PER_GATHER)
 
 
 ## Walk to a nearby tree and chop it (accumulating wood in the camp's
@@ -664,9 +677,11 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 				break
 			var gained: float = tree.harvest(camp.wood_per_chop)
 			if gained > 0.0 and data:
-				camp.output_buffer += gained * data.get_skill_multiplier(camp.get_skill_id()) * GameState.happiness_output_multiplier
+				var amount: float = gained * data.get_skill_multiplier(camp.get_skill_id()) * GameState.happiness_output_multiplier
+				camp.output_buffer += amount
 				gather_sound.play()
 				_gain_skill_xp(camp.get_skill_id(), XP_PER_GATHER)
+				_show_gather_feedback("wood", amount, XP_PER_GATHER)
 
 		if is_instance_valid(tree) and tree.wood_remaining > 0.0:
 			tree.claimed = false

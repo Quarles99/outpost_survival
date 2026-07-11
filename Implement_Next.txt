@@ -1042,9 +1042,35 @@ Implement these next:
       confirm nothing looks stretched or distorted, and that the HUD's
       anchored corners still read correctly at each size.
 
-- Implement floating then fading text indicating when a material is gathered, how much was gathered, and how much xp was gained
+- [DONE] Implement floating then fading text indicating when a material is gathered, how much was gathered, and how much xp was gained
   - This should be very minimal so as not to clutter the screen too much
   - Satisfying feedback for steady progression
+    - New scripts/gather_feedback.gd (GatherFeedback, extends Label).
+      GatherFeedback.spawn(parent, local_position, resource_type, amount,
+      xp) builds a small "+1.2 Food  +4 xp" Label (white text, black
+      outline for readability against any background), positions it just
+      above the spawn point, then tweens it upward 28px while fading its
+      alpha to 0 over 1 second, and queue_free()s itself once that
+      finishes. z_index=100 keeps it drawing on top of every normal
+      y-sorted child regardless of position, the same trick CLAUDE.md
+      documents for IsoGround always rendering behind everything.
+    - Wired into all three of Character's production-tick sites (the
+      generic work loop, the Farm-class loop, and the Lumberjack chop
+      loop) - each already computed a produced `amount` inline, so each
+      site now stores that in a local var and calls
+      _show_gather_feedback(resource_type, amount, XP_PER_GATHER) right
+      after gather_sound.play()/_gain_skill_xp(). _show_gather_feedback
+      spawns the label as a child of get_parent() (Base, since every
+      Character is a direct child of it) at the character's own
+      `position`, which is already in Base's local coordinate space -
+      no global/local conversion needed.
+    - Verified headless: placed a Stone Mine, assigned a worker, waited
+      for its first production tick (work_interval=1.5s) and confirmed a
+      GatherFeedback child appeared on Base reading "+0.5 Stone  +4 xp"
+      (matching Stone Mine's output_per_tick/skill multiplier and
+      XP_PER_GATHER); waited past the 1-second fade (but before the next
+      1.5s tick, to avoid the next tick's own label confusing the check)
+      and confirmed it was gone (queue_free'd).
 
 - House upgrade with stone to increase capacity
 
