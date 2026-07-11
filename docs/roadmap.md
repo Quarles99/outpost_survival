@@ -32,7 +32,7 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Per-farm crop selection.** Any placed Farm-family building can be clicked to retool it into any other Farm-family recipe, free and instant, without disturbing an assigned worker or the building's footprint. See [mechanics.md](mechanics.md#building--placement).
 
-**Worker caps.** Every Workstation now caps out at 3 assigned workers (Wall Segments, unchanged, still cap at 1) - generalized from a cap that used to be hardcoded as a WallSegment-only special case. See [mechanics.md](mechanics.md#gathering--hauling).
+**Worker caps.** Every Workstation now caps out at 1 assigned worker (Wall Segments already capped at 1; Outpost Hall/Storage Facility stay at 10) - down from an earlier 3-worker default. See [mechanics.md](mechanics.md#gathering--hauling).
 
 **Task list removed, skill panel added.** Clicking a citizen no longer opens a menu of assignable posts - it selects them and opens a panel of all their skill levels instead. Assignment is now drag-and-drop, or click-citizen-then-click-post (denied with a message if that post is full); clicking an already-selected citizen again unassigns them. See [mechanics.md](mechanics.md#assigning-citizens).
 
@@ -51,6 +51,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 **Resizable game window.** The window can now be resized/scale to different resolutions without stretching or distorting the image - see [stats.md](stats.md).
 
 **Minimal starting buildings.** Only the Outpost Hall starts built now - no fixed Cabbage Farm or Lumber Camp. Starting resources still comfortably afford building a Lumber Camp right away.
+
+**Live worker-slot labels.** Every post's status label now shows filled/max occupancy (e.g. "Lumber Camp 1/1"), updating immediately on assignment/unassignment, alongside the drop to a 1-worker default cap above. See [mechanics.md](mechanics.md#gathering--hauling).
 
 ## Planned Next (from `Implement_Next.txt`)
 

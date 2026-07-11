@@ -851,8 +851,26 @@ Implement these next:
       the worker's position settled back at the mine's worker spot
       (within ~1.5px) rather than staying at the stockpile.
 
-- Buildings should show how many of their worker slots are filled in the text field above them
+- [DONE] Buildings should show how many of their worker slots are filled in the text field above them
   - Most buildings should only allow 1 worker max
+    - Workstation.max_workers default dropped from 3 to 1 (a first-pass
+      default, not tuned via playtesting - individual catalog entries can
+      still override it upward for genuine parallel-throughput cases).
+      WallSegment was already 1. OutpostHall/StorageFacility stay at 10 -
+      haulers don't share a production buffer the way workers at one post
+      do, so there's no throughput reason to bottleneck them.
+    - Each of Workstation/WallSegment/OutpostHall/StorageFacility gained an
+      _update_label() that sets label.text to "%s\n%d/%d" %
+      [display_name, active_workers, max_workers], called from _ready()
+      (and Workstation's refresh_visual(), for the crop-selection-at-
+      runtime path) plus every add_worker()/remove_worker() so the count
+      stays live as workers come and go.
+    - Verified headless: placed a Lumber Camp (max_workers=1), confirmed
+      its label read "Lumber Camp 0/1" before assignment and "Lumber Camp
+      1/1" after assigning one worker; confirmed a second assignment
+      attempt was correctly denied (_post_has_room returned false); and
+      confirmed Outpost Hall's label still reads "Outpost Hall 0/10",
+      preserving its higher cap.
 
 - [DONE] Farm efficiency buff when well is built
   - I'm thinking more production for the same wood cost

@@ -24,13 +24,15 @@ const RESOURCE_VISUALS := {
 ## work loop (e.g. StoneMine); Farm reads it too even though it has its own
 ## specialized loop, and LumberCamp ignores it in favor of chop_interval.
 @export var work_interval: float = 1.5
-## How many citizens can be assigned here at once - sharing a post's buffers
-## for parallel throughput is intentional (see CLAUDE.md), but unbounded
-## stacking isn't; a first-pass default, not tuned via playtesting. Checked
-## by Base (_post_has_room) before allowing a new assignment via drag or the
-## task menu, alongside WallSegment's own max_workers (duck-typed the same
-## way add_worker/remove_worker/get_worker_spot/display_name already are).
-@export var max_workers: int = 3
+## How many citizens can be assigned here at once - most Workstations only
+## have room for one at a time now (a first-pass default, not tuned via
+## playtesting - a handful of catalog entries may still want to override it
+## upward for genuine parallel-throughput cases). Checked by Base
+## (_post_has_room) before allowing a new assignment via drag or click,
+## alongside WallSegment/OutpostHall/StorageFacility's own max_workers
+## (duck-typed the same way add_worker/remove_worker/get_worker_spot/
+## display_name already are).
+@export var max_workers: int = 1
 ## Lets several BuildingCatalog entries share one placeholder scene (e.g.
 ## every crop/refinement building in the Farm family) while still reading
 ## visually distinct - applied over whatever RESOURCE_VISUALS or the scene's
@@ -62,18 +64,26 @@ var _default_offset: Vector2
 
 
 func _ready() -> void:
-	label.text = display_name
+	_update_label()
 	_default_texture = sprite.texture
 	_default_centered = sprite.centered
 	_default_offset = sprite.offset
 	refresh_visual()
 
 
-## Re-applies resource_type/sprite_tint to the sprite - split out of _ready()
-## so a caller reconfiguring these exported fields at runtime (Farm's
-## crop-selection panel) can refresh the visual without needing _ready() to
-## run again (it only runs once, on entering the tree).
+## "Farm\n1/1" - shows how full this post's worker slots are, not just its
+## name, refreshed on every add_worker()/remove_worker() so it stays live.
+func _update_label() -> void:
+	label.text = "%s\n%d/%d" % [display_name, active_workers, max_workers]
+
+
+## Re-applies resource_type/sprite_tint to the sprite (and display_name to
+## the label) - split out of _ready() so a caller reconfiguring these
+## exported fields at runtime (Farm's crop-selection panel) can refresh the
+## visuals without needing _ready() to run again (it only runs once, on
+## entering the tree).
 func refresh_visual() -> void:
+	_update_label()
 	var visual: Dictionary = RESOURCE_VISUALS.get(resource_type, {})
 	if visual:
 		sprite.texture = visual["texture"]
@@ -107,12 +117,14 @@ func get_input_resource() -> String:
 
 func add_worker() -> void:
 	active_workers += 1
+	_update_label()
 	if active_workers == 1:
 		_start_pulse()
 
 
 func remove_worker() -> void:
 	active_workers = max(0, active_workers - 1)
+	_update_label()
 	if active_workers == 0:
 		_stop_pulse()
 

@@ -15,7 +15,12 @@ var _pulse_tween: Tween
 
 
 func _ready() -> void:
-	label.text = display_name
+	_update_label()
+
+
+## "Storage Facility\n0/10" - see Workstation._update_label's doc comment.
+func _update_label() -> void:
+	label.text = "%s\n%d/%d" % [display_name, active_workers, max_workers]
 
 
 ## A placed Storage Facility is a real drop-off/pickup point for haulers,
@@ -44,12 +49,14 @@ func get_worker_spot() -> Vector2:
 
 func add_worker() -> void:
 	active_workers += 1
+	_update_label()
 	if active_workers == 1:
 		_start_pulse()
 
 
 func remove_worker() -> void:
 	active_workers = max(0, active_workers - 1)
+	_update_label()
 	if active_workers == 0:
 		_stop_pulse()
 
