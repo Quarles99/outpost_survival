@@ -50,6 +50,8 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 **Resizable game window.** The window can now be resized/scale to different resolutions without stretching or distorting the image - see [stats.md](stats.md).
 
+**Minimal starting buildings.** Only the Outpost Hall starts built now - no fixed Cabbage Farm or Lumber Camp. Starting resources still comfortably afford building a Lumber Camp right away.
+
 ## Planned Next (from `Implement_Next.txt`)
 
 Nothing is currently queued - every item in `Implement_Next.txt` has been implemented (see above). Add new entries there to populate this list again.

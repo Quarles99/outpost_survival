@@ -43,7 +43,7 @@ Multiple citizens can be assigned to the same workstation — they share that po
 
 A Lumber Camp doesn't just deplete trees — it maintains a **target forest size** in the area around it. Before heading out to chop, a lumberjack checks whether the number of trees (mature or still growing) within the camp's search radius is under that target; if it is, they plant a sapling on open ground instead of chopping. This is a shared, area-wide target — any worker at the camp will top up the forest regardless of who personally chopped what down. Saplings take real time to grow to maturity (visibly scaling up) before they can be harvested. If a tree still has wood left when a chopper's carry limit caps out, it's left standing (not clear-cut) so someone can finish it later.
 
-The map starts with a scattered forest of mature trees around the starting Lumber Camp so there's something to harvest immediately.
+The map starts with a scattered forest of mature trees around the Outpost Hall so there's something to harvest immediately, even though the town starts with no Lumber Camp of its own yet.
 
 ## Skills & Leveling
 

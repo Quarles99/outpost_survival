@@ -94,13 +94,6 @@ var _slot_panel_purpose := ""
 var _placed_buildings: Array[Dictionary] = []
 var _next_placed_id := 0
 
-## The catalog option id the fixed scene-file $Farm currently matches -
-## unlike player-placed buildings (tracked in _placed_buildings above),
-## $Farm has no entry there to update on retool (see _restore_placed_buildings'
-## doc comment: fixed buildings are left alone by save/load), so this is a
-## separate, minimal bit of save state just for it.
-var _fixed_farm_option_id := "farm"
-
 var _selected_character: Character = null
 
 var _placing_option: Dictionary = {}
@@ -131,17 +124,14 @@ func _ready() -> void:
 	WorldGrid.register_stockpile($OutpostHall.get_stockpile_spot())
 	_configure_camera_limits(min_cell, max_cell)
 
-	posts.append($Farm)
-	posts.append($Woodpile)
+	## Only the Outpost Hall starts built - a Cabbage Farm and Lumber Camp
+	## used to be fixed starting buildings too, but the player now has to
+	## build everything else themselves (starting resources - 10 food, 10
+	## wood - comfortably cover a Lumber Camp's 5 wood cost to get going).
 	posts.append($OutpostHall)
-	$Farm.set_meta("save_id", "farm")
-	$Woodpile.set_meta("save_id", "woodpile")
 	$OutpostHall.set_meta("save_id", "outpost_hall")
-	_wire_farm_clicks($Farm)
 
 	_reserve_existing_footprint($OutpostHall, BuildingCatalog.get_option("outpost_hall")["grid_size"])
-	_reserve_existing_footprint($Farm, BuildingCatalog.get_option("farm")["grid_size"])
-	_reserve_existing_footprint($Woodpile, BuildingCatalog.get_option("woodpile")["grid_size"])
 
 	_scatter_initial_trees()
 
@@ -217,9 +207,11 @@ func _configure_camera_limits(min_cell: Vector2i, max_cell: Vector2i) -> void:
 
 
 func _scatter_initial_trees() -> void:
-	var woodpile_cell := WorldGrid.local_to_grid($Woodpile.position)
+	## Scattered around the Outpost Hall rather than a starting Lumber
+	## Camp - there isn't a fixed one anymore, the player builds their own.
+	var scatter_center := WorldGrid.local_to_grid($OutpostHall.position)
 	for i in INITIAL_TREE_COUNT:
-		var cell = WorldGrid.find_plantable_cell(woodpile_cell, INITIAL_TREE_RADIUS)
+		var cell = WorldGrid.find_plantable_cell(scatter_center, INITIAL_TREE_RADIUS)
 		if cell == null:
 			break
 		WorldGrid.plant_tree(cell, true)
@@ -526,10 +518,10 @@ func _on_outpost_hall_clicked() -> void:
 
 
 ## Connects a Farm-family building's clicked signal (see Farm.gd) so
-## clicking it opens the crop-selection panel - called for both fixed
-## scene-file Farms ($Farm) and every dynamically placed/restored one.
-## Buildings that aren't Farm instances (LumberCamp, StoneMine, passive
-## structures) don't have this signal at all, so this is a no-op for them.
+## clicking it opens the crop-selection panel - called for every
+## dynamically placed/restored Farm-family building. Buildings that aren't
+## Farm instances (LumberCamp, StoneMine, passive structures) don't have
+## this signal at all, so this is a no-op for them.
 func _wire_farm_clicks(building: Node) -> void:
 	if building is Farm:
 		building.clicked.connect(_on_farm_clicked.bind(building))
@@ -575,17 +567,16 @@ func _on_crop_selected(option: Dictionary) -> void:
 	_crop_target.input_buffer = 0.0
 	hud.flash_message("Now growing %s" % option["display_name"])
 
-	## Keep whatever tracks this building's recipe for save/load in sync -
+	## Keep _placed_buildings' record of this building's recipe in sync -
 	## otherwise a retool would silently revert on the next save/load
-	## round-trip, since both paths rebuild a Farm-family building's fields
-	## from an option_id rather than reading them live off the node.
-	if _crop_target == $Farm:
-		_fixed_farm_option_id = option["id"]
-	else:
-		for entry in _placed_buildings:
-			if entry["node"] == _crop_target:
-				entry["option_id"] = option["id"]
-				break
+	## round-trip, since _restore_placed_buildings rebuilds a Farm-family
+	## building's fields from its saved option_id rather than reading them
+	## live off the node. Every Farm-family building is a placed one now
+	## (no fixed scene-file Farm to special-case anymore).
+	for entry in _placed_buildings:
+		if entry["node"] == _crop_target:
+			entry["option_id"] = option["id"]
+			break
 
 	_crop_target = null
 
@@ -822,7 +813,6 @@ func _save_game() -> void:
 		"placed_buildings": _serialize_placed_buildings(),
 		"post_buffers": _serialize_post_buffers(),
 		"characters": _serialize_characters(),
-		"fixed_farm_option_id": _fixed_farm_option_id,
 	}
 	SaveManager.save_game(SaveManager.active_slot, data)
 	hud.flash_message("Saved")
@@ -860,18 +850,6 @@ func _load_game() -> void:
 	GameState.water_changed.emit(GameState.has_water())
 	GameState.storage_capacity = float(data.get("storage_capacity", GameState.storage_capacity))
 	GameState.storage_capacity_changed.emit(GameState.storage_capacity)
-
-	## $Farm is a fixed scene-file building, not one of the entries
-	## _restore_placed_buildings rebuilds - its recipe (if ever retooled via
-	## the crop-selection panel) is tracked separately and reapplied here.
-	## Done before _restore_post_buffers below, since (unlike
-	## _on_crop_selected's interactive path) this must NOT clear
-	## output_buffer/input_buffer - the save's actual buffer values are the
-	## authority here, not the empty-buffer reset a live retool wants.
-	_fixed_farm_option_id = data.get("fixed_farm_option_id", "farm")
-	var fixed_farm_option := BuildingCatalog.get_option(_fixed_farm_option_id)
-	if not fixed_farm_option.is_empty():
-		_apply_crop_option($Farm, fixed_farm_option)
 
 	## Buildings are restored before trees: WorldGrid.plant_tree() doesn't
 	## check cell occupancy, and a stale placed building torn down after
@@ -1075,13 +1053,13 @@ func _restore_characters(entries: Array) -> void:
 			character.queue_free()
 
 
+## "farm"/"woodpile" are no longer valid - the fixed starting Cabbage Farm
+## and Lumber Camp are gone, so an old save referencing a citizen assigned
+## to either just falls through to null (unassigned) rather than crashing
+## on a node that doesn't exist anymore.
 func _post_by_save_id(save_id: String) -> Node:
 	if save_id.is_empty():
 		return null
-	if save_id == "farm":
-		return $Farm
-	if save_id == "woodpile":
-		return $Woodpile
 	if save_id == "outpost_hall":
 		return $OutpostHall
 	for entry in _placed_buildings:

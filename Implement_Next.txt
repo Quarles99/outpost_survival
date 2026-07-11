@@ -1038,8 +1038,35 @@ Implement these next:
   - Apprentice -> Journeyman -> Master -> Grandmaster -> Legendary
     - Precedes the job title ex. Legendary Farmer, Master Lumberjack
 
-- Remove starting buildings other than outpost hall
+- [DONE] Remove starting buildings other than outpost hall
   - Make sure starting resources are enough to build a lumber camp
+    - Removed the fixed $Farm (Cabbage Farm) and $Woodpile (Lumber Camp)
+      nodes from Base.tscn entirely - only the Outpost Hall starts built
+      now. Starting resources (10 food, 10 wood) already comfortably
+      cover a Lumber Camp's 5 wood cost, so no balance change needed
+      there. Removed everything that specifically depended on those two
+      fixed nodes existing: Base.posts/_reserve_existing_footprint
+      registration, _wire_farm_clicks($Farm), the "farm"/"woodpile"
+      special cases in _post_by_save_id (an old save referencing either
+      now just resolves to null/unassigned rather than crashing on a
+      missing node), and the whole _fixed_farm_option_id/
+      "fixed_farm_option_id" save-field mechanism from the crop-selection
+      feature (every Farm-family building is a normal placed one now, so
+      _on_crop_selected's _placed_buildings-entry-update path covers all
+      of them uniformly - no more special-casing needed). _scatter_
+      initial_trees() now scatters around the Outpost Hall instead of the
+      (no longer existing) starting Lumber Camp.
+    - Verified headless: confirmed posts only contains the Outpost Hall on
+      a fresh boot, starting wood affords a Lumber Camp, initial trees
+      still scatter (12, now around the Outpost Hall), and all 3 starting
+      citizens default to hauling with no crash. Separately verified a
+      full save/load round-trip with a player-built Lumber Camp (place it,
+      assign a worker, save, load, confirm both the post and the
+      assignment survived) to make sure removing the fixed-building
+      machinery didn't regress the now-only-path for Farm-family
+      buildings. Not verified in-editor for feel/balance (whether the
+      early game reads as too slow now that literally everything must be
+      built from scratch) - recommend a playtest.
 
 - Get rid of manual assignment system
   - Each pawn should automatically take a job matching whatever their highest stat is
