@@ -18,6 +18,25 @@ const BUILDING_PROPERTIES := [
 const INITIAL_TREE_COUNT := 12
 const INITIAL_TREE_RADIUS := 5.0
 
+## --- Building system -----------------------------------------------------
+## Placing a building no longer completes it instantly - it spawns a
+## ConstructionSite instead (see _confirm_placement/_spawn_construction_site),
+## which haulers stock with the option's own cost (see
+## ConstructionSite.materials_needed) and a construction-skilled worker then
+## spends labor on (see Character._run_construction_loop) before it becomes
+## the real building (see _on_construction_complete).
+const CONSTRUCTION_SITE_SCENE := preload("res://scenes/workstation/ConstructionSite.tscn")
+
+## A site's total labor_required is derived from its own material cost
+## (bigger/more expensive buildings take longer to build) rather than a
+## separate hand-authored number per catalog entry - LABOR_PER_MATERIAL_UNIT
+## multiplies the sum of every resource unit in the option's cost dict, with
+## MIN_LABOR_REQUIRED as a floor so even a very cheap building still takes a
+## meaningful amount of labor rather than finishing in a single tick. Both
+## first-pass numbers, not tuned via playtesting.
+const LABOR_PER_MATERIAL_UNIT := 2.0
+const MIN_LABOR_REQUIRED := 10.0
+
 ## --- Happiness ---------------------------------------------------------
 ## Every tick, each citizen's happiness eases toward a target recomputed
 ## from current settlement conditions (see _on_happiness_tick) rather than
@@ -69,6 +88,15 @@ const CHARACTER_SCENE := preload("res://scenes/character/Character.tscn")
 
 var posts: Array[Node] = []
 
+## Buildings still under construction - see the "Building system" consts
+## above. Deliberately NOT part of `posts` while still gathering materials
+## (ConstructionSite.materials_ready hasn't fired yet - see
+## _on_construction_materials_ready), so _job_posts()/_run_job_assignment()
+## never try to staff a site that has nothing to build with yet. A site is
+## removed from here (and from `posts`, if it had been added) the moment
+## construction finishes - see _on_construction_complete.
+var construction_sites: Array[ConstructionSite] = []
+
 ## The Farm-family building currently open in crop_panel, set by
 ## _on_farm_clicked and consumed by _on_crop_selected. Only one crop panel
 ## can be open at a time (opening a new one closes any other panel first,
@@ -118,7 +146,7 @@ func _ready() -> void:
 
 	## Only the Outpost Hall starts built - a Cabbage Farm and Lumber Camp
 	## used to be fixed starting buildings too, but the player now has to
-	## build everything else themselves (starting resources - 10 food, 10
+	## build everything else themselves (starting resources - 10 cabbage, 10
 	## wood - comfortably cover a Lumber Camp's 5 wood cost to get going).
 	## Not appended to `posts` - it's never a job post (see _job_posts), only
 	## a stockpile drop-off point.
@@ -225,7 +253,7 @@ func _scatter_initial_trees() -> void:
 func _on_happiness_tick() -> void:
 	var target := HAPPINESS_BASELINE
 	target += HAPPINESS_WATER_BONUS if GameState.has_water() else -HAPPINESS_WATER_BONUS
-	target += HAPPINESS_FOOD_BONUS if GameState.resources.get("food", 0.0) > 0.0 else -HAPPINESS_STARVING_PENALTY
+	target += HAPPINESS_FOOD_BONUS if GameState.get_total_food() > 0.0 else -HAPPINESS_STARVING_PENALTY
 	target += _food_variety_count() * HAPPINESS_PER_FOOD_VARIETY
 	target = clampf(target, 0.0, 100.0)
 
@@ -461,11 +489,16 @@ func _on_post_disabled_changed(is_disabled: bool, post: Workstation) -> void:
 	_run_job_assignment()
 
 
-## Every placed post that trains one of the six job skills (see
-## SkillTitles.TITLE_SKILLS) - the Outpost Hall and Storage Facilities
-## never appear here (they're not in `posts` at all - see _ready's doc
-## comment on the Outpost Hall), and a disabled post is excluded too (its
-## effective capacity is 0 - see _run_job_assignment).
+## Every placed post that trains one of the seven job skills (see
+## SkillTitles.TITLE_SKILLS - includes "construction" now, see the Building
+## system consts up top) - the Outpost Hall and Storage Facilities never
+## appear here (they're not in `posts` at all - see _ready's doc comment on
+## the Outpost Hall), a disabled post is excluded too (its effective
+## capacity is 0 - see _run_job_assignment), and a ConstructionSite only
+## ever appears here once its materials phase is done and it's actually
+## been added to `posts` in the first place (see
+## _on_construction_materials_ready) - a site still gathering materials
+## lives only in construction_sites, never here.
 func _job_posts() -> Array:
 	var result: Array = []
 	for post in posts:
@@ -643,10 +676,10 @@ func _on_candidate_selected(candidate: Dictionary) -> void:
 	if GameState.population_count >= GameState.population_capacity:
 		hud.flash_message("No housing available")
 		return
-	if not GameState.can_afford(RecruitCatalog.RECRUIT_COST):
+	if not GameState.can_afford(candidate["cost"]):
 		hud.flash_message("Not enough food")
 		return
-	GameState.spend(RecruitCatalog.RECRUIT_COST)
+	GameState.spend(candidate["cost"])
 
 	var character := _spawn_character(candidate["name"], $OutpostHall.get_stockpile_spot())
 	character.data.skill_xp[candidate["skill_id"]] = candidate["starting_xp"]
@@ -734,6 +767,12 @@ func _update_ghost(local_pos: Vector2) -> void:
 	_ghost.modulate = VALID_TINT if _ghost_valid else INVALID_TINT
 
 
+## Confirming placement no longer instantiates the real building - it starts
+## a ConstructionSite instead (see the "Building system" consts up top).
+## Affordability is still checked here (matching the ghost's own green/red
+## tint), same as before this feature existed, but resources aren't spent
+## yet - see _spawn_construction_site/Character._deliver_construction_material,
+## which drain the stockpile gradually as each material actually arrives.
 func _confirm_placement() -> void:
 	if not _ghost_valid:
 		return
@@ -741,14 +780,106 @@ func _confirm_placement() -> void:
 	var size: Vector2i = option["grid_size"]
 	var origin := _ghost_origin
 
-	GameState.spend(option["cost"])
 	_reserve_cells(origin, size)
 
-	var building: Node2D = option["scene"].instantiate()
-	_apply_option_properties(building, option)
-	building.position = WorldGrid.grid_to_local(_footprint_anchor(origin, size))
 	var save_id := "placed_%d" % _next_placed_id
 	_next_placed_id += 1
+	_spawn_construction_site(option, origin, save_id, (option["cost"] as Dictionary).duplicate())
+
+	_cancel_placement()
+
+
+## Creates a ConstructionSite for `option` at `origin` and registers it in
+## construction_sites - shared by a fresh placement (called with the
+## option's full cost, zero labor_completed) and _restore_construction_sites
+## (an in-progress save entry, passing whatever was actually left of each -
+## `materials_needed` must be passed explicitly rather than defaulting to
+## "the full cost" here, since an empty dict is itself a meaningful saved
+## state - every material already delivered, nothing left to haul). A site
+## with no materials needed at all is immediately added to `posts` too, same
+## as _on_construction_materials_ready would do the moment that happens live.
+func _spawn_construction_site(option: Dictionary, origin: Vector2i, save_id: String, materials_needed: Dictionary, labor_completed: float = 0.0) -> ConstructionSite:
+	var size: Vector2i = option["grid_size"]
+	var site: ConstructionSite = CONSTRUCTION_SITE_SCENE.instantiate()
+	site.display_name = option["display_name"]
+	site.target_option_id = option["id"]
+	site.materials_needed = materials_needed.duplicate()
+	site.labor_required = _labor_required_for(option)
+	site.labor_completed = labor_completed
+	site.position = WorldGrid.grid_to_local(_footprint_anchor(origin, size))
+	site.set_meta("save_id", save_id)
+	site.set_meta("origin", origin)
+	add_child(site)
+	_wire_workstation_disable(site)
+	site.materials_ready.connect(_on_construction_materials_ready.bind(site))
+	site.construction_complete.connect(_on_construction_complete.bind(site))
+	site.refresh_label()
+
+	construction_sites.append(site)
+	if site.materials_are_ready():
+		posts.append(site)
+
+	return site
+
+
+func _labor_required_for(option: Dictionary) -> float:
+	var total := 0.0
+	for resource_name in option.get("cost", {}):
+		total += option["cost"][resource_name]
+	return maxf(total * LABOR_PER_MATERIAL_UNIT, MIN_LABOR_REQUIRED)
+
+
+## Every material has arrived - see ConstructionSite.materials_ready's doc
+## comment. Adds the site to `posts` for the first time (if a save/load
+## round-trip hasn't already done so - see _restore_construction_sites) so
+## it becomes eligible for automatic job assignment, same as any other job
+## post, then re-runs assignment so a construction-skilled worker (or
+## whoever's currently unassigned) can pick it up right away rather than
+## waiting for some other trigger.
+func _on_construction_materials_ready(site: ConstructionSite) -> void:
+	if not posts.has(site):
+		posts.append(site)
+	site.refresh_label()
+	_run_job_assignment()
+
+
+## labor_completed reached labor_required - see ConstructionSite.
+## construction_complete's doc comment. Evicts whoever was working the site
+## (their assigned_post is about to point at a freed node otherwise), swaps
+## the site for the real building via _materialize_building (identical to
+## what _confirm_placement used to do the instant a building was placed),
+## then re-runs job assignment - a freshly finished job post (or the
+## just-freed builder themselves) might be eligible for it immediately.
+func _on_construction_complete(site: ConstructionSite) -> void:
+	var option := BuildingCatalog.get_option(site.target_option_id)
+	var origin: Vector2i = site.get_meta("origin")
+	var save_id: String = site.get_meta("save_id")
+
+	for citizen in characters:
+		if citizen.assigned_post == site:
+			citizen.assign_to(null)
+
+	posts.erase(site)
+	construction_sites.erase(site)
+	site.queue_free()
+
+	var building := _materialize_building(option, origin, save_id)
+	hud.flash_message("%s construction complete" % building.display_name)
+	_run_job_assignment()
+
+
+## Instantiates the real building for `option` at `origin`, wires it up, and
+## grants whatever it provides (capacity/stockpile/job-post registration) -
+## the exact set of steps _confirm_placement used to do the instant a
+## building was placed, before construction sites existed. The only caller
+## now is _on_construction_complete - a save/load round-trip rebuilds an
+## already-finished building via _restore_placed_buildings instead, which
+## deliberately never re-grants capacity (see its own doc comment on why),
+## so this helper isn't reused there.
+func _materialize_building(option: Dictionary, origin: Vector2i, save_id: String) -> Node2D:
+	var building: Node2D = option["scene"].instantiate()
+	_apply_option_properties(building, option)
+	building.position = WorldGrid.grid_to_local(_footprint_anchor(origin, option["grid_size"]))
 	building.set_meta("save_id", save_id)
 	add_child(building)
 	_wire_farm_clicks(building)
@@ -767,13 +898,7 @@ func _confirm_placement() -> void:
 		WorldGrid.register_stockpile(building.get_stockpile_spot())
 
 	_placed_buildings.append({"save_id": save_id, "option_id": option["id"], "origin": origin, "node": building})
-
-	_cancel_placement()
-	## A freshly built job post might open a slot a hauler's been waiting on
-	## - see _run_job_assignment's doc comment. Harmless no-op for a passive
-	## building (House/Well/Storage Facility) since it never appears in
-	## _job_posts().
-	_run_job_assignment()
+	return building
 
 
 func _cancel_placement() -> void:
@@ -872,6 +997,7 @@ func _save_game() -> void:
 		"storage_capacity": GameState.storage_capacity,
 		"trees": _serialize_trees(),
 		"placed_buildings": _serialize_placed_buildings(),
+		"construction_sites": _serialize_construction_sites(),
 		"post_buffers": _serialize_post_buffers(),
 		"characters": _serialize_characters(),
 	}
@@ -915,6 +1041,7 @@ func _load_game() -> void:
 	## trees are replanted could release a cell a just-restored tree also
 	## claimed, leaving WorldGrid.is_free() wrong about that cell forever.
 	_restore_placed_buildings(data.get("placed_buildings", []))
+	_restore_construction_sites(data.get("construction_sites", []))
 	_restore_trees(data.get("trees", []))
 	_restore_post_buffers(data.get("post_buffers", {}))
 	_restore_characters(data.get("characters", []))
@@ -1018,6 +1145,59 @@ func _restore_placed_buildings(entries: Array) -> void:
 			WorldGrid.register_stockpile(building.get_stockpile_spot())
 
 		_placed_buildings.append({"save_id": save_id, "option_id": entry["option_id"], "origin": origin, "node": building})
+
+		if save_id.begins_with("placed_"):
+			_next_placed_id = maxi(_next_placed_id, int(save_id.trim_prefix("placed_")) + 1)
+
+
+func _serialize_construction_sites() -> Array:
+	var out := []
+	for site in construction_sites:
+		if not is_instance_valid(site):
+			continue
+		var origin: Vector2i = site.get_meta("origin")
+		out.append({
+			"save_id": site.get_meta("save_id"),
+			"option_id": site.target_option_id,
+			"origin": [origin.x, origin.y],
+			"materials_needed": site.materials_needed.duplicate(),
+			"labor_completed": site.labor_completed,
+		})
+	return out
+
+
+## Wipes every in-progress ConstructionSite and rebuilds from saved entries -
+## the same "clear and rebuild from scratch" pattern _restore_placed_buildings
+## uses for finished buildings, run right after it (before trees, for the
+## same cell-occupancy-ordering reason - see _load_game). A site whose
+## materials were already fully delivered before the save (materials_needed
+## saved as {}) goes straight back into `posts` too (see
+## _spawn_construction_site), so a citizen already mid-labor on it resumes
+## from labor_completed rather than the site reverting to the materials
+## phase. Shares _next_placed_id's counter/prefix with _restore_placed_
+## buildings (construction sites and finished buildings are two states of
+## the same save_id, not two separate id spaces), so this must run after
+## that function's own reset-to-0 - see the call order in _load_game.
+func _restore_construction_sites(entries: Array) -> void:
+	for site in construction_sites.duplicate():
+		if is_instance_valid(site):
+			posts.erase(site)
+			var option := BuildingCatalog.get_option(site.target_option_id)
+			if option.has("grid_size"):
+				_release_cells(site.get_meta("origin"), option["grid_size"])
+			site.queue_free()
+	construction_sites.clear()
+
+	for entry in entries:
+		var option := BuildingCatalog.get_option(entry["option_id"])
+		if option.is_empty():
+			continue
+		var origin_arr: Array = entry["origin"]
+		var origin := Vector2i(int(origin_arr[0]), int(origin_arr[1]))
+		_reserve_cells(origin, option["grid_size"])
+
+		var save_id: String = entry["save_id"]
+		_spawn_construction_site(option, origin, save_id, entry.get("materials_needed", {}), entry.get("labor_completed", 0.0))
 
 		if save_id.begins_with("placed_"):
 			_next_placed_id = maxi(_next_placed_id, int(save_id.trim_prefix("placed_")) + 1)
@@ -1141,4 +1321,10 @@ func _post_by_save_id(save_id: String) -> Node:
 	for entry in _placed_buildings:
 		if entry["save_id"] == save_id:
 			return entry["node"]
+	## A citizen mid-labor on a construction site when the game was saved -
+	## the site itself isn't in _placed_buildings yet (see construction_sites'
+	## doc comment), so it needs its own lookup here too.
+	for site in construction_sites:
+		if is_instance_valid(site) and site.has_meta("save_id") and site.get_meta("save_id") == save_id:
+			return site
 	return null

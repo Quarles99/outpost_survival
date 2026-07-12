@@ -906,9 +906,126 @@ Implement these next:
       sentence, not a table row like everything else this feature
       touched). Fixed by adding `skill_id` back to the list.
 
-- Implement building system
+- [DONE] Implement building system
   - Citizens need to drop off building materials at building site
   - Then preferring citizens with the highest proficiency in the new construction skill the building must be contructed which requires a certain amount of labor
+    - Confirming placement no longer instantiates the real building on the
+      spot - it reserves the footprint and spawns a new ConstructionSite
+      (scripts/construction_site.gd, scenes/workstation/ConstructionSite.tscn,
+      extends Workstation - reused rather than a fresh duck-typed class
+      specifically so it could plug into the existing Gale-Shapley job-
+      assignment system for the labor phase with zero changes to that
+      algorithm) instead, tracked in a new Base.construction_sites list.
+      Resources aren't spent at placement-confirm time anymore (though
+      affordability of the full cost is still checked then, matching the
+      ghost's existing green/red tint) - GameState.spend() now happens
+      gradually as each material actually gets delivered.
+    - Materials phase: ConstructionSite.materials_needed (resource_name ->
+      remaining amount, seeded from the option's cost) is drained by
+      ordinary haulers. Character._find_haul_job() gained a third job kind
+      alongside output-pickup/input-delivery - any site's still-needed
+      resources compete on equal footing (compared by how much each would
+      move, same as the existing two kinds already were) for the same pool
+      of idle/assisting labor - and a new _deliver_construction_material()
+      does the actual walk/spend/deliver, with the same re-check-on-arrival
+      /refund-surplus safety _deliver_to_post already has (multiple haulers
+      converging on one site from an identical "still needed" snapshot).
+      A resource's entry is erased (not left at 0.0) once fully delivered;
+      once materials_needed is empty the site emits materials_ready.
+    - This is also the gate that keeps a site OUT of Base.posts (and so
+      invisible to _job_posts()/_run_job_assignment()) until it's actually
+      buildable - Base._on_construction_materials_ready() is the only place
+      a site is ever added to posts. From there it's a completely ordinary
+      job post training a new "construction" skill (added to SkillTitles.
+      TITLE_SKILLS/JOB_NOUNS ("Builder"), RecruitCatalog.SPECIALIZATIONS,
+      SkillPanel.SKILL_DISPLAY_ORDER/LABELS) - "preferring citizens with the
+      highest proficiency" is just what _run_job_assignment's existing
+      swap-on-strict-improvement matching already does for any skill, no
+      special-casing needed at all.
+    - Labor phase: new Character._run_construction_loop() - no haul cycle,
+      no input/output buffer, just adds a flat CONSTRUCTION_LABOR_PER_TICK
+      (scaled by the worker's construction skill multiplier and the
+      settlement's happiness output multiplier, the same "skill/happiness
+      scale output only" pattern every other work loop follows) to
+      ConstructionSite.labor_completed every work_interval tick.
+      labor_required is derived from the option's own cost
+      (Base._labor_required_for: sum of every resource unit *
+      LABOR_PER_MATERIAL_UNIT, floored at MIN_LABOR_REQUIRED) rather than
+      hand-authored per building, so bigger/pricier buildings automatically
+      take longer without new catalog data. Reaching it calls
+      ConstructionSite.mark_complete(), emitting construction_complete.
+    - Completion: Base._on_construction_complete() evicts the current
+      worker, frees the site, and calls a new _materialize_building()
+      helper - the exact instantiate/apply-properties/grant-capacity/
+      register-as-post-or-stockpile sequence _confirm_placement() used to
+      do synchronously at placement time, factored out so it can run once
+      construction actually finishes instead. A fresh job-assignment pass
+      follows immediately, so the just-freed builder (or anyone else) can
+      pick up the newly-finished post right away.
+    - Save/load: a new "construction_sites" save section
+      (Base._serialize_construction_sites/_restore_construction_sites,
+      same wipe-and-rebuild-from-scratch pattern _restore_placed_buildings
+      already uses) persists materials_needed and labor_completed exactly,
+      and shares _next_placed_id's counter/"placed_N" prefix with
+      _placed_buildings - a site's save_id carries over unchanged once it
+      becomes the real building, not reassigned. Base._post_by_save_id()
+      now checks construction_sites too, so a citizen saved mid-labor on a
+      site resumes correctly on load (and, if their materials-phase site
+      had already reached materials_ready before the save, _spawn_
+      construction_site() puts it straight back into posts rather than
+      reverting to the materials phase).
+    - Deliberately no bespoke art: every ConstructionSite reuses one
+      generic scaffold-tinted sprite (iso_workstation_generic.svg)
+      regardless of the target building - the in-world label communicates
+      phase/progress instead ("Needs: 5 Wood" during materials, "Building
+      65%" during labor). The separate "Unique art for every building" item
+      elsewhere in this file is what would eventually replace this.
+    - Verified headless end-to-end via a real Base scene, not mocked
+      pieces: placed a Lumber Camp, confirmed wood was NOT spent yet and
+      the site wasn't a job post; let the 3 starting (all-idle) citizens
+      discover and actually deliver the wood for real over real time,
+      confirmed the spend happened only then and the site became a job
+      post; confirmed a citizen was auto-assigned to build it; fast-forwarded
+      labor_completed to just under the finish line and let the next real
+      tick push it over, confirming the real building appeared as a job
+      post in the same position, capacity/registration applied, and the
+      builder got reassigned (in this run, right back onto the finished
+      Lumber Camp itself). Separately verified a full save/reload round-trip
+      on a second, hand-mutated in-progress site (partial materials +
+      partial labor) - confirmed both values survived exactly and its
+      footprint stayed reserved. Not verified in-editor for feel (whether
+      the generic scaffold art reads clearly as "under construction", label
+      text legibility, timing/pacing of the two phases) - recommend a
+      playtest.
+    - Post-review fix, from real playtest feedback: citizens weren't
+      prioritizing building at all - construction sites just sat stalled in
+      the materials phase forever while everyone kept doing routine
+      hauling instead, so nothing ever got far enough to open a labor slot.
+      Root cause: Character._find_haul_job() picked whichever of
+      output-pickup/input-delivery/construction-delivery would move the
+      *largest* amount, with construction's own per-trip amount capped by
+      carry capacity (~6-8 units) same as the other two - but once a
+      couple of workstations are actually running, their output/input
+      amounts regularly match or exceed that, so construction almost never
+      won the comparison in a real (non-empty-economy) playthrough, only
+      in the isolated fresh-boot-no-competition scenario the original
+      headless test happened to cover. Fixed by giving construction
+      delivery unconditional priority: a new _find_construction_haul_job()
+      is checked first and returned immediately if it finds anything,
+      before output/input hauling are even considered (which keep their
+      old amount-vs-amount comparison against each other, unchanged) - a
+      stalled build blocks an entire job post from ever opening, while a
+      slightly-delayed output/input haul just waits for the next
+      comparison, so this is a real priority difference, not just a tie-
+      break tweak.
+    - Verified headless: built a real, staffed Lumber Camp with its
+      output_buffer set to 50 (registered in Base.posts, exactly like a
+      normal placed building) alongside a construction site needing only 4
+      wood, and confirmed _find_haul_job() picked the construction
+      delivery over the 12x-larger output-pickup job. Separately confirmed
+      the fallback path is unchanged: with no construction site pending,
+      the same citizen against the same Lumber Camp still correctly picks
+      the output-pickup job as before.
 
 - [DONE] Fix citizens not dropping off at storehouse and prefering outpost hall instead
     - Root cause: WorldGrid.stockpile_spot was a single fixed Vector2, set
@@ -1020,8 +1137,59 @@ Implement these next:
       by exactly 0.5 (the flat per-tick cost, not 0.5*1.98) while
       crediting 1.98 to output_buffer (1.0*1.98, unchanged scaling).
 
-- Track all types of food under the food category in the UI but have a collapsable drop down with individual food types listed as well
+- [DONE] Track all types of food under the food category in the UI but have a collapsable drop down with individual food types listed as well
   - Recruiting a new citizen will now offer a choice of citizens each costing one of the types of food with the higher tier foods granting citizens with higher starting levels, the higher level citizens should cost their particular food tier as well as an equal amount of all food from lower tiers, this keeps all food types relevant throughout progression
+    - First bullet (the collapsible food UI) was already covered by an
+      earlier pass this session (see the "Food is still not being
+      displayed properly" [DONE] entry further up) - GameState.
+      FOOD_RESOURCES/get_total_food() and the HUD's collapsible Food row
+      already existed by the time this item was picked back up.
+    - New RecruitCatalog.FOOD_TIERS := ["cabbage", "potato", "fruit",
+      "bread", "beer"] - a *separate* const from GameState.FOOD_RESOURCES
+      (which is deliberately no longer an ordered priority list, see its
+      own doc comment) - defines the recruit-cost/level progression
+      specifically, cheapest/simplest crop to most-refined luxury good.
+      generate_candidates() now shuffles FOOD_TIERS (not just NAMES) and
+      assigns each of the `count` offered candidates a distinct tier where
+      possible, so the 3 offered choices read as an actual cheap-vs-
+      expensive spread rather than 3 near-identical draws.
+    - Starting level: RecruitCatalog.STARTING_LEVEL (5, unchanged) applies
+      at tier 0 (cabbage); each tier above adds TIER_LEVEL_STEP (5) more,
+      so a beer-tier (index 4) candidate starts at level 25 instead of the
+      old flat 5 for everyone.
+    - Cost: RecruitCatalog._cost_for_tier(tier_index) charges
+      RECRUIT_UNIT_COST (15, same value the old flat RECRUIT_COST used)
+      of the candidate's own tier's food *and* every cheaper tier's food -
+      e.g. a bread-tier (index 3) candidate costs 15 cabbage + 15 potato +
+      15 fruit + 15 bread, not just 15 bread - so cabbage/potato/fruit stay
+      a real, ongoing cost even once a player has Bakeries/Breweries
+      running, rather than being obsoleted the moment better food exists.
+      RecruitCatalog.RECRUIT_COST (the old flat constant) is gone;
+      Base._on_candidate_selected now reads candidate["cost"] (per-
+      candidate, not global) for both the affordability check and the
+      spend call.
+    - RecruitPanel's candidate buttons now show a second line with the
+      actual per-candidate cost (e.g. "15 Cabbage + 15 Potato + 15 Fruit"),
+      built from the cost dict's insertion order (already low-tier-first,
+      so no separate sorting needed) and reusing HUD.FOOD_BREAKDOWN_LABELS
+      so "beer" reads as "Ale" here too, matching the Food panel. The
+      panel was widened (280->360px offset_right, -220->-280px offset_top)
+      and buttons given `autowrap_mode` since a 5-food-type cost line runs
+      long enough to wrap even in the widened panel.
+    - Verified headless: generate_candidates(3) produced 3 candidates with
+      3 distinct tiers, each with a cost dict exactly matching the
+      cumulative-tier formula and a level exactly matching
+      STARTING_LEVEL + tier_index*TIER_LEVEL_STEP; specifically confirmed
+      a cabbage-tier candidate costs only {cabbage: 15} at level 5
+      (matching the old pre-tier behavior exactly) and a beer-tier
+      candidate costs all 5 food types at level 25. Full integration
+      verified through a live Base scene: recruiting a beer-tier candidate
+      with 100 of every food type correctly spent 15 from each of the 5
+      down to 85 and incremented population_count; a follow-up recruit
+      attempt with insufficient beer (5, need 15) was correctly denied
+      with population_count unchanged. Not verified in-editor for feel
+      (whether the two-line button text/word-wrap reads cleanly at the
+      widened panel size) - recommend a playtest.
 
 - [DONE] Allow the game window to scale with different resolutions
   - Don't stretch the image
@@ -1304,6 +1472,103 @@ Implement these next:
       repeat assignment pass while still disabled; re-enabling gets it
       restaffed; and a full save/reload round-trip correctly restored
       the disabled flag with 0 workers on the reloaded node.
+
+- [DONE] Citizens consume too much food, the vast majority of the economy has to be devoted to farming to sustain the population, lets reduce consumption slightly
+    - GameState.FOOD_PER_CITIZEN dropped 0.3 -> 0.2 per citizen per second (a
+      ~33% cut) - a first-pass tuning number, not derived from a formula,
+      same spirit as every other first-pass balance number in this project.
+    - Verified headless: confirmed the constant reads 0.2 and is strictly
+      below the old 0.3.
+
+- [DONE] Food is still not being displayed properly. There should be a food category with an aggregate food amount displayed, then below that and indented should be each food type listed individually in a collapsable menu.
+    - Root cause of the "cabbage patches harvesting generic food" bug: the
+      Cabbage Farm's BuildingCatalog entry (id "farm") set resource_type to
+      the generic literal "food" rather than a real "cabbage" resource -
+      there was never an actual "cabbage" resource in GameState.resources
+      at all, just a "food" one every Farm-family building's early history
+      happened to share. Fixed by renaming that one catalog entry's
+      resource_type to "cabbage", moving GameState.DEFAULT_RESOURCES'
+      starting 10-units entry from "food" to "cabbage" (Wood stays the same
+      10), and repointing Workstation.RESOURCE_VISUALS' "food" key (the
+      farm-art sprite lookup) to "cabbage" so the Cabbage Farm's visual
+      still resolves correctly. Since GatherFeedback's floating text already
+      reads directly off resource_type (see the earlier gather-feedback
+      feature), this alone fixes the reported "+1.2 Food" text into
+      "+1.2 Cabbage" with no separate change needed. RecruitCatalog.
+      RECRUIT_COST and its RecruitPanel title text moved from "food" to
+      "cabbage" too (cabbage being the base/starting food type), and
+      Base's happiness "does the settlement have any food at all" check now
+      reads the new GameState.get_total_food() aggregate instead of a
+      literal resources["food"] lookup that no longer exists.
+    - GameState.FOOD_RESOURCES (the hunger-eligible list) reordered to
+      cabbage/potato/fruit/bread/beer and a new get_total_food() sums it -
+      used by both the HUD's aggregate row and Base's happiness check.
+      Wheat (the "grain" resource) and flour are tracked in the HUD
+      breakdown (see below) but deliberately excluded from FOOD_RESOURCES/
+      get_total_food(), matching "inedible on their own... but should still
+      be tracked."
+    - HUD.tscn restructured: the old fixed-offset row-per-label layout
+      became a VBoxContainer ("Rows") so inserting new rows doesn't require
+      manually recomputing every following label's pixel offset. The old
+      single FoodLabel became FoodButton (a flat, click-to-toggle Button)
+      plus a FoodBreakdown VBoxContainer (initially hidden) that hud.gd
+      populates at _ready() with one Label per HUD.FOOD_BREAKDOWN_ORDER
+      entry (cabbage/potato/fruit/bread/beer, then grain/flour - 7 total),
+      each showing "<Name>: amount/cap (+rate/min)" the same format the
+      existing Wood/Stone rows already use. Clicking FoodButton toggles
+      food_breakdown.visible and flips a "> Food: N" / "v Food: N" arrow
+      prefix on the aggregate line; the surrounding Control's height is
+      sized generously for the fully-expanded state up front (544px) rather
+      than dynamically resized on toggle, so a collapsed panel just leaves
+      empty panel space below the Build/Menu buttons - simpler and safer
+      than live-resizing an anchored Control, and this compact corner panel
+      has plenty of unused vertical room at the base 1280x720 resolution.
+      "Ale" and "Wheat" are display-only relabels of the beer/grain
+      resource keys (kept internally as-is, since beer/grain are already
+      threaded through Brewery/Mill/BuildingCatalog/save data) - only the
+      HUD's FOOD_BREAKDOWN_LABELS dict and the RecruitPanel/docs prose
+      needed updating for the rename.
+    - Mid-implementation correction (explicit follow-up request): the
+      initial pass kept the old sequential priority-order consumption
+      (drain cabbage fully, then potato, then fruit, etc.) just reordered
+      to put cabbage first - the ask was actually for an *even split*
+      across every stocked food type every tick, not a priority order at
+      all. Rewrote GameState._consume_food as an iterative water-filling
+      split: divide the remaining hunger need evenly across every
+      currently-stocked FOOD_RESOURCES entry, and for any type that runs
+      out partway through its even share, redistribute the shortfall
+      evenly across whatever's still stocked in a follow-up round (bounded
+      by FOOD_RESOURCES.size() rounds, since a resource can only drop out
+      of the candidate pool once). FOOD_RESOURCES' list order is now just a
+      stable iteration/display order, not a priority - updated its doc
+      comment (and mechanics.md/stats.md) accordingly.
+    - Verified headless: GameState.resources booted with "cabbage": 10.0 and
+      no "food" key at all; BuildingCatalog.get_option("farm")["resource_type"]
+      reads "cabbage"; a live Farm node with resource_type "cabbage"
+      resolved its sprite to the real Cabbage Farm art via RESOURCE_VISUALS
+      (not a fallback/default texture); the HUD's FoodButton read
+      "> Food: 10" collapsed and correctly flipped to "v Food: 10" with all
+      7 breakdown rows visible ("Cabbage: 10/30", "Wheat: 0/30", etc.) on
+      toggle; and a simulated legacy save containing an orphaned "food" key
+      loaded without crashing and correctly did NOT count toward
+      get_total_food(). Separately verified _consume_food's even-split
+      redistribution directly: 5 stocked types each lost an equal 1/5
+      share of a flat need; a type reduced to near-empty had its shortfall
+      correctly redistributed evenly across the other 4 in the same call;
+      a total-need-exceeds-total-stock case drained everything to exactly
+      0 with no error/negative values; and a single-stocked-type case
+      correctly consumed only up to what was available, matching the old
+      behavior's floor-at-0 guarantee. Not verified in-editor for feel
+      (whether the collapsed/expanded Food row reads clearly at 260px
+      panel width, whether the extra blank space below the buttons when
+      collapsed looks intentional or like a layout bug) - recommend a
+      playtest.
+
+- Stone brick production chain
+  - Stone mine -> Brickmaker
+  - Stone bricks used for upgraded houses, brewery, mill, and other advanced buildings
+
+- Make early game easier by increasing starting food so happiness doesn't tank immediately
 
 - Introduce day / night cycle
   - Citizens need 8 hours of sleep a day

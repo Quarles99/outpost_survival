@@ -13,7 +13,7 @@ const OPTIONS := [
 		"id": "farm",
 		"display_name": "Cabbage Farm",
 		"scene": preload("res://scenes/workstation/Farm.tscn"),
-		"resource_type": "food",
+		"resource_type": "cabbage",
 		"output_per_tick": 1.0,
 		"grid_size": Vector2i(2, 2),
 		"cost": {"wood": 6.0},

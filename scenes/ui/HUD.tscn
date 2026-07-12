@@ -13,73 +13,56 @@ anchor_right = 1.0
 offset_left = -260.0
 offset_top = 16.0
 offset_right = -16.0
-offset_bottom = 312.0
+offset_bottom = 560.0
 grow_horizontal = 0
 
 [node name="Panel" type="Panel" parent="Control"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="FoodLabel" type="Label" parent="Control"]
+[node name="Rows" type="VBoxContainer" parent="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
 offset_left = 12.0
 offset_top = 8.0
-offset_right = 232.0
-offset_bottom = 36.0
-text = "Food: 0"
-horizontal_alignment = 2
+offset_right = -12.0
+offset_bottom = -8.0
 
-[node name="WoodLabel" type="Label" parent="Control"]
-offset_left = 12.0
-offset_top = 40.0
-offset_right = 232.0
-offset_bottom = 68.0
+[node name="FoodButton" type="Button" parent="Control/Rows"]
+flat = true
+text = "> Food: 0"
+alignment = 2
+
+[node name="FoodBreakdown" type="VBoxContainer" parent="Control/Rows"]
+visible = false
+
+[node name="WoodLabel" type="Label" parent="Control/Rows"]
 text = "Wood: 0"
 horizontal_alignment = 2
 
-[node name="StoneLabel" type="Label" parent="Control"]
-offset_left = 12.0
-offset_top = 72.0
-offset_right = 232.0
-offset_bottom = 100.0
+[node name="StoneLabel" type="Label" parent="Control/Rows"]
 text = "Stone: 0"
 horizontal_alignment = 2
 
-[node name="WaterLabel" type="Label" parent="Control"]
-offset_left = 12.0
-offset_top = 104.0
-offset_right = 232.0
-offset_bottom = 132.0
+[node name="WaterLabel" type="Label" parent="Control/Rows"]
 text = "Water: None"
 horizontal_alignment = 2
 
-[node name="PopulationLabel" type="Label" parent="Control"]
-offset_left = 12.0
-offset_top = 136.0
-offset_right = 232.0
-offset_bottom = 164.0
+[node name="PopulationLabel" type="Label" parent="Control/Rows"]
 text = "Population: 0/0"
 horizontal_alignment = 2
 
-[node name="HappinessLabel" type="Label" parent="Control"]
-offset_left = 12.0
-offset_top = 168.0
-offset_right = 232.0
-offset_bottom = 196.0
+[node name="HappinessLabel" type="Label" parent="Control/Rows"]
 text = "Happiness: 50%"
 horizontal_alignment = 2
 
-[node name="BuildButton" type="Button" parent="Control"]
-offset_left = 12.0
-offset_top = 224.0
-offset_right = 232.0
-offset_bottom = 256.0
+[node name="ButtonSpacer" type="Control" parent="Control/Rows"]
+custom_minimum_size = Vector2(0, 8)
+
+[node name="BuildButton" type="Button" parent="Control/Rows"]
 text = "Build"
 
-[node name="MenuButton" type="Button" parent="Control"]
-offset_left = 12.0
-offset_top = 264.0
-offset_right = 232.0
-offset_bottom = 296.0
+[node name="MenuButton" type="Button" parent="Control/Rows"]
 text = "Menu"
 
 [node name="SaveIndicator" type="Label" parent="."]

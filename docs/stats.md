@@ -6,7 +6,7 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 
 | | Value |
 |---|---|
-| Starting food | 10 |
+| Starting cabbage | 10 |
 | Starting wood | 10 |
 | Starting stone / grain / flour / bread / hops / beer / fruit / potato | 0 each |
 | Starting population | 3 (Aldric, Brenna, Cass) |
@@ -22,13 +22,13 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 | Baseline storage capacity (per resource, with no Storage Facility) | 30 |
 | Storage Facility bonus | +30 (stacks per facility built) |
 | Overflow behavior | Excess above capacity is lost, not refunded |
-| Food-equivalent resources (drawn down for hunger, in priority order) | food → bread → potato → fruit |
+| Food-equivalent resources (drawn down for hunger, split evenly across whichever are in stock) | cabbage, potato, fruit, bread, beer ("Ale") |
 
 ## Resource Consumption
 
 | | Value |
 |---|---|
-| Food (or food-equivalent) eaten per citizen | 0.3 / second |
+| Food (or food-equivalent) eaten per citizen | 0.2 / second |
 | Consumption tick interval | every 1 second |
 | Applies to | every citizen, regardless of work assignment |
 | Floor | resources can't go below 0 |
@@ -38,7 +38,7 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 | Building | Footprint | Cost | Grants | Notes |
 |---|---|---|---|---|
 | Outpost Hall | 2×2 | 20 wood | — | A stockpile drop-off/pickup point - haulers use whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest. |
-| Cabbage Farm | 2×2 | 6 wood | — | Converts wood → food. See production table below. |
+| Cabbage Farm | 2×2 | 6 wood | — | Converts wood → cabbage. See production table below. |
 | Lumber Camp | 1×1 | 5 wood | — | Produces wood by chopping trees. See production table below. |
 | House | 2×2 | 10 wood | +2 population capacity | Passive — no worker slot. Clickable once placed for a one-time upgrade: 15 stone for +2 more population capacity (denied if already upgraded or unaffordable). |
 | Stone Mine | 1×1 | 8 wood | — | Produces stone, no input needed. See production table below. |
@@ -58,7 +58,7 @@ All 8 of the above (Farm through Potato Farm) can be clicked once placed to reto
 
 | | Farm | Lumber Camp | Stone Mine |
 |---|---|---|---|
-| Output resource | food | wood | stone |
+| Output resource | cabbage | wood | stone |
 | Output per work cycle | 1.0 × skill multiplier | 2.0 × skill multiplier (per chop) | 0.5 × skill multiplier |
 | Input resource | wood | — | — |
 | Input cost per work cycle | 0.5 wood flat (not scaled by skill) | — | — |
@@ -81,13 +81,13 @@ Each post's status label shows live occupancy as `"<name>\n<active_workers>/<max
 
 | | Value |
 |---|---|
-| Job skills eligible for auto-assignment | farming, lumberjacking, mining, milling, baking, brewing (`SkillTitles.TITLE_SKILLS`) |
+| Job skills eligible for auto-assignment | farming, lumberjacking, mining, milling, baking, brewing, construction (`SkillTitles.TITLE_SKILLS`) |
 | Matching algorithm | Citizen-proposing deferred acceptance (generalized Gale-Shapley), recomputed from scratch on every trigger |
 | Triggers | Game boot/load, citizen recruited/departed, job post built/disabled/re-enabled |
 | Swap condition | Strictly higher level in the contested skill only - ties never swap |
 | Post disable toggle | Right-click any placed job post - evicts its current worker immediately, excluded from matching (0 capacity) until re-enabled |
 
-The **Farm** class is a generic single-input/single-output converter (exported `input_per_tick`, `input_resource`, `skill_id`, `sprite_tint`) — the row above is its default configuration (wood → food, "farming"). The full Alternative Crop Types chain is built from the same class, sharing one scene (`CropStation.tscn`) and distinguished only by catalog configuration:
+The **Farm** class is a generic single-input/single-output converter (exported `input_per_tick`, `input_resource`, `skill_id`, `sprite_tint`) — the row above is its default configuration (wood → cabbage, "farming"). The full Alternative Crop Types chain is built from the same class, sharing one scene (`CropStation.tscn`) and distinguished only by catalog configuration:
 
 | Building | Input → Output | Input/tick | Output/tick | Work interval | Skill trained |
 |---|---|---|---|---|---|
@@ -125,7 +125,7 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 
 ## Skill Titles (`SkillTitles`)
 
-Only the six job skills (farming, lumberjacking, mining, milling, baking, brewing) count - speed/strength are excluded, since they train passively and don't represent a trade.
+Only the seven job skills (farming, lumberjacking, mining, milling, baking, brewing, construction) count - speed/strength are excluded, since they train passively and don't represent a trade.
 
 | Level | Tier |
 |---|---|
@@ -135,7 +135,20 @@ Only the six job skills (farming, lumberjacking, mining, milling, baking, brewin
 | 75 | Grandmaster |
 | 99 | Legendary |
 
-Title = tier word (by whichever job skill is trained highest) + that skill's job noun (Farmer, Lumberjack, Miner, Miller, Baker, Brewer) - e.g. "Master Lumberjack". A tie at the same max level goes to whichever skill matches the citizen's current assignment, if any.
+Title = tier word (by whichever job skill is trained highest) + that skill's job noun (Farmer, Lumberjack, Miner, Miller, Baker, Brewer, Builder) - e.g. "Master Lumberjack". A tie at the same max level goes to whichever skill matches the citizen's current assignment, if any.
+
+## Construction (`Base`, `ConstructionSite`, `Character`)
+
+| | Value |
+|---|---|
+| Skill trained | `construction` |
+| Materials delivery | Any idle/hauling citizen, same mechanism as output pickup/input delivery - see Gathering & Hauling |
+| Labor required | `max(total units in the option's cost * 2.0, 10.0)` (`Base.LABOR_PER_MATERIAL_UNIT`/`MIN_LABOR_REQUIRED`) - e.g. a 5-wood Lumber Camp needs 10 labor (floor applies), a 25-wood+stone Storage Facility needs 50 |
+| Labor added per work cycle | 1.0 (`Character.CONSTRUCTION_LABOR_PER_TICK`) × the worker's construction skill multiplier × the settlement's happiness output multiplier |
+| Work cycle interval | 1.5 s (`Workstation.work_interval` default, unchanged for a construction site) |
+| Max workers per site | 1 |
+| What happens on completion | Site is freed; the real building is instantiated in its place and granted its capacity/water/storage bonus then, not at placement time; a fresh job-assignment pass runs immediately |
+| What's spent, and when | The option's full cost, deducted resource-by-resource as each haul trip actually delivers it - nothing is spent at placement-confirm time |
 
 ## Movement & Work Timing (`Character`)
 
@@ -181,7 +194,7 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 |---|---|
 | History sample interval | 1 s |
 | Rolling window | Exactly 60 s once that much history exists (interpolated between samples straddling the boundary); shorter and exact just after boot |
-| Displayed for | Food, Wood, Stone (the HUD's dedicated resource rows) |
+| Displayed for | Wood, Stone (dedicated rows), and every food-family resource (aggregate + each of the collapsible breakdown's rows) |
 
 ## Happiness (`Base`, `CharacterData`)
 
@@ -212,11 +225,13 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 
 | | Value |
 |---|---|
-| Candidates offered per visit | 3 |
-| Recruit cost | 15 food |
-| Starting specialization level | 5 |
-| Possible specializations | farming, lumberjacking, mining, milling, baking, brewing |
-| Gated on | open population capacity, and affording the food cost |
+| Candidates offered per visit | 3, distinct food tiers where possible |
+| Food tiers (lowest to highest) | cabbage, potato, fruit, bread, beer ("Ale") |
+| Cost per food type in a candidate's cost | 15 |
+| Cost formula | 15 of the candidate's own tier's food, plus 15 of every cheaper tier's food (e.g. a bread-tier (index 3) candidate costs 15 cabbage + 15 potato + 15 fruit + 15 bread) |
+| Starting level | 5 at tier 0 (cabbage), +5 per tier above that (5/10/15/20/25) |
+| Possible specializations | farming, lumberjacking, mining, milling, baking, brewing, construction |
+| Gated on | open population capacity, and affording that candidate's own (tier-scaled) cost |
 
 ## Map Size (`IsoGround`, `Base.tscn`)
 

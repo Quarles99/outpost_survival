@@ -1,7 +1,23 @@
 extends RefCounted
 class_name RecruitCatalog
 
-const RECRUIT_COST := {"food": 15.0}
+## Food tiers a recruit's cost/starting level scale with, ordered lowest to
+## highest - deliberately its own list rather than reusing
+## GameState.FOOD_RESOURCES (which is just a stable iteration order today,
+## not a priority list - see its own doc comment). Mirrors the same
+## cabbage -> potato -> fruit -> bread -> beer progression the hunger
+## system's docs describe: cheap/direct crops first, harder-won refined
+## goods (bread's 3-stage grain->flour->bread chain, beer's 2-stage
+## hops->beer chain) last.
+const FOOD_TIERS := ["cabbage", "potato", "fruit", "bread", "beer"]
+
+## Cost in units of a single food type. A tier-T candidate costs this many
+## units of EVERY food type at tier <= T (see _cost_for_tier), not just its
+## own tier's food - "the higher level citizens should cost their
+## particular food tier as well as an equal amount of all food from lower
+## tiers", so a Grandmaster-tier recruit still keeps cabbage/potato/fruit
+## relevant instead of obsoleting them the moment Bread/Ale come online.
+const RECRUIT_UNIT_COST := 15.0
 
 const NAMES := [
 	"Brom", "Ysolde", "Garrick", "Merida", "Torvald", "Elowen",
@@ -19,30 +35,53 @@ const SPECIALIZATIONS := {
 	"milling": "Milling",
 	"baking": "Baking",
 	"brewing": "Brewing",
+	"construction": "Construction",
 }
 
-## Starting level in a candidate's specialization - a meaningful head start
-## over a fresh level-1 worker ("different starting skills" per the design
-## doc) without being able to out-level what a citizen earns through play.
+## Starting level for a tier-0 (cabbage) candidate - a meaningful head
+## start over a fresh level-1 worker ("different starting skills" per the
+## design doc) without being able to out-level what a citizen earns
+## through play. Each tier above that adds TIER_LEVEL_STEP more, so a
+## tier-4 (beer/Ale) candidate starts at STARTING_LEVEL + 4*TIER_LEVEL_STEP.
 const STARTING_LEVEL := 5
+const TIER_LEVEL_STEP := 5
 
 
-## `count` candidates (distinct names where possible), each with a random
-## specialization and a starting_xp amount ready to drop straight into a
-## fresh CharacterData.skill_xp.
+## `count` candidates - distinct names AND distinct food tiers where
+## possible (so the offered choice reads as an actual spread of cheap/
+## common vs. expensive/rare, not 3 draws that might repeat the same
+## tier) - each with a random specialization, a starting_xp amount ready
+## to drop straight into a fresh CharacterData.skill_xp, and a `cost`
+## Dictionary reflecting its tier (see _cost_for_tier).
 static func generate_candidates(count: int = 3) -> Array[Dictionary]:
 	var names := NAMES.duplicate()
 	names.shuffle()
+	var tiers := FOOD_TIERS.duplicate()
+	tiers.shuffle()
 	var skill_ids := SPECIALIZATIONS.keys()
-	var starting_xp := SkillCurve.xp_for_level(STARTING_LEVEL)
 
 	var out: Array[Dictionary] = []
 	for i in count:
 		var skill_id: String = skill_ids.pick_random()
+		var tier_index := FOOD_TIERS.find(tiers[i % tiers.size()])
+		var level := STARTING_LEVEL + tier_index * TIER_LEVEL_STEP
 		out.append({
 			"name": names[i % names.size()],
 			"skill_id": skill_id,
 			"skill_label": SPECIALIZATIONS[skill_id],
-			"starting_xp": starting_xp,
+			"starting_xp": SkillCurve.xp_for_level(level),
+			"level": level,
+			"tier_food": FOOD_TIERS[tier_index],
+			"cost": _cost_for_tier(tier_index),
 		})
 	return out
+
+
+## Tier-T cost: RECRUIT_UNIT_COST of every food type at tier 0..T (its own
+## tier's food plus an equal amount of every cheaper tier's food) - see
+## RECRUIT_UNIT_COST's doc comment for why.
+static func _cost_for_tier(tier_index: int) -> Dictionary:
+	var cost := {}
+	for i in tier_index + 1:
+		cost[FOOD_TIERS[i]] = RECRUIT_UNIT_COST
+	return cost

@@ -31,6 +31,12 @@ const WATER_FARM_OUTPUT_BONUS := 1.25
 ## Idle haulers ignore a workstation buffer below this - not worth a whole
 ## round trip for a trickle.
 const HAUL_MIN_THRESHOLD := 1.0
+## Labor progress a construction worker adds to a ConstructionSite per
+## work_interval tick, before their own construction skill/the settlement's
+## happiness multiplier - see _run_construction_loop. A first-pass number,
+## not tuned via playtesting (see Base._labor_required_for for how a site's
+## total labor_required is derived from it).
+const CONSTRUCTION_LABOR_PER_TICK := 1.0
 ## "speed" and "strength" are universal skills every citizen trains just by
 ## moving/carrying, regardless of what post (if any) they're assigned to -
 ## unlike XP_PER_GATHER's per-tick skills, which only train while actively
@@ -257,6 +263,8 @@ func _start_work(post: Node) -> void:
 		_run_farm_loop(post, _work_session)
 	elif post is LumberCamp:
 		_run_lumberjack_loop(post, _work_session)
+	elif post is ConstructionSite:
+		_run_construction_loop(post, _work_session)
 	elif post is Workstation:
 		_run_generic_work_loop(post, _work_session)
 
@@ -299,6 +307,9 @@ func _run_hauler_loop(session: int) -> void:
 ## their own post has nothing for them to do). Returns false if a
 ## reassignment interrupted the trip.
 func _execute_haul_job(job: Dictionary, session: int) -> bool:
+	if job["type"] == "construction":
+		return await _deliver_construction_material(job["post"], session, job["resource"])
+
 	var post: Workstation = job["post"]
 
 	if job["type"] == "output":
@@ -328,21 +339,31 @@ func _assist_haul_or_wait(session: int) -> bool:
 	return await _execute_haul_job(job, session)
 
 
-## Picks the single most valuable haul job across every Workstation post
-## (found via Base.posts - Character is always a direct child of Base, see
-## CLAUDE.md's y-sort notes): either hauling a post's output_buffer out to
-## the stockpile, or delivering its get_input_resource() in from the
-## stockpile. Compares the two kinds by how much they'd move (both are
-## bounded by this character's own _carry_capacity in practice) and just
-## takes the larger -
-## not a sophisticated priority system, but enough to stop a hauler
-## fixating on one post type while another starves. Returns {} if nothing
-## clears HAUL_MIN_THRESHOLD (or, for input jobs, if the stockpile has
-## none of the needed resource to bring).
+## Construction material delivery always wins over routine output/input
+## hauling - checked first, and returned immediately if found, rather than
+## competing on "how much would this move" the way output/input do against
+## each other below. A stalled construction site doesn't just mean one
+## delivery is a little late (an already-working post's buffer can always
+## wait for the next comparison); it means an entire job post's labor phase
+## can never start, and a citizen who could be assigned to build it instead
+## sits hauling forever (see _run_job_assignment - a post with 0 effective
+## capacity because materials never finished arriving just never gets
+## proposed to). A comparison-by-amount approach used to structurally lose
+## to output/input hauling once the economy had a couple of active
+## producers - construction's own per-trip amount is capped by carry
+## capacity (~6-8 units), which routine output/input hauling regularly
+## matches or exceeds once workstations are actually running, so
+## construction almost never won the old comparison and buildings
+## effectively never finished. Falls through to the old output/input
+## comparison only when no construction site currently needs anything.
 func _find_haul_job() -> Dictionary:
 	var base := get_parent() as Base
 	if not base:
 		return {}
+
+	var construction_job := _find_construction_haul_job(base)
+	if not construction_job.is_empty():
+		return construction_job
 
 	var best_output: Workstation = null
 	var best_output_amount := HAUL_MIN_THRESHOLD
@@ -372,6 +393,34 @@ func _find_haul_job() -> Dictionary:
 		return {"post": best_output, "type": "output"}
 	if best_input:
 		return {"post": best_input, "type": "input", "resource": best_input_resource}
+	return {}
+
+
+## The single most valuable construction-material delivery across every
+## in-progress Base.construction_sites entry (a site can need several
+## different resources at once - see ConstructionSite.materials_needed) -
+## bounded by this character's own _carry_capacity, same as any other haul
+## amount. Returns {} if nothing clears HAUL_MIN_THRESHOLD or the stockpile
+## has none of whatever's needed to bring. Split out of _find_haul_job so
+## it can be checked first, unconditionally, ahead of routine output/input
+## hauling - see that function's doc comment for why.
+func _find_construction_haul_job(base: Base) -> Dictionary:
+	var best_site: ConstructionSite = null
+	var best_amount := HAUL_MIN_THRESHOLD
+	var best_resource := ""
+
+	for site in base.construction_sites:
+		if not is_instance_valid(site):
+			continue
+		for resource_name in site.materials_needed:
+			var needed: float = minf(site.materials_needed[resource_name], _carry_capacity(site))
+			if needed > best_amount and GameState.resources.get(resource_name, 0.0) > 0.0:
+				best_site = site
+				best_amount = needed
+				best_resource = resource_name
+
+	if best_site:
+		return {"post": best_site, "type": "construction", "resource": best_resource}
 	return {}
 
 
@@ -469,6 +518,58 @@ func _deliver_to_post(post: Workstation, session: int, resource: String) -> bool
 	return true
 
 
+## Same shape as _deliver_to_post, but targets a ConstructionSite's
+## materials_needed Dictionary entry for `resource` instead of a
+## Workstation's single input_buffer - a site can need several different
+## resources at once (e.g. a Storage Facility needs wood AND stone), so
+## delivery is per-resource rather than a single float. Erases the
+## resource's entry once fully delivered (not just left at 0.0 - see
+## ConstructionSite.materials_are_ready()) and emits materials_ready once
+## every entry is gone, which Base listens for to make the site eligible
+## for automatic labor assignment. Same re-check-on-arrival/refund-surplus
+## safety as _deliver_to_post, for the same reason (multiple haulers
+## converging on the same site from an identical "still needed" snapshot).
+func _deliver_construction_material(site: ConstructionSite, session: int, resource: String) -> bool:
+	await get_tree().create_timer(_move_to(WorldGrid.nearest_stockpile(global_position))).timeout
+	if session != _work_session:
+		return false
+
+	var needed: float = site.materials_needed.get(resource, 0.0)
+	var take: float = minf(minf(_carry_capacity(site), needed), GameState.resources.get(resource, 0.0))
+	if take <= 0.0:
+		return true
+	GameState.spend({resource: take})
+
+	await get_tree().create_timer(STOCKPILE_PAUSE).timeout
+	if session != _work_session:
+		GameState.add_resource(resource, take)
+		return false
+
+	await get_tree().create_timer(_move_to(site.get_worker_spot())).timeout
+	if session != _work_session:
+		GameState.add_resource(resource, take)
+		return false
+
+	if not is_instance_valid(site):
+		GameState.add_resource(resource, take)
+		return true
+
+	var remaining: float = site.materials_needed.get(resource, 0.0)
+	var delivered: float = minf(take, remaining)
+	if delivered > 0.0:
+		site.materials_needed[resource] -= delivered
+		if site.materials_needed[resource] <= 0.0:
+			site.materials_needed.erase(resource)
+			site.refresh_label()
+			if site.materials_are_ready():
+				site.materials_ready.emit()
+	if delivered < take:
+		GameState.add_resource(resource, take - delivered)
+	if delivered > 0.0:
+		_gain_skill_xp("strength", XP_PER_GATHER)
+	return true
+
+
 ## The plain-labor case: no input to manage, no special walking pattern
 ## (LumberCamp) - just produce output_per_tick every work_interval and haul
 ## it out once this character's _carry_capacity is hit (a stronger worker
@@ -501,6 +602,39 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 		gather_sound.play()
 		_gain_skill_xp(post.get_skill_id(), XP_PER_GATHER)
 		_show_gather_feedback(post.resource_type, amount, XP_PER_GATHER)
+
+
+## A construction site is only ever assigned to a worker once its materials
+## phase is already done (see ConstructionSite.materials_ready/Base._on_
+## construction_materials_ready) - this loop is purely the labor phase, no
+## haul cycle at all (nothing here is a resource that needs carrying to the
+## stockpile, "labor" just represents time spent). Every work_interval,
+## adds CONSTRUCTION_LABOR_PER_TICK * this worker's construction skill
+## multiplier * the settlement's happiness multiplier to labor_completed -
+## same "skill/happiness scale output, not a separate input" pattern every
+## other work loop already follows, just with no input side to begin with.
+## Once labor_completed reaches labor_required, tells the site it's done
+## and stops - Base's construction_complete handler takes it from there
+## (including reassigning this character via the next job-assignment pass).
+func _run_construction_loop(site: ConstructionSite, session: int) -> void:
+	while _work_active and session == _work_session:
+		await get_tree().create_timer(site.work_interval).timeout
+		if session != _work_session:
+			return
+		if not is_instance_valid(site):
+			return
+
+		var multiplier: float = data.get_skill_multiplier(site.get_skill_id())
+		var gain: float = CONSTRUCTION_LABOR_PER_TICK * multiplier * GameState.happiness_output_multiplier
+		site.labor_completed += gain
+		gather_sound.play()
+		_gain_skill_xp(site.get_skill_id(), XP_PER_GATHER)
+		_show_gather_feedback("labor", gain, XP_PER_GATHER)
+		site.refresh_label()
+
+		if site.labor_completed >= site.labor_required:
+			site.mark_complete()
+			return
 
 
 ## Converts input_resource into resource_type: consumes input_per_tick from

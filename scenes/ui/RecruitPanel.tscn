@@ -14,8 +14,8 @@ anchor_top = 1.0
 anchor_right = 0.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -220.0
-offset_right = 280.0
+offset_top = -280.0
+offset_right = 360.0
 offset_bottom = -16.0
 
 [node name="Panel" type="Panel" parent="Control"]

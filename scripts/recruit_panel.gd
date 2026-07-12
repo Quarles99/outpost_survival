@@ -22,7 +22,7 @@ func _ready() -> void:
 
 
 func open_for(candidates: Array[Dictionary]) -> void:
-	title_label.text = "Recruit (%d food)" % int(RecruitCatalog.RECRUIT_COST["food"])
+	title_label.text = "Recruit"
 	_clear_buttons()
 	_option_callables.clear()
 
@@ -30,7 +30,7 @@ func open_for(candidates: Array[Dictionary]) -> void:
 		var candidate: Dictionary = candidates[i]
 		var prefix := "[%d] " % (i + 1) if i < 9 else ""
 		var callable := func() -> void: _choose(candidate)
-		var label := "%s%s (Lv %d %s)" % [prefix, candidate["name"], RecruitCatalog.STARTING_LEVEL, candidate["skill_label"]]
+		var label := "%s%s (Lv %d %s)\n%s" % [prefix, candidate["name"], candidate["level"], candidate["skill_label"], _cost_text(candidate["cost"])]
 		_add_button(label, callable)
 		_option_callables.append(callable)
 
@@ -71,9 +71,26 @@ func _input(event: InputEvent) -> void:
 			_option_callables[idx].call()
 
 
+## "15 Cabbage + 15 Ale" - cost dict iterates in insertion order, which
+## RecruitCatalog._cost_for_tier builds low-tier-first, so this always
+## reads as an ascending list without needing to sort here. Reuses HUD's
+## display-label map so "beer" reads as "Ale" here too, rather than
+## drifting from what the Food breakdown panel calls it.
+func _cost_text(cost: Dictionary) -> String:
+	var parts: Array[String] = []
+	for resource_name in cost:
+		var label: String = HUD.FOOD_BREAKDOWN_LABELS.get(resource_name, resource_name.capitalize())
+		parts.append("%d %s" % [int(cost[resource_name]), label])
+	return " + ".join(parts)
+
+
 func _add_button(text: String, on_pressed: Callable) -> void:
 	var button := Button.new()
 	button.text = text
+	## A candidate's cost line can run long at high food tiers (up to all 5
+	## food types listed) - word-wrap rather than letting it overflow the
+	## button/panel width or silently clip.
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.pressed.connect(on_pressed)
 	button.resized.connect(func() -> void: button.pivot_offset = button.size / 2)
 	button.button_down.connect(func() -> void: button.scale = Vector2(0.94, 0.94))

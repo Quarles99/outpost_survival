@@ -6,27 +6,33 @@ signal water_changed(available: bool)
 signal storage_capacity_changed(capacity: float)
 
 ## Food each citizen eats per second, drained continuously regardless of
-## whether they're assigned to a post.
-const FOOD_PER_CITIZEN := 0.3
+## whether they're assigned to a post. Lowered from the original 0.3 - early
+## playtesting showed the entire economy had to be devoted to farming just
+## to keep the population fed, leaving little room to build anything else.
+const FOOD_PER_CITIZEN := 0.2
 const CONSUMPTION_INTERVAL := 1.0
 
 ## Every resource that satisfies hunger - a citizen doesn't care which kind
-## it's eating, so consumption draws from these in order until the need is
-## met or all of them run dry. Order matters: "food" (the original Farm's
-## direct output) is drained first, refined/slower-to-produce crops last, so
-## the harder-won foods are held in reserve rather than spent first. Grain,
-## flour, hops, and beer are deliberately excluded - they're intermediate or
-## luxury goods (see farm.gd's Alternative Crop Types docs), not something a
-## citizen can eat directly. Exposed as a const so the (future) Happiness
-## system can measure "food variety" by how many of these currently have
-## stock, per the design doc's "food variety gives improved happiness".
-const FOOD_RESOURCES := ["food", "bread", "potato", "fruit"]
+## it's eating. Consumption (see _consume_food) splits the need *evenly*
+## across whichever of these currently have stock, rather than draining
+## them one at a time in list order - a town with cabbage, bread, and beer
+## all in stock eats a third of its hunger need from each every tick, not
+## bread only once cabbage is fully gone. This list's order therefore has
+## no priority meaning anymore; it's just a stable iteration/display order.
+## Grain and flour are deliberately excluded - they're intermediate goods,
+## not something a citizen can eat directly (see farm.gd's Alternative Crop
+## Types docs) - still tracked/displayed (see HUD.FOOD_BREAKDOWN_ORDER) just
+## not consumed by hunger. Exposed as a const so the Happiness system can
+## measure "food variety" by how many of these currently have stock, per
+## the design doc's "food variety gives improved happiness", and so the HUD
+## can sum them for its aggregate "Food" readout (see get_total_food()).
+const FOOD_RESOURCES := ["cabbage", "potato", "fruit", "bread", "beer"]
 
 ## Kept as a const (rather than inlining the dict literal into `resources`
 ## below) so reset_to_defaults() can restore exactly this without a second,
 ## driftable copy of the same starting values.
 const DEFAULT_RESOURCES := {
-	"food": 10.0,
+	"cabbage": 10.0,
 	"wood": 10.0,
 	"stone": 0.0,
 	"grain": 0.0,
@@ -97,25 +103,49 @@ func _on_consumption_timeout() -> void:
 	_consume_food(FOOD_PER_CITIZEN * population_count * CONSUMPTION_INTERVAL)
 
 
-## Drains up to `amount` total hunger need from FOOD_RESOURCES in priority
-## order. Unlike add_resource(-x) on a single resource, this can't be
-## satisfied by one type alone running negative - it just stops once every
-## food-equivalent resource is empty, same as add_resource's existing
-## floor-at-0 behavior but spread across several stockpiles instead of one.
+## Drains up to `amount` total hunger need, split evenly across whichever
+## FOOD_RESOURCES currently have stock rather than one type at a time - a
+## town with 3 food types stocked eats a third of its need from each. When a
+## type runs dry partway through a round (its even share exceeds what it has
+## left), the shortfall is redistributed evenly across the remaining
+## stocked types on the next round, so the full `amount` still gets consumed
+## as long as *some* food-equivalent resource has enough between them (same
+## floor-at-0 behavior as add_resource, just spread across several
+## stockpiles and rounds instead of one deduction).
 func _consume_food(amount: float) -> void:
 	var remaining := amount
-	for resource_name in FOOD_RESOURCES:
-		if remaining <= 0.0:
-			return
-		var take := minf(resources.get(resource_name, 0.0), remaining)
-		if take > 0.0:
-			add_resource(resource_name, -take)
-			remaining -= take
+	var candidates := FOOD_RESOURCES.filter(func(r: String) -> bool: return resources.get(r, 0.0) > 0.0)
+	while remaining > 0.0 and not candidates.is_empty():
+		var share := remaining / candidates.size()
+		var next_candidates: Array = []
+		var consumed_this_round := 0.0
+		for resource_name in candidates:
+			var take := minf(resources.get(resource_name, 0.0), share)
+			if take > 0.0:
+				add_resource(resource_name, -take)
+				consumed_this_round += take
+			if resources.get(resource_name, 0.0) > 0.0:
+				next_candidates.append(resource_name)
+		remaining -= consumed_this_round
+		if consumed_this_round <= 0.0:
+			break
+		candidates = next_candidates
 
 
 func add_resource(resource_name: String, amount: float) -> void:
 	resources[resource_name] = clampf(resources.get(resource_name, 0.0) + amount, 0.0, storage_capacity)
 	resources_changed.emit(resource_name, resources[resource_name])
+
+
+## Sum of every FOOD_RESOURCES stockpile - the number the HUD's collapsed
+## "Food" row shows, and what Base's happiness tick uses for "does this
+## settlement have any food at all" (a single named resource, "food", no
+## longer exists as such - Alternative Crop Types split it into several).
+func get_total_food() -> float:
+	var total := 0.0
+	for resource_name in FOOD_RESOURCES:
+		total += resources.get(resource_name, 0.0)
+	return total
 
 
 func can_afford(cost: Dictionary) -> bool:

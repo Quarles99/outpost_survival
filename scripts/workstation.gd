@@ -13,7 +13,7 @@ signal disabled_changed(is_disabled: bool)
 const DISABLED_TINT := Color(0.55, 0.55, 0.55)
 
 const RESOURCE_VISUALS := {
-	"food": {
+	"cabbage": {
 		"texture": preload("res://art/iso_workstation_farm.svg"),
 		"centered": false,
 		"offset": Vector2(-138, -106),
@@ -26,7 +26,7 @@ const RESOURCE_VISUALS := {
 }
 
 @export var display_name: String = "Workstation"
-@export var resource_type: String = "food"
+@export var resource_type: String = "cabbage"
 @export var output_per_tick: float = 1.0
 ## Max units of resource_type a worker will accumulate here before hauling
 ## the lot to the stockpile - also how much a single haul trip carries.

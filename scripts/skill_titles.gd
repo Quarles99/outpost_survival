@@ -6,7 +6,7 @@ class_name SkillTitles
 ## representing a trade, so there's no natural "job noun" to pair a tier
 ## word with (compare SKILL_LABELS in skill_panel.gd, which does show all
 ## eight for the raw stats sheet).
-const TITLE_SKILLS := ["farming", "lumberjacking", "mining", "milling", "baking", "brewing"]
+const TITLE_SKILLS := ["farming", "lumberjacking", "mining", "milling", "baking", "brewing", "construction"]
 
 const JOB_NOUNS := {
 	"farming": "Farmer",
@@ -15,6 +15,7 @@ const JOB_NOUNS := {
 	"milling": "Miller",
 	"baking": "Baker",
 	"brewing": "Brewer",
+	"construction": "Builder",
 }
 
 ## [min_level, tier name] pairs, ascending - level 99 (SkillCurve.MAX_LEVEL)

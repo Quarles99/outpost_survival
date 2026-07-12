@@ -4,15 +4,15 @@ class_name SkillPanel
 const SLIDE_OFFSET := Vector2(0, 20)
 const ANIM_DURATION := 0.18
 
-## Every skill a citizen can train: the 6 work skills a Workstation/Farm-
-## family post can train, plus "speed"/"strength" - the 2 universal skills
-## every citizen trains passively regardless of assignment (see
-## Character.SPEED_XP_PER_SECOND's doc comment). RecruitCatalog.
-## SPECIALIZATIONS has its own copy of the 6 work-skill labels for a
+## Every skill a citizen can train: the 7 work skills a Workstation/Farm-
+## family/ConstructionSite post can train, plus "speed"/"strength" - the 2
+## universal skills every citizen trains passively regardless of assignment
+## (see Character.SPEED_XP_PER_SECOND's doc comment). RecruitCatalog.
+## SPECIALIZATIONS has its own copy of the 7 work-skill labels for a
 ## different purpose (picking a recruit's starting specialization, not
 ## listing everything a citizen has) - small, stable, and separate enough a
 ## shared constant felt like unneeded coupling between the two panels.
-const SKILL_DISPLAY_ORDER := ["farming", "lumberjacking", "mining", "milling", "baking", "brewing", "speed", "strength"]
+const SKILL_DISPLAY_ORDER := ["farming", "lumberjacking", "mining", "milling", "baking", "brewing", "construction", "speed", "strength"]
 const SKILL_LABELS := {
 	"farming": "Farming",
 	"lumberjacking": "Lumberjacking",
@@ -20,6 +20,7 @@ const SKILL_LABELS := {
 	"milling": "Milling",
 	"baking": "Baking",
 	"brewing": "Brewing",
+	"construction": "Construction",
 	"speed": "Speed",
 	"strength": "Strength",
 }
@@ -38,7 +39,7 @@ func _ready() -> void:
 	_base_position = panel_control.position
 
 
-## Always shows all 8 skills in SKILL_DISPLAY_ORDER, including untrained
+## Always shows all 9 skills in SKILL_DISPLAY_ORDER, including untrained
 ## ones at level 1 - a fixed layout that doesn't reflow as a citizen picks
 ## up new skills reads more like a stats sheet than a shrinking/growing list.
 func open_for(character: Character) -> void:
