@@ -35,7 +35,24 @@ text = ""
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 260.0
-offset_bottom = 60.0
+offset_bottom = 82.0
 autowrap_mode = 2
 text = "R: Restart battle
+M: Cycle matchup
 Esc: Main menu"
+
+[node name="MatchupLabel" type="Label" parent="UI"]
+offset_left = 16.0
+offset_top = 90.0
+offset_right = 320.0
+offset_bottom = 112.0
+autowrap_mode = 2
+text = "Matchup: "
+
+[node name="StrategyLabel" type="Label" parent="UI"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 64.0
+offset_bottom = 88.0
+horizontal_alignment = 1
+text = ""

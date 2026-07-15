@@ -6,20 +6,24 @@ class_name Formation
 ## leash, which could deadlock two units each leashed to their own
 ## far-apart, never-updating spawn point once the battle had drifted from
 ## where it started (confirmed via headless testing: 2 of 6 battles never
-## resolved within 90s under that scheme). First pass: only a single static
-## "Line" preset (see FormationCatalog) - dynamic formation/tactic
-## *selection* by any kind of higher-level strategist AI, and tactics like
-## kiting living on the formation rather than the unit type, are
-## deliberately deferred ideas - see
-## Outpost_Survival/Ideas/Formation Strategy AI.md.
+## resolved within 90s under that scheme). Also the thing a StrategistAI
+## (scripts/combat/strategist_ai.gd) reconfigures via apply_preset() to
+## switch a team's whole formation+tactics mid-battle - see
+## Outpost_Survival/Ideas/Formation Strategy AI.md for the design.
 
 var facing: float = 1.0
 var rank_depths: Array = []
 var rank_for_type: Dictionary = {}
 var row_spacing: float = 90.0
-## Copied from the preset, not read by anything yet - extension point for a
-## future formation-level tactics system (e.g. kiting aggressiveness).
+## Read by CombatUnit._nearest_melee_threat() to override that type's
+## default melee_avoid_radius - e.g. "Skirmish" wants far more evasive
+## ranged units, "Guard" wants its front-line Archers holding ground
+## instead. See FormationCatalog.
 var tactics: Dictionary = {}
+## Which FormationCatalog entry this is currently configured as - lets
+## StrategistAI (and the UI) tell what's active without keeping a second
+## copy of that state themselves.
+var preset_id: String = ""
 var play_bounds := Rect2()
 
 ## Shared Array reference, same pattern as CombatUnit.enemies -
@@ -33,11 +37,32 @@ var living_units: Array = []
 
 func setup(preset: Dictionary, p_facing: float, p_play_bounds: Rect2 = Rect2()) -> void:
 	facing = p_facing
+	play_bounds = p_play_bounds
+	_apply_layout(preset)
+
+
+## Switches to a different preset mid-battle (StrategistAI's whole job) and
+## reassigns every currently-living unit's slot_offset to match. Existing
+## units aren't teleported to their new slot - they just start getting
+## pulled there by the same weighted leash every unit already has (see
+## CombatUnit._apply_formation_pull), so "the formation reorganizes" falls
+## out of infrastructure that already existed for an unrelated reason,
+## rather than needing its own transition/animation logic here.
+func apply_preset(preset: Dictionary) -> void:
+	_apply_layout(preset)
+	var alive: Array = living_units.filter(func(u): return is_instance_valid(u) and not (u as CombatUnit)._dead)
+	var types: Array = alive.map(func(u): return (u as CombatUnit).unit_type)
+	var offsets := assign_slots(types)
+	for i in alive.size():
+		(alive[i] as CombatUnit).slot_offset = offsets[i]
+
+
+func _apply_layout(preset: Dictionary) -> void:
 	rank_depths = preset.get("rank_depths", [400.0])
 	rank_for_type = preset.get("rank_for_type", {})
 	row_spacing = preset.get("row_spacing", 90.0)
 	tactics = preset.get("tactics", {})
-	play_bounds = p_play_bounds
+	preset_id = preset.get("id", "")
 
 
 ## Returns local offsets (relative to this Formation's own position)

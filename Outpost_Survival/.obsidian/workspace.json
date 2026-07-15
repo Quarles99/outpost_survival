@@ -41,12 +41,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Ideas/Formation Strategy AI.md",
+                "file": "Planning/Planning.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Formation Strategy AI"
+              "title": "Planning"
             }
           }
         ],
@@ -123,7 +123,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Ideas/Formation Strategy AI.md",
+                "file": "Planning/Planning.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -133,7 +133,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for Formation Strategy AI"
+              "title": "Backlinks for Planning"
             }
           },
           {
@@ -142,12 +142,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Ideas/Formation Strategy AI.md",
+                "file": "Planning/Planning.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from Formation Strategy AI"
+              "title": "Outgoing links from Planning"
             }
           },
           {
@@ -185,13 +185,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Ideas/Formation Strategy AI.md",
+                "file": "Planning/Planning.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of Formation Strategy AI"
+              "title": "Outline of Planning"
             }
           }
         ],
@@ -214,31 +214,33 @@
   },
   "active": "a45c1ce4cf2c0337",
   "lastOpenFiles": [
+    "Ideas/Combat System.md.tmp.13816.249bca74ea58",
+    "Ideas/Combat Units.md.tmp.13816.cc839e025020",
+    "Ideas/Combat System.md.tmp.13816.b1b88386dc63",
+    "Ideas/Combat Units.md.tmp.13816.6847f15112d5",
+    "Home.md",
+    "Planning/Planning.md",
+    "Ideas/Combat Units.md",
+    "Journal/2026-07-15.md",
+    "Ideas/Formation Strategy AI.md.tmp.13816.da8e26a84813",
+    "Ideas/Combat System.md.tmp.13816.8321edec3b75",
+    "Planning/Strategist AI (Combat Sandbox).md",
+    "Ideas/Formation Strategy AI.md",
+    "Planning/Strategist AI (Combat Sandbox).md.tmp.13816.8e16cd590fe0",
+    "Ideas/Formation Strategy AI.md.tmp.13816.85e690ab75bb",
+    "Ideas/Formation Strategy AI.md.tmp.13816.35450a8b9ffe",
     "Ideas/Ideas.md",
     "Planning/Planning.md.tmp.13816.d50c3a2f773f",
     "Journal/2026-07-15.md.tmp.13816.e2c7caa8ffcf",
-    "Docs/README.md.tmp.13816.1da7ddc706fc",
-    "Home.md.tmp.13816.f4c8c7407fc9",
-    "Home.md.tmp.13816.2e28e77b639a",
-    "Ideas/Ideas.md.tmp.13816.2ac0b0781a66",
-    "Ideas/Combat System.md.tmp.13816.6a118c2174c5",
-    "Journal/2026-07-15.md",
     "Planning/Formation System (Combat Sandbox).md",
     "Docs/README.md",
     "Docs/mechanics.md",
     "Docs/roadmap.md",
     "Docs/stats.md",
     "Docs/controls.md",
-    "Planning/Planning.md",
-    "Docs",
-    "Ideas/Completed",
-    "Home.md.tmp.13816.2d1a809a4d3c",
-    "Ideas/Formation Strategy AI.md",
     "Ideas/Combat System.md",
-    "Ideas/Combat Units.md",
     "Ideas/Day-Night Cycle.md",
     "Ideas/Unique Building Art.md",
-    "Home.md",
     "Welcome.md"
   ]
 }

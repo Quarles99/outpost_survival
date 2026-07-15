@@ -11,13 +11,15 @@ class_name CombatUnit
 
 signal died(unit: CombatUnit)
 
-enum UnitType { SWORDSMAN, ARCHER, MAGE }
+enum UnitType { SWORDSMAN, ARCHER, MAGE, OUTRIDER, TRAPPER }
 enum Team { A, B }
 
 const TYPE_NAMES := {
 	UnitType.SWORDSMAN: "Swordsman",
 	UnitType.ARCHER: "Archer",
 	UnitType.MAGE: "Mage",
+	UnitType.OUTRIDER: "Outrider",
+	UnitType.TRAPPER: "Trapper",
 }
 
 ## First-pass stats, not tuned via playtesting - see Ideas/Combat Units.md
@@ -25,7 +27,13 @@ const TYPE_NAMES := {
 ## blocker, high-damage kiting archer, fragile-but-punishing kiting mage).
 ## melee_avoid_radius is only read for units with avoids_melee = true - a
 ## nearby enemy Swordsman inside that radius makes the unit retreat instead
-## of attacking that tick (see _process).
+## of attacking that tick (see _process). Outrider and Trapper both have
+## avoids_melee = false despite being fragile-ish - both are melee-range
+## themselves (can't attack at all without being in melee anyway, so
+## fleeing would just mean never landing a hit - the exact "no safe firing
+## zone" trap the Skirmish preset's melee_avoid_radius bug fell into for
+## ranged units) and their whole design is built around aggressively
+## closing distance, not evading.
 const STATS := {
 	UnitType.SWORDSMAN: {
 		"health": 120.0, "damage": 12.0, "attack_range": 45.0,
@@ -45,7 +53,37 @@ const STATS := {
 		"avoids_melee": true, "melee_avoid_radius": 170.0,
 		"target_priority": [UnitType.SWORDSMAN, UnitType.ARCHER, UnitType.MAGE],
 	},
+	## Pure-mobility counter to kiting Archers/Mages: fast enough (200) to
+	## outrun both outright (170/140) with no bonus damage or resistances
+	## at all - the whole answer to "my melee can't catch archers" is
+	## literally catching them, nothing else. Fragile (80 HP, no defensive
+	## edge) so it loses a straight fight to a Swordsman if it's forced
+	## into one.
+	UnitType.OUTRIDER: {
+		"health": 80.0, "damage": 10.0, "attack_range": 45.0,
+		"attack_interval": 0.8, "move_speed": 200.0, "ranged": false,
+		"avoids_melee": false, "melee_avoid_radius": 0.0,
+		"target_priority": [UnitType.ARCHER, UnitType.MAGE, UnitType.SWORDSMAN],
+	},
+	## Counter to fast movers (Outrider specifically, but the slow applies
+	## to anything it hits) - see SLOW_MULTIPLIER/SLOW_DURATION and _attack().
+	## No bonus damage or resistances either; its counter-play is entirely
+	## the debuff, not the damage triangle. Prioritizes Outrider first since
+	## negating a fast diver's whole advantage is the actual point.
+	UnitType.TRAPPER: {
+		"health": 100.0, "damage": 9.0, "attack_range": 60.0,
+		"attack_interval": 1.1, "move_speed": 130.0, "ranged": false,
+		"avoids_melee": false, "melee_avoid_radius": 0.0,
+		"target_priority": [UnitType.OUTRIDER, UnitType.ARCHER, UnitType.MAGE, UnitType.SWORDSMAN],
+	},
 }
+
+## Applied by a Trapper's attack (see _attack()) to whatever it hits -
+## overwrites rather than stacks on repeated hits (no duration-refresh or
+## multiplicative-stacking logic), the simplest version that still directly
+## negates a fast mover's whole advantage. First-pass numbers.
+const SLOW_MULTIPLIER := 0.5
+const SLOW_DURATION := 2.0
 
 ## defender type -> attacker type -> incoming damage multiplier. Encodes
 ## every resistance/weakness pair from Ideas/Combat Units.md directly
@@ -53,16 +91,34 @@ const STATS := {
 ## Mage/weak to Swordsman, Mage weak to both and its own "strong vs melee"
 ## trait is just the Swordsman row's weakness restated from the attacker's
 ## side) rather than deriving it at runtime from separate resistance lists.
+## Outrider/Trapper are both flat 1.0 in every direction, including against
+## each other - both were explicitly designed to win through mobility/
+## crowd-control instead of the damage triangle, not to be a 4th/5th
+## faction in it.
 const DAMAGE_MULTIPLIERS := {
-	UnitType.SWORDSMAN: {UnitType.SWORDSMAN: 1.0, UnitType.ARCHER: 0.5, UnitType.MAGE: 1.5},
-	UnitType.ARCHER: {UnitType.SWORDSMAN: 1.5, UnitType.ARCHER: 1.0, UnitType.MAGE: 0.5},
-	UnitType.MAGE: {UnitType.SWORDSMAN: 1.5, UnitType.ARCHER: 1.5, UnitType.MAGE: 0.5},
+	UnitType.SWORDSMAN: {UnitType.SWORDSMAN: 1.0, UnitType.ARCHER: 0.5, UnitType.MAGE: 1.5, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
+	UnitType.ARCHER: {UnitType.SWORDSMAN: 1.5, UnitType.ARCHER: 1.0, UnitType.MAGE: 0.5, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
+	UnitType.MAGE: {UnitType.SWORDSMAN: 1.5, UnitType.ARCHER: 1.5, UnitType.MAGE: 0.5, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
+	UnitType.OUTRIDER: {UnitType.SWORDSMAN: 1.0, UnitType.ARCHER: 1.0, UnitType.MAGE: 1.0, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
+	UnitType.TRAPPER: {UnitType.SWORDSMAN: 1.0, UnitType.ARCHER: 1.0, UnitType.MAGE: 1.0, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
 }
 
 const TEAM_COLORS := {
 	Team.A: Color(0.35, 0.55, 1.0),
 	Team.B: Color(1.0, 0.4, 0.35),
 }
+
+## Rough "how much army is this worth" cost, derived from STATS rather than
+## a separate hardcoded number so it can't drift out of sync with the stats
+## it's describing - health * damage-per-second. A first-pass heuristic for
+## hand-authoring asymmetric-but-comparable test rosters (see
+## CombatTestManager's matchups), not a perfectly balanced economy - it
+## deliberately ignores matchup-dependent value (DAMAGE_MULTIPLIERS), attack
+## range, or move speed, since those are exactly the factors a composition
+## counter-pick is supposed to exploit, not average away.
+static func point_cost(unit_type: UnitType) -> float:
+	var stats: Dictionary = STATS[unit_type]
+	return float(stats["health"]) * float(stats["damage"]) / float(stats["attack_interval"])
 
 ## Collision radius fed to NavigationAgent2D's avoidance (RVO) simulation -
 ## same for every type, first pass, roughly matching the character token's
@@ -108,6 +164,14 @@ var _holding_position := false
 ## where kiting dragged the anchor back, which pulled every other unit's
 ## leash back too, compounding into the whole team retreating).
 var _fleeing := false
+## 1.0 = no slow. Set by take_damage_from_trapper-equivalent logic in
+## _attack() when hit by a Trapper (see SLOW_MULTIPLIER/SLOW_DURATION);
+## counts down and resets to 1.0 in _process(). Applied everywhere
+## STATS.move_speed would otherwise be read directly (combat_velocity,
+## the formation-pull's own return velocity, and nav_agent.max_speed) so a
+## slowed unit is actually slower in every context, not just some of them.
+var _speed_multiplier := 1.0
+var _speed_debuff_timer := 0.0
 ## Hard clamp applied after every avoidance-driven move - RVO avoidance
 ## isn't aware of the navmesh's own bounds (it only reasons about nearby
 ## agents, not terrain), so heavy crowding at the initial engagement can
@@ -163,6 +227,11 @@ func _process(delta: float) -> void:
 	_delta = delta
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
 
+	if _speed_debuff_timer > 0.0:
+		_speed_debuff_timer -= delta
+		if _speed_debuff_timer <= 0.0:
+			_speed_multiplier = 1.0
+
 	if not is_instance_valid(_target) or (_target as CombatUnit)._dead:
 		_retarget()
 	if not is_instance_valid(_target):
@@ -172,6 +241,8 @@ func _process(delta: float) -> void:
 		return
 
 	var stats: Dictionary = STATS[unit_type]
+	var effective_speed: float = float(stats["move_speed"]) * _speed_multiplier
+	nav_agent.max_speed = effective_speed
 	var to_target: Vector2 = _target.global_position - global_position
 	var dist := to_target.length()
 	var threat: CombatUnit = _nearest_melee_threat() if stats["avoids_melee"] else null
@@ -190,13 +261,13 @@ func _process(delta: float) -> void:
 	_fleeing = false
 	if threat:
 		_fleeing = true
-		combat_velocity = (global_position - threat.global_position).normalized() * float(stats["move_speed"])
+		combat_velocity = (global_position - threat.global_position).normalized() * effective_speed
 	elif dist > float(stats["attack_range"]):
 		nav_agent.target_position = _target.global_position
 		var next_pos := nav_agent.get_next_path_position()
 		var dir := next_pos - global_position
 		if dir.length_squared() > 0.0001:
-			combat_velocity = dir.normalized() * float(stats["move_speed"])
+			combat_velocity = dir.normalized() * effective_speed
 	else:
 		# In range and no threat to evade - hold the line and finish this
 		# target rather than drift. A zero *preferred* velocity alone isn't
@@ -215,7 +286,7 @@ func _process(delta: float) -> void:
 	if _holding_position:
 		nav_agent.set_velocity(Vector2.ZERO)
 	else:
-		var desired_velocity := _apply_formation_pull(combat_velocity, float(stats["move_speed"]))
+		var desired_velocity := _apply_formation_pull(combat_velocity, effective_speed)
 		if desired_velocity.length_squared() > 0.0001:
 			_face(desired_velocity.normalized())
 		nav_agent.set_velocity(desired_velocity)
@@ -317,7 +388,14 @@ func _nearest_melee_threat() -> CombatUnit:
 	if melee_enemies.is_empty():
 		return null
 	var nearest := _nearest(melee_enemies)
+	# The per-type default from STATS, unless this unit's current Formation
+	# overrides it (e.g. "Skirmish" wants far more evasive ranged units,
+	# "Guard" wants its front-line Archers holding ground like a tank
+	# instead) - the tactics-as-a-formation-property extension point noted
+	# in Ideas/Formation Strategy AI.md, now actually read.
 	var radius: float = STATS[unit_type]["melee_avoid_radius"]
+	if is_instance_valid(formation):
+		radius = formation.tactics.get("melee_avoid_radius", radius)
 	return nearest if global_position.distance_to(nearest.global_position) < radius else null
 
 
@@ -328,6 +406,8 @@ func _attack(target: CombatUnit) -> void:
 	_punch()
 	if STATS[unit_type]["ranged"]:
 		_spawn_tracer(target.global_position)
+	if unit_type == UnitType.TRAPPER:
+		target.apply_slow(SLOW_MULTIPLIER, SLOW_DURATION)
 
 
 func take_damage(amount: float) -> void:
@@ -338,6 +418,18 @@ func take_damage(amount: float) -> void:
 	_spawn_floating_text("-%d" % int(round(amount)), Color(1.0, 0.35, 0.35))
 	if health <= 0.0:
 		_die()
+
+
+## Called by a Trapper's _attack() on whatever it hits - overwrites any
+## existing slow rather than stacking (see SLOW_MULTIPLIER/SLOW_DURATION's
+## own comment for why). _process() ticks _speed_debuff_timer down and
+## resets _speed_multiplier to 1.0 once it expires.
+func apply_slow(multiplier: float, duration: float) -> void:
+	if _dead:
+		return
+	_speed_multiplier = multiplier
+	_speed_debuff_timer = duration
+	_spawn_floating_text("Slowed!", Color(0.55, 0.85, 1.0))
 
 
 func _die() -> void:
