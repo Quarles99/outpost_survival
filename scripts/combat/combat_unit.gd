@@ -132,6 +132,11 @@ const WARD_REEVAL_INTERVAL := 3.0
 ## Where a Trapper leashes to when it has a ward - just behind/beside them,
 ## not exactly overlapping.
 const WARD_OFFSET := Vector2(0.0, 40.0)
+## See _ward_score() - deliberately larger than any possible danger-score
+## gap (bounded by the map's own diagonal, ~2800px) so spreading coverage
+## across every available ward always wins over concentrating it,
+## regardless of relative danger.
+const WARD_COVERAGE_PENALTY := 5000.0
 
 ## Per-role multiplier on FORMATION_LEASH_RANGE. Swordsman "holds the line"
 ## - a noticeably tighter leash than the baseline so it won't wander far
@@ -488,6 +493,16 @@ func _score_target(candidate: CombatUnit) -> float:
 ## formation.living_units rather than a separate "allies" reference - it's
 ## already the exact same array CombatTestManager points a team's Formation
 ## at, so there's nothing new to keep in sync.
+##
+## Each Trapper decides independently, with no central assignment step, so
+## danger alone isn't enough: every Trapper would agree on the single
+## most-threatened archer and all pile onto it, leaving every other archer
+## completely unguarded (confirmed via a headless trace before this fix -
+## all 3 Trappers in one test converged on the same ward). _ward_score()
+## folds in how many *other* living Trappers already guard a candidate as a
+## strong penalty, so coverage spreads across every available ward first;
+## only once everyone already has at least one guard does it become worth
+## doubling up on whichever is most endangered.
 func _update_ward() -> void:
 	if not is_instance_valid(formation):
 		ward = null
@@ -501,13 +516,29 @@ func _update_ward() -> void:
 		return
 	var live_enemies := _live_enemies()
 	var best: CombatUnit = candidates[0]
-	var best_danger := _danger_to(best, live_enemies)
+	var best_score := _ward_score(best, live_enemies)
 	for c in candidates:
-		var danger := _danger_to(c, live_enemies)
-		if danger > best_danger:
+		var score := _ward_score(c, live_enemies)
+		if score > best_score:
 			best = c
-			best_danger = danger
+			best_score = score
 	ward = best
+
+
+## WARD_COVERAGE_PENALTY is deliberately far larger than any possible
+## _danger_to() gap (bounded by the map's own diagonal, ~2800px) - "already
+## guarded by one more Trapper than some alternative" always outweighs any
+## danger difference, guaranteeing an unguarded ward beats a guarded one
+## regardless of relative threat, not just usually.
+func _ward_score(candidate: CombatUnit, live_enemies: Array) -> float:
+	var guard_count := 0
+	for u in formation.living_units:
+		var other: CombatUnit = u
+		if other == self or not is_instance_valid(other) or other._dead:
+			continue
+		if other.unit_type == UnitType.TRAPPER and other.ward == candidate:
+			guard_count += 1
+	return _danger_to(candidate, live_enemies) - guard_count * WARD_COVERAGE_PENALTY
 
 
 ## Higher = more in danger (nearest enemy is closer). -INF with no living
