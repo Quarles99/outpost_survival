@@ -39,19 +39,16 @@ const STATS := {
 		"health": 120.0, "damage": 12.0, "attack_range": 45.0,
 		"attack_interval": 1.0, "move_speed": 150.0, "ranged": false,
 		"avoids_melee": false, "melee_avoid_radius": 0.0,
-		"target_priority": [],
 	},
 	UnitType.ARCHER: {
 		"health": 70.0, "damage": 16.0, "attack_range": 260.0,
 		"attack_interval": 1.2, "move_speed": 170.0, "ranged": true,
 		"avoids_melee": true, "melee_avoid_radius": 150.0,
-		"target_priority": [UnitType.MAGE, UnitType.ARCHER, UnitType.SWORDSMAN],
 	},
 	UnitType.MAGE: {
 		"health": 55.0, "damage": 14.0, "attack_range": 220.0,
 		"attack_interval": 1.5, "move_speed": 140.0, "ranged": true,
 		"avoids_melee": true, "melee_avoid_radius": 170.0,
-		"target_priority": [UnitType.SWORDSMAN, UnitType.ARCHER, UnitType.MAGE],
 	},
 	## Pure-mobility counter to kiting Archers/Mages: fast enough (200) to
 	## outrun both outright (170/140) with no bonus damage or resistances
@@ -63,19 +60,93 @@ const STATS := {
 		"health": 80.0, "damage": 10.0, "attack_range": 45.0,
 		"attack_interval": 0.8, "move_speed": 200.0, "ranged": false,
 		"avoids_melee": false, "melee_avoid_radius": 0.0,
-		"target_priority": [UnitType.ARCHER, UnitType.MAGE, UnitType.SWORDSMAN],
 	},
 	## Counter to fast movers (Outrider specifically, but the slow applies
 	## to anything it hits) - see SLOW_MULTIPLIER/SLOW_DURATION and _attack().
 	## No bonus damage or resistances either; its counter-play is entirely
-	## the debuff, not the damage triangle. Prioritizes Outrider first since
-	## negating a fast diver's whole advantage is the actual point.
+	## the debuff, not the damage triangle.
 	UnitType.TRAPPER: {
 		"health": 100.0, "damage": 9.0, "attack_range": 60.0,
 		"attack_interval": 1.1, "move_speed": 130.0, "ranged": false,
 		"avoids_melee": false, "melee_avoid_radius": 0.0,
-		"target_priority": [UnitType.OUTRIDER, UnitType.ARCHER, UnitType.MAGE, UnitType.SWORDSMAN],
 	},
+}
+
+## Role behavior: target selection is a weighted score, not a strict ordered
+## list (target_priority, removed) - the old approach couldn't express
+## "prefer whoever's wounded" or "defend my ward" without special-casing,
+## both of which the role system below needs. See _score_target().
+##
+## attacker type -> defender type -> preference bonus. Replaces the old
+## ordered target_priority lists with equivalent (or richer) weighted
+## preferences - e.g. Archer's old [Mage, Archer, Swordsman] tiers become
+## descending bonuses here, plus new entries for Outrider/Trapper that
+## didn't exist when target_priority was ordered-list-only. Swordsman stays
+## empty (no type preference at all) - it holds the line and fights
+## whoever's in front of it, not a specific type.
+const TYPE_PREFERENCE := {
+	UnitType.SWORDSMAN: {},
+	UnitType.ARCHER: {
+		UnitType.MAGE: 100.0, UnitType.OUTRIDER: 80.0, UnitType.ARCHER: 60.0,
+		UnitType.TRAPPER: 50.0, UnitType.SWORDSMAN: 20.0,
+	},
+	UnitType.MAGE: {
+		UnitType.SWORDSMAN: 100.0, UnitType.OUTRIDER: 50.0, UnitType.ARCHER: 40.0,
+		UnitType.TRAPPER: 40.0, UnitType.MAGE: 20.0,
+	},
+	UnitType.OUTRIDER: {
+		UnitType.ARCHER: 100.0, UnitType.MAGE: 60.0, UnitType.TRAPPER: 30.0,
+		UnitType.SWORDSMAN: 10.0, UnitType.OUTRIDER: 20.0,
+	},
+	UnitType.TRAPPER: {
+		UnitType.OUTRIDER: 90.0, UnitType.ARCHER: 40.0, UnitType.MAGE: 40.0,
+		UnitType.SWORDSMAN: 20.0, UnitType.TRAPPER: 20.0,
+	},
+}
+
+## Bonus per point of "how wounded" a candidate target is (0 at full health,
+## WOUNDED_WEIGHT at 0 health) - "consistent DPS to squishy targets" reads
+## as focus-firing already-wounded enemies to secure kills rather than
+## spreading damage, applies to every role (not just Archer) since it's
+## generally good behavior. Deliberately smaller than a typical
+## TYPE_PREFERENCE gap so it nudges rather than overrides type preference.
+const WOUNDED_WEIGHT := 40.0
+## Added when a candidate is near this unit's `ward` (see _update_ward()) -
+## deliberately the largest single term, so a Trapper reliably peels onto
+## whatever's actually threatening its ward rather than a preferred-type
+## enemy standing safely elsewhere. Falls off smoothly to 0 at
+## WARD_THREAT_RADIUS rather than a hard cutoff.
+const WARD_THREAT_WEIGHT := 120.0
+const WARD_THREAT_RADIUS := 220.0
+## Small tiebreaker so "no other reason to prefer A over B" falls back to
+## nearest, without letting distance alone override a real type/wounded/
+## ward preference for a far-but-juicier target.
+const DISTANCE_WEIGHT := 0.05
+
+## How often a Trapper reconsiders which ally it's guarding (see
+## _update_ward()) - dynamic/periodic rather than assigned once, so it
+## follows whichever ally is actually in danger as the battle shifts,
+## rather than committing to one ward for the whole fight regardless of
+## where the real threat moves.
+const WARD_REEVAL_INTERVAL := 3.0
+## Where a Trapper leashes to when it has a ward - just behind/beside them,
+## not exactly overlapping.
+const WARD_OFFSET := Vector2(0.0, 40.0)
+
+## Per-role multiplier on FORMATION_LEASH_RANGE. Swordsman "holds the line"
+## - a noticeably tighter leash than the baseline so it won't wander far
+## chasing a kill. Outrider is the opposite: its whole job is intentionally
+## breaking formation cohesion to run down a specific enemy Archer, so it
+## gets a much looser leash instead of being exempted from one entirely -
+## still can't literally run to the map edge chasing something forever
+## (see Combat System.md's "runs to the edge" history), just has far more
+## room than everyone else before being reeled back.
+const LEASH_MULTIPLIER := {
+	UnitType.SWORDSMAN: 0.6,
+	UnitType.ARCHER: 1.0,
+	UnitType.MAGE: 1.0,
+	UnitType.OUTRIDER: 2.0,
+	UnitType.TRAPPER: 1.0,
 }
 
 ## Applied by a Trapper's attack (see _attack()) to whatever it hits -
@@ -185,6 +256,11 @@ var play_bounds := Rect2()
 ## world point.
 var formation: Formation = null
 var slot_offset := Vector2.ZERO
+## Only meaningfully used by Trapper (see _update_ward()) - the ally this
+## unit is currently protecting. When set, _apply_formation_pull() leashes
+## to the ward's live position instead of the static formation slot.
+var ward: CombatUnit = null
+var _ward_reeval_timer := 0.0
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var name_label: Label = $NameLabel
@@ -231,6 +307,12 @@ func _process(delta: float) -> void:
 		_speed_debuff_timer -= delta
 		if _speed_debuff_timer <= 0.0:
 			_speed_multiplier = 1.0
+
+	if unit_type == UnitType.TRAPPER:
+		_ward_reeval_timer -= delta
+		if _ward_reeval_timer <= 0.0 or not is_instance_valid(ward) or ward._dead:
+			_ward_reeval_timer = WARD_REEVAL_INTERVAL
+			_update_ward()
 
 	if not is_instance_valid(_target) or (_target as CombatUnit)._dead:
 		_retarget()
@@ -312,28 +394,39 @@ func _on_velocity_computed(safe_velocity: Vector2) -> void:
 		global_position = global_position.clamp(play_bounds.position, play_bounds.end)
 
 
-## Blends combat_velocity with a pull back toward this unit's Formation
-## slot, weighted by how far it's already drifted - a smooth gradient, not
-## a hard clamp (an earlier version hard-clamped position to a fixed radius
-## around the unit's own static spawn point, which caused real deadlocks:
-## two units each leashed to their own far-apart, never-updating point could
-## end up with no reachable overlap once the battle drifted from where it
-## started - see Formation, whose whole job is being a leash center that
-## moves with the battle instead). At dist_from_slot >= FORMATION_LEASH_RANGE
-## the pull fully dominates (weight 1.0); below that it's a proportional mix,
-## so a unit chasing something can still drift meaningfully off its slot
+## Blends combat_velocity with a pull back toward this unit's leash center,
+## weighted by how far it's already drifted - a smooth gradient, not a hard
+## clamp (an earlier version hard-clamped position to a fixed radius around
+## the unit's own static spawn point, which caused real deadlocks: two units
+## each leashed to their own far-apart, never-updating point could end up
+## with no reachable overlap once the battle drifted from where it started -
+## see Formation, whose whole job is being a leash center that moves with
+## the battle instead). At dist_from_slot >= this role's own leash range the
+## pull fully dominates (weight 1.0); below that it's a proportional mix, so
+## a unit chasing something can still drift meaningfully off its slot
 ## without a sudden snap back the instant it crosses some threshold.
+##
+## The leash center itself is role-dependent: a Trapper with a live ward
+## leashes to the ward's own current position (WARD_OFFSET beside it)
+## instead of a fixed formation slot, so it actually follows its charge
+## around rather than sitting in a static spot. Everyone else (and a
+## ward-less Trapper) uses the usual formation-slot center.
 func _apply_formation_pull(combat_velocity: Vector2, speed: float) -> Vector2:
 	if not is_instance_valid(formation):
 		return combat_velocity
-	var leash_center: Vector2 = formation.global_position + slot_offset
+	var leash_center: Vector2
+	if is_instance_valid(ward):
+		leash_center = ward.global_position + WARD_OFFSET
+	else:
+		leash_center = formation.global_position + slot_offset
 	if play_bounds.size != Vector2.ZERO:
 		leash_center = leash_center.clamp(play_bounds.position, play_bounds.end)
 	var offset := global_position - leash_center
 	var dist_from_slot := offset.length()
 	if dist_from_slot < 0.001:
 		return combat_velocity
-	var pull_weight := clampf(dist_from_slot / FORMATION_LEASH_RANGE, 0.0, 1.0)
+	var leash_range := FORMATION_LEASH_RANGE * float(LEASH_MULTIPLIER.get(unit_type, 1.0))
+	var pull_weight := clampf(dist_from_slot / leash_range, 0.0, 1.0)
 	if pull_weight <= 0.0:
 		return combat_velocity
 	var return_velocity := (-offset / dist_from_slot) * speed
@@ -352,18 +445,81 @@ func _face(dir: Vector2) -> void:
 ## silently detach this unit's view from that shared array, leaving stale
 ## freed-object references behind for _nearest_melee_threat() to crash on
 ## later - caught via the headless battle-simulation verification run.
+##
+## Only called when the current _target dies/goes invalid, not re-run every
+## frame - "consistent DPS to squishy targets" means committing to a kill,
+## not constantly re-scoring and flip-flopping toward marginally-better
+## targets mid-fight, which would spread damage around instead of securing
+## kills.
 func _retarget() -> void:
 	var live := _live_enemies()
 	if live.is_empty():
 		_target = null
 		return
-	var priority: Array = STATS[unit_type]["target_priority"]
-	for p_type in priority:
-		var candidates: Array = live.filter(func(e): return (e as CombatUnit).unit_type == p_type)
-		if not candidates.is_empty():
-			_target = _nearest(candidates)
-			return
-	_target = _nearest(live)
+	var best: CombatUnit = live[0]
+	var best_score := _score_target(best)
+	for c in live:
+		var score := _score_target(c)
+		if score > best_score:
+			best = c
+			best_score = score
+	_target = best
+
+
+## Weighted target score: type preference (TYPE_PREFERENCE) + how wounded
+## the candidate already is (WOUNDED_WEIGHT) + how close it is to this
+## unit's ward, if any (WARD_THREAT_WEIGHT) - distance to the candidate
+## itself only ever factors in as a small tiebreaker (DISTANCE_WEIGHT). See
+## each const's own comment for why it's weighted the way it is.
+func _score_target(candidate: CombatUnit) -> float:
+	var score: float = TYPE_PREFERENCE[unit_type].get(candidate.unit_type, 0.0)
+	var hp_frac := candidate.health / candidate.max_health if candidate.max_health > 0.0 else 0.0
+	score += (1.0 - hp_frac) * WOUNDED_WEIGHT
+	if is_instance_valid(ward):
+		var dist_to_ward := candidate.global_position.distance_to(ward.global_position)
+		score += WARD_THREAT_WEIGHT * clampf(1.0 - dist_to_ward / WARD_THREAT_RADIUS, 0.0, 1.0)
+	score -= global_position.distance_to(candidate.global_position) * DISTANCE_WEIGHT
+	return score
+
+
+## Trapper-only (see _process()) - picks whichever living Archer/Mage ally
+## is currently in the most danger (nearest enemy closest to them), falling
+## back to nearest ally if no enemies are alive to threaten anyone. Reads
+## formation.living_units rather than a separate "allies" reference - it's
+## already the exact same array CombatTestManager points a team's Formation
+## at, so there's nothing new to keep in sync.
+func _update_ward() -> void:
+	if not is_instance_valid(formation):
+		ward = null
+		return
+	var candidates: Array = formation.living_units.filter(func(u):
+		var c: CombatUnit = u
+		return is_instance_valid(c) and not c._dead and c != self and (c.unit_type == UnitType.ARCHER or c.unit_type == UnitType.MAGE)
+	)
+	if candidates.is_empty():
+		ward = null
+		return
+	var live_enemies := _live_enemies()
+	var best: CombatUnit = candidates[0]
+	var best_danger := _danger_to(best, live_enemies)
+	for c in candidates:
+		var danger := _danger_to(c, live_enemies)
+		if danger > best_danger:
+			best = c
+			best_danger = danger
+	ward = best
+
+
+## Higher = more in danger (nearest enemy is closer). -INF with no living
+## enemies at all, so any real ally beats "no candidate yet" in the caller's
+## first-iteration comparison without needing a special case there.
+func _danger_to(ally: CombatUnit, live_enemies: Array) -> float:
+	if live_enemies.is_empty():
+		return -INF
+	var nearest := INF
+	for e in live_enemies:
+		nearest = minf(nearest, ally.global_position.distance_to((e as CombatUnit).global_position))
+	return -nearest
 
 
 func _live_enemies() -> Array:
