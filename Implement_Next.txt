@@ -822,7 +822,8 @@ Implement these next:
       dragging onto these specific buildings reads as intuitively
       "become a hauler" without any on-screen hint) - recommend a playtest.
 
-- Unique art for every building aligning with current design standards
+- [MOVED] Unique art for every building aligning with current design standards
+    - Migrated to Outpost_Survival/Ideas/Unique Building Art.md - see below.
 
 - [DONE] Calculate income per minute for resources constantly looking back at the last minute of income rather than when turn ins happen
     - Already addressed by an earlier post-review pass this session (see
@@ -1564,21 +1565,255 @@ Implement these next:
       collapsed looks intentional or like a layout bug) - recommend a
       playtest.
 
-- Stone brick production chain
+- [DONE] Stone brick production chain
   - Stone mine -> Brickmaker
   - Stone bricks used for upgraded houses, brewery, mill, and other advanced buildings
+    - Scope decisions confirmed with the user before implementing: (1) a new
+      "masonry" skill rather than reusing "mining" (matches the existing
+      precedent of Mill/Bakery/Brewery each getting their own trade skill
+      separate from their raw-gathering source); (2) Brickmaker is a
+      dedicated, single-recipe building, NOT part of the Farm-family
+      crop-selection retool system (clicking a Cabbage Farm can't retool it
+      into a Brickmaker or vice versa); (3) also retrofit brick into
+      House's upgrade cost and Mill/Brewery's build costs now, not deferred.
+    - New `Brickmaker` (scripts/brickmaker.gd, scenes/workstation/
+      Brickmaker.tscn, 1x1, reusing StoneMine's generic-sprite sizing since
+      no bespoke art exists yet - see the still-open "Unique art for every
+      building" item) `extends Workstation`, NOT `Farm`. It still reuses
+      `Character._run_farm_loop` (the same input-buffer/output-buffer/
+      haul-trip converter loop every Farm-family building already shares)
+      by structural typing alone: `input_resource`/`input_per_tick` (and
+      `get_input_resource()`'s implementation) were moved from `Farm` up
+      onto `Workstation` itself specifically so a non-Farm-family converter
+      could share the loop without extending `Farm`. Not extending `Farm`
+      is also what keeps Brickmaker out of the crop-selection panel with
+      zero extra guarding needed - `Base._wire_farm_clicks` only wires
+      that panel to `is Farm` nodes, and Brickmaker has no `clicked` signal
+      at all. `_start_work`'s dispatch became `if post is Farm or post is
+      Brickmaker: _run_farm_loop(...)`. One real behavioral risk this
+      generalization introduced and had to guard against: `_run_farm_loop`
+      already applies `Character.WATER_FARM_OUTPUT_BONUS` (a well-access
+      output bonus, previously implicitly Farm-only since only Farm used
+      the loop) - broadening the loop to a second class would have silently
+      given Brickmaker the same bonus too (a well boosting brick
+      production makes no sense), so that line is now explicitly gated on
+      `post is Farm` rather than being unconditional.
+    - BuildingCatalog gained a "brickmaker" entry (1x1, 8 wood + 6 stone,
+      stone -> brick at a 1:1 ratio matching every other refinement
+      building's ratio, e.g. Mill's grain -> flour). New "brick" resource
+      added to GameState.DEFAULT_RESOURCES (starts at 0, not food, not in
+      FOOD_RESOURCES). New "masonry" skill added everywhere a job skill
+      needs to be known: SkillTitles.TITLE_SKILLS/JOB_NOUNS ("Mason"),
+      RecruitCatalog.SPECIALIZATIONS, SkillPanel.SKILL_DISPLAY_ORDER/
+      SKILL_LABELS - Base._run_job_assignment's existing Gale-Shapley
+      matching and _job_posts()'s TITLE_SKILLS filter both pick Brickmaker
+      up automatically with no special-casing, same as every prior skill
+      addition in this project.
+    - Cost retrofits (mid-task correction from the user: House's upgrade
+      specifically should drop raw stone entirely, not just add brick
+      alongside it - "a stone house should be built from worked brick, not
+      the raw ore"): House.UPGRADE_COST changed from {"stone": 15.0} to
+      {"brick": 10.0, "wood": 15.0} (stone removed, not just supplemented).
+      Mill's cost gained "brick": 6.0 (unchanged wood: 8.0). Brewery's cost
+      gained "brick": 6.0 alongside its existing wood/stone cost (stone
+      kept here, unlike House, since the ask was specifically about the
+      *upgraded house* representing worked stone - Brewery/Mill's stone
+      cost isn't being reinterpreted the same way). Bakery/Well/Storage
+      Facility were left untouched - not named in the backlog item.
+    - Verified headless via a real, non-mocked run: `flatpak run
+      org.godotengine.Godot --headless --path .` is how Godot actually
+      runs in this environment (it's a Flatpak install, not a `godot4`/
+      `godot` PATH binary - see the project memory entry on this). A
+      first attempt drove the test via `-s <script>` (overriding the
+      SceneTree main loop) but that turned out to break global-identifier
+      resolution for the `GameState`/`WorldGrid`/`SaveManager` autoloads
+      for *every* script including the project's own base.gd/character.gd
+      (not just the throwaway test script) - Base.tscn's script failed to
+      compile under that mode and every property access on it then failed
+      too. Worked around by temporarily pointing project.godot's
+      `run/main_scene` at Base.tscn directly and adding a throwaway
+      DebugVerify autoload to drive the test instead, letting the engine's
+      normal boot sequence (which does register autoloads correctly)
+      handle everything - both reverted afterward, confirmed via `git
+      status` showing zero net diff on project.godot. Also needed a one-time
+      `--headless --path . --import` pass first so the new Brickmaker
+      global class actually got registered (a stale `.godot/
+      global_script_class_cache.cfg` predating this session's new files
+      otherwise makes `is Brickmaker`/bare `Brickmaker` references fail to
+      resolve even under normal boot).
+    - The real run: instantiated a live Base scene (real starting citizens,
+      real WorldGrid/stockpile, nothing mocked), added a Stone Mine +
+      Brickmaker directly as children (bypassing the placement/construction
+      UI flow to save time, matching how earlier single-tick isolation
+      tests in this file already do), seeded 100 stone/100 wood, and ran
+      `Base._run_job_assignment()` for real - confirmed Aldric auto-matched
+      to the Stone Mine (mining) and Brenna to the Brickmaker (masonry),
+      leaving Cass hauling, exactly the expected Gale-Shapley outcome for 3
+      citizens and 2 posts. Ran 45 real seconds: confirmed `brick` rose
+      from 0 to 18 in the shared resource pool, `stone` was correctly drawn
+      down while `wood` (untouched by this chain) stayed exactly 100, and
+      Brickmaker's own input_buffer/output_buffer both read sane non-
+      negative values throughout with zero errors printed. Also directly
+      confirmed `Brickmaker.get_skill_id()`, `get_input_resource()`
+      (empty before catalog application, "stone" after - proving
+      `_apply_option_properties`'s generic `node.set(key, ...)` genuinely
+      works on the new class with no special-casing), House/Mill/Brewery's
+      updated cost dicts, and SkillTitles' masonry entries all read exactly
+      as configured. mining/masonry skill levels for all 3 citizens stayed
+      at 1 after 45s, which is expected (not a bug) - matches the earlier-
+      verified "speed took 90 real seconds to reach level 2" precedent for
+      flat per-action xp on a RuneScape-style curve, and much of the 45s
+      window here was spent on haul-trip travel rather than production
+      ticks specifically. Not verified in-editor for feel (Brickmaker's
+      generic-sprite visual at 1x1 scale, whether the new "masonry" skill
+      panel row/recruit specialization reads correctly) - recommend a
+      playtest.
 
-- Make early game easier by increasing starting food so happiness doesn't tank immediately
+- [DONE] Make early game easier by increasing starting food so happiness doesn't tank immediately
+    - GameState.DEFAULT_RESOURCES' starting cabbage raised 10 -> 30 (matches
+      BASE_STORAGE_CAPACITY exactly, so the HUD's per-resource "amount/cap"
+      breakdown row never reads as overflowed at boot). At 3 starting
+      citizens * FOOD_PER_CITIZEN (0.2/citizen/sec, see the earlier
+      consumption-tuning item), the old 10-cabbage start ran out in ~17
+      real seconds - GameState.get_total_food() hit 0 almost immediately,
+      tripping Base's happiness system into -HAPPINESS_STARVING_PENALTY
+      territory before the player had any realistic chance to place, staff,
+      and haul-supply a first farm. 30 cabbage stretches that to ~50
+      seconds - still not infinite (starvation is still a real, intended
+      pressure once it hits), but enough of a window to get a Cabbage Farm
+      built and delivering food before the penalty starts accumulating.
+      Starting wood (10) is untouched - it already comfortably covers a
+      Lumber Camp's 5-wood cost and wasn't the reported problem.
+    - No other balance numbers changed - this is deliberately scoped to
+      the literal ask (more starting food), not a broader consumption-rate
+      or happiness-curve pass; FOOD_PER_CITIZEN was already tuned down in
+      an earlier item and is left alone here.
+    - Verified headless (via `flatpak run org.godotengine.Godot --headless
+      --path . -s <script>` - Godot here is a Flatpak install, not a PATH
+      binary, so it needs invoking that way): confirmed
+      GameState.resources["cabbage"] reads exactly 30.0 at boot (matching
+      storage_capacity exactly, so the HUD's "30/30" breakdown row won't
+      read as overflowed), and confirmed
+      get_total_food()/(FOOD_PER_CITIZEN*population_count) computes exactly
+      50.0 seconds - matching the hand-computed expectation and roughly 3x
+      the old ~16.7s window. Not verified in-editor for feel (whether 50s
+      actually reads as enough breathing room in practice) - recommend a
+      playtest.
 
-- Introduce day / night cycle
-  - Citizens need 8 hours of sleep a day
-    - Citizens prefer to sleep at night
-  - 4 hours of free time per day not counting sleep where a citizen doesn't have to work
-    - Get a happiness bonus during this time
-  - Initial 3 citizen can sleep in the outpost hall but others need houses
-  - Citizens eat 2 meals a day
-    - Citizens can carry food on them for their meals that day or pick it up from the storehouse when needed
-  - Economy will need to be rebalanced to take into account this downtime and still allow growth out of the early game
-  - Track current day and current time in the UI
+- [DONE] Remove floating info text from citizens (except for name, title, and floating xp and gathered item drops)
+    - Character._update_label() dropped its third line entirely - the old
+      "(Hauling)" / "(Lumber Camp · Lv 3)" status line (assigned post's
+      display_name, or "Hauling" if unassigned, plus a " · Lv N" suffix
+      when a skill applied) is gone. Label.text is now just "%s\n%s" %
+      [character_name, title] instead of the old 3-line "%s\n%s\n(%s)".
+      That status info isn't lost from the game, just no longer shown
+      floating in-world - it's still fully visible via the (unchanged)
+      skill panel on click, which already lists every skill level.
+      GatherFeedback (the separate "+1.2 Cabbage +4 xp" floating text
+      spawned per production tick) was untouched, matching the "keep
+      floating xp and gathered item drops" carve-out.
+    - Character.tscn's Label rect shrank from a 3-line box (offset_top
+      -110, offset_bottom -84, 26px tall) to a 2-line one (offset_top
+      -108, offset_bottom -84, 24px tall - matching Workstation's own
+      2-line "Name\nfilled/max" label sizing convention) so the tighter
+      content doesn't leave an oversized gap above the character's head.
+    - Verified headless via a real Base scene: called _update_label()
+      directly on a live starting citizen and confirmed label.text reads
+      exactly "Aldric\nApprentice Farmer" (2 lines, split("\n").size()==2),
+      with no status/assignment text present.
 
-- Nothing else queued - add new items above this line to continue.
+- [DONE] Brewery, mill, and bakery need to be dissasociated from the farm building class, they are specialist workshops that need their own art and identity
+    - Two scope decisions confirmed with the user before implementing:
+      (1) one shared new `Workshop` class (scripts/workshop.gd) rather than
+      three separate near-identical classes - like `Farm`, `skill_id` stays
+      a per-catalog-entry export since the class covers three distinct
+      trades (milling/baking/brewing), rather than being hardcoded the way
+      Brickmaker's single fixed "masonry" is; (2) one new shared 2x2
+      placeholder art asset for all three (not a full bespoke pass per
+      building, which is the separate still-open "Unique art for every
+      building" item, and not leaving them on the old farm art either).
+    - `Workshop extends Workstation`, NOT `Farm` - exactly the same
+      relationship to `Character._run_farm_loop` Brickmaker already
+      established (structural typing via input_per_tick/input_resource
+      living on `Workstation` itself, no `clicked` signal at all). Not
+      extending `Farm` and having no `clicked` signal is what keeps a
+      building out of the Farm-family crop-selection retool panel with
+      zero extra guarding - `Base._wire_farm_clicks` only wires that panel
+      to `is Farm` nodes, and `BuildingCatalog.FARM_FAMILY_SCENE_PATHS`
+      only lists `Farm.tscn`/`CropStation.tscn`, not the new
+      `Workshop.tscn`. `_start_work`'s dispatch became `if post is Farm or
+      post is Brickmaker or post is Workshop: _run_farm_loop(...)`.
+    - Real behavioral change this causes, not just a code reorganization:
+      Mill/Bakery/Brewery used to be real `Farm` instances, so they
+      silently received `Character.WATER_FARM_OUTPUT_BONUS` (the
+      well-access output bonus) same as any crop farm. `_run_farm_loop`'s
+      water-bonus line is gated on `post is Farm` specifically (added
+      earlier this session for Brickmaker's benefit) - now that Mill/
+      Bakery/Brewery are `Workshop` instances instead, they no longer
+      qualify and lose that bonus. Accepted as the correct consequence of
+      "these are specialist workshops, not farms," not a regression to
+      fix.
+      - BuildingCatalog: Mill/Bakery/Brewery's "scene" changed from
+      `CropStation.tscn` to the new `Workshop.tscn`; all other fields
+      (resource_type/input_resource/input_per_tick/output_per_tick/
+      skill_id/sprite_tint/cost, including this session's earlier brick
+      cost additions) are untouched. `farm_family_options()`/
+      `FARM_FAMILY_SCENE_PATHS` needed no code change at all - excluding
+      Mill/Bakery/Brewery from the retool panel fell out automatically
+      from them no longer being on a Farm-family scene path, the same
+      "generalizes for free" pattern this whole session has repeated.
+      Grain Farm/Hops Farm/Fruit Orchard/Potato Farm (the actual raw crops)
+      are untouched and stay on `CropStation.tscn`/in the retool group.
+    - New art: `art/iso_workstation_workshop.svg`, a 2x2 flat-shed
+      silhouette (stone-toned walls, a low single-ridge shed roof, a
+      chimney with a puff of smoke, and stacked barrels out front) built
+      from the same proven wall/roof coordinate skeleton `iso_house.svg`
+      already uses (front-corner-down footprint, left face lighter/right
+      face darker on both walls and roof, matching CLAUDE.md's dimetric
+      lighting rules) but with a lower/flatter roof and no door/windows -
+      deliberately distinct from both the Cabbage Farm's flat tilled-soil
+      plot and the House's cozy peaked roof, reading as a generic
+      "industrious workshop" rather than either. All three buildings share
+      this one asset, distinguished only by their existing per-catalog
+      sprite_tint (same "shared silhouette, different tint" pattern
+      already used elsewhere in this project, e.g. StoneMine/Brickmaker/
+      ConstructionSite's shared generic sprite) - a real bespoke silhouette
+      per building is explicitly deferred to the separate "Unique art for
+      every building" item, not attempted here.
+      - Workshop.tscn's sprite offset (-132,-153) was derived, not guessed:
+      confirmed both `CropStation.tscn` (offset -138,-106, farm-art front
+      vertex at SVG-local 138,138) and `House.tscn` (offset -132,-203,
+      house-art front vertex at SVG-local 132,235) both resolve to the
+      exact same node-local anchor point (0, 32) via `offset + front_vertex
+      = anchor`, then solved that same equation for the new art's own
+      front vertex (132,185) to land on that identical anchor, so Workshop
+      sits at the same visual height/grid-snap as every other 2x2 building
+      rather than floating or sinking relative to them.
+    - Verified headless via a real Base scene, not mocked: instantiated a
+      live Mill from `BuildingCatalog.get_option("mill")`, confirmed its
+      scene resolves to `Workshop.tscn` (not `CropStation.tscn`), confirmed
+      `mill is Workshop` and `not (mill is Farm)`, confirmed it's absent
+      from `farm_family_options()`, confirmed `has_signal("clicked")` is
+      false, confirmed `get_skill_id()`/`get_input_resource()`/
+      `resource_type` all read "milling"/"grain"/"flour" correctly after
+      catalog application, and confirmed its sprite resolved to the new
+      `iso_workstation_workshop.svg` (not falling back to a stale default).
+      Then ran a real 40-second production test: `Base._run_job_assignment`
+      correctly auto-staffed the Mill with no special-casing, and grain
+      100->18 correctly converted into flour 0->12 over that window with
+      both buffers left in a sane non-negative state. Not verified
+      in-editor for visual quality (whether the new workshop silhouette
+      actually reads well at in-game scale/zoom, whether the three tints
+      remain distinguishable against it) - recommend a playtest.
+
+- [MOVED] Introduce day / night cycle (Not Ready, Don't Implement Yet)
+  - Migrated to Outpost_Survival/Ideas/Day-Night Cycle.md - see below.
+
+---
+
+SUPERSEDED as of 2026-07-15: this file is now a frozen historical log of everything
+implemented up through the item above. New work items are no longer queued here -
+they go in the Outpost_Survival/ Obsidian vault's Ideas/ folder instead, and the
+user tells Claude which Ideas items to implement. Completion write-ups for
+newly-implemented ideas go back into that idea's own vault note rather than being
+appended to this file. See CLAUDE.md's "Design vault (Obsidian)" section.

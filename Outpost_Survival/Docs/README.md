@@ -13,4 +13,4 @@ A single-base isometric (2:1 dimetric) survival/builder. Three fixed citizens (A
 
 ## Keeping this up to date
 
-This documentation is maintained alongside development: a fresh pass happens whenever an item in `/Implement_Next.txt` is marked `[DONE]`, so `mechanics.md` and `stats.md` should always describe the current build, not a stale one.
+This documentation is maintained alongside development: a fresh pass happens whenever an item in the `Ideas/` backlog (see `Home.md`) is implemented, so `mechanics.md` and `stats.md` should always describe the current build, not a stale one.

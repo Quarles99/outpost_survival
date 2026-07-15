@@ -2,10 +2,12 @@ extends Control
 class_name MainMenu
 
 const BASE_SCENE := "res://scenes/base/Base.tscn"
+const COMBAT_TEST_SCENE := "res://scenes/combat/CombatTest.tscn"
 
 @onready var continue_button: Button = $CenterContainer/VBoxContainer/ContinueButton
 @onready var new_game_button: Button = $CenterContainer/VBoxContainer/NewGameButton
 @onready var load_game_button: Button = $CenterContainer/VBoxContainer/LoadGameButton
+@onready var battle_test_button: Button = $CenterContainer/VBoxContainer/BattleTestButton
 @onready var quit_button: Button = $CenterContainer/VBoxContainer/QuitButton
 @onready var slot_panel: SlotPanel = $SlotPanel
 
@@ -23,6 +25,7 @@ func _ready() -> void:
 	continue_button.pressed.connect(_on_continue_pressed)
 	new_game_button.pressed.connect(func() -> void: _open_slot_panel("new"))
 	load_game_button.pressed.connect(func() -> void: _open_slot_panel("load"))
+	battle_test_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(COMBAT_TEST_SCENE))
 	quit_button.pressed.connect(func() -> void: get_tree().quit())
 
 	slot_panel.slot_chosen.connect(_on_slot_chosen)

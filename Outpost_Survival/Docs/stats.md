@@ -6,9 +6,9 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 
 | | Value |
 |---|---|
-| Starting cabbage | 10 |
+| Starting cabbage | 30 |
 | Starting wood | 10 |
-| Starting stone / grain / flour / bread / hops / beer / fruit / potato | 0 each |
+| Starting stone / grain / flour / bread / hops / beer / fruit / potato / brick | 0 each |
 | Starting population | 3 (Aldric, Brenna, Cass) |
 | Starting population capacity | 3 |
 | Starting water access | None (no Well built) |
@@ -40,34 +40,37 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 | Outpost Hall | 2×2 | 20 wood | — | A stockpile drop-off/pickup point - haulers use whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest. |
 | Cabbage Farm | 2×2 | 6 wood | — | Converts wood → cabbage. See production table below. |
 | Lumber Camp | 1×1 | 5 wood | — | Produces wood by chopping trees. See production table below. |
-| House | 2×2 | 10 wood | +2 population capacity | Passive — no worker slot. Clickable once placed for a one-time upgrade: 15 stone for +2 more population capacity (denied if already upgraded or unaffordable). |
+| House | 2×2 | 10 wood | +2 population capacity | Passive — no worker slot. Clickable once placed for a one-time upgrade: 10 brick + 15 wood for +2 more population capacity (denied if already upgraded or unaffordable). Deliberately no raw stone in the upgrade cost - an upgraded ("stone") house is built from worked brick, not the raw ore. |
 | Stone Mine | 1×1 | 8 wood | — | Produces stone, no input needed. See production table below. |
 | Well | 1×1 | 10 stone + 4 wood | +1 to water-well count (unlocks water access) | Passive — no worker slot. |
 | Storage Facility | 2×4 | 15 wood + 10 stone | +30 storage capacity (all resources) | Also a stockpile drop-off/pickup point, same as the Outpost Hall, and assignable as a hauler post (see Assigning Citizens). Not upgradeable in place yet; build another for more capacity. |
+| Brickmaker | 1×1 | 8 wood + 6 stone | — | Converts stone → brick. Not part of the Farm-family retool group (see below) - a dedicated, single-recipe building. See production table below. |
 | Grain Farm | 2×2 | 6 wood | — | Converts wood → grain. Crop-chain building; see table below. |
-| Mill | 2×2 | 8 wood | — | Converts grain → flour. |
+| Mill | 2×2 | 8 wood + 6 brick | — | Converts grain → flour. |
 | Bakery | 2×2 | 8 wood + 4 stone | — | Converts flour → bread (edible). |
 | Hops Farm | 2×2 | 6 wood | — | Converts wood → hops. |
-| Brewery | 2×2 | 10 wood + 4 stone | — | Converts hops → beer (luxury good, not edible). |
+| Brewery | 2×2 | 10 wood + 4 stone + 6 brick | — | Converts hops → beer (luxury good, not edible). |
 | Fruit Orchard | 2×2 | 8 wood | — | Produces fruit (edible), no input needed — slower but reliable. |
 | Potato Farm | 2×2 | 6 wood | — | Produces potato (edible), no input needed. |
 
-All 8 of the above (Farm through Potato Farm) can be clicked once placed to retool into any other one of the 8, for free, at any time - see [mechanics.md](mechanics.md#building--placement).
+All 8 of the above (Farm through Potato Farm) can be clicked once placed to retool into any other one of the 8, for free, at any time - see [mechanics.md](mechanics.md#building--placement). Brickmaker is deliberately excluded from this group (see its own Buildings row above) despite sharing the same converter work loop as Farm.
 
 ## Workstation Production
 
-| | Farm | Lumber Camp | Stone Mine |
-|---|---|---|---|
-| Output resource | cabbage | wood | stone |
-| Output per work cycle | 1.0 × skill multiplier | 2.0 × skill multiplier (per chop) | 0.5 × skill multiplier |
-| Input resource | wood | — | — |
-| Input cost per work cycle | 0.5 wood flat (not scaled by skill) | — | — |
-| Work cycle interval | 1.5 s | 1.2 s (per chop) | 1.5 s |
-| Carry limit (output buffer cap / haul size) | 6.0 | 6.0 | 6.0 |
-| Search radius (tree-finding, Lumber Camp only) | — | 4.5 tiles | — |
-| Target forest size maintained (Lumber Camp only) | — | 16 trees within search radius | — |
-| Skill trained | `farming` | `lumberjacking` | `mining` |
-| Max workers assigned at once | 1 | 1 | 1 |
+| | Farm | Lumber Camp | Stone Mine | Brickmaker |
+|---|---|---|---|---|
+| Output resource | cabbage | wood | stone | brick |
+| Output per work cycle | 1.0 × skill multiplier | 2.0 × skill multiplier (per chop) | 0.5 × skill multiplier | 1.0 × skill multiplier |
+| Input resource | wood | — | — | stone |
+| Input cost per work cycle | 0.5 wood flat (not scaled by skill) | — | — | 1.0 stone flat (not scaled by skill) |
+| Work cycle interval | 1.5 s | 1.2 s (per chop) | 1.5 s | 1.5 s (default) |
+| Carry limit (output buffer cap / haul size) | 6.0 | 6.0 | 6.0 | 6.0 |
+| Search radius (tree-finding, Lumber Camp only) | — | 4.5 tiles | — | — |
+| Target forest size maintained (Lumber Camp only) | — | 16 trees within search radius | — | — |
+| Skill trained | `farming` | `lumberjacking` | `mining` | `masonry` |
+| Max workers assigned at once | 1 | 1 | 1 | 1 |
+
+Brickmaker shares `Character._run_farm_loop` with the Farm class (input_per_tick/input_resource live on `Workstation` itself, not `Farm`, specifically so a non-Farm-family converter like this can reuse the loop) but does **not** get the Water Farming Bonus below - that bonus is gated to `post is Farm` specifically, since an irrigation well boosting brick-making wouldn't make sense.
 
 ## Worker Caps (`Workstation`)
 
@@ -81,7 +84,7 @@ Each post's status label shows live occupancy as `"<name>\n<active_workers>/<max
 
 | | Value |
 |---|---|
-| Job skills eligible for auto-assignment | farming, lumberjacking, mining, milling, baking, brewing, construction (`SkillTitles.TITLE_SKILLS`) |
+| Job skills eligible for auto-assignment | farming, lumberjacking, mining, masonry, milling, baking, brewing, construction (`SkillTitles.TITLE_SKILLS`) |
 | Matching algorithm | Citizen-proposing deferred acceptance (generalized Gale-Shapley), recomputed from scratch on every trigger |
 | Triggers | Game boot/load, citizen recruited/departed, job post built/disabled/re-enabled |
 | Swap condition | Strictly higher level in the contested skill only - ties never swap |
@@ -125,7 +128,7 @@ RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1
 
 ## Skill Titles (`SkillTitles`)
 
-Only the seven job skills (farming, lumberjacking, mining, milling, baking, brewing, construction) count - speed/strength are excluded, since they train passively and don't represent a trade.
+Only the eight job skills (farming, lumberjacking, mining, masonry, milling, baking, brewing, construction) count - speed/strength are excluded, since they train passively and don't represent a trade.
 
 | Level | Tier |
 |---|---|
@@ -135,7 +138,7 @@ Only the seven job skills (farming, lumberjacking, mining, milling, baking, brew
 | 75 | Grandmaster |
 | 99 | Legendary |
 
-Title = tier word (by whichever job skill is trained highest) + that skill's job noun (Farmer, Lumberjack, Miner, Miller, Baker, Brewer, Builder) - e.g. "Master Lumberjack". A tie at the same max level goes to whichever skill matches the citizen's current assignment, if any.
+Title = tier word (by whichever job skill is trained highest) + that skill's job noun (Farmer, Lumberjack, Miner, Mason, Miller, Baker, Brewer, Builder) - e.g. "Master Lumberjack". A tie at the same max level goes to whichever skill matches the citizen's current assignment, if any.
 
 ## Construction (`Base`, `ConstructionSite`, `Character`)
 
@@ -230,7 +233,7 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 | Cost per food type in a candidate's cost | 15 |
 | Cost formula | 15 of the candidate's own tier's food, plus 15 of every cheaper tier's food (e.g. a bread-tier (index 3) candidate costs 15 cabbage + 15 potato + 15 fruit + 15 bread) |
 | Starting level | 5 at tier 0 (cabbage), +5 per tier above that (5/10/15/20/25) |
-| Possible specializations | farming, lumberjacking, mining, milling, baking, brewing, construction |
+| Possible specializations | farming, lumberjacking, mining, masonry, milling, baking, brewing, construction |
 | Gated on | open population capacity, and affording that candidate's own (tier-scaled) cost |
 
 ## Map Size (`IsoGround`, `Base.tscn`)
