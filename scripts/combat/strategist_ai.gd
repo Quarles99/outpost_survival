@@ -21,22 +21,43 @@ const RE_EVAL_INTERVAL := 4.0
 const SWITCH_COOLDOWN := 6.0
 
 ## Dominant-enemy-type -> the FormationCatalog preset that counters it - see
-## that file's own comments for the DAMAGE_MULTIPLIERS-derived reasoning
-## behind each of the first three. Outrider/Trapper aren't in the damage
-## triangle at all (both flat 1.0 everywhere), so their entries are reasoned
-## from behavior instead: an Outrider-dominant enemy is fast but fragile
-## and doesn't kite, so "rush" (close distance fast, minimize exposure to
-## whatever else they're bringing) beats it in a straight fight; a
-## Trapper-dominant enemy's whole threat is negating mobility-dependent
-## play via the slow debuff, so "guard" (low melee_avoid_radius, front line
-## already holds ground rather than relying on kiting) sidesteps that
-## threat instead of walking into it. Neither is deeply tested/tuned yet.
+## that file's own comments for the DAMAGE_MULTIPLIERS-derived reasoning.
+## Marauder inherits the old Swordsman-dominant mapping ("skirmish" - a
+## genuine high-DPS melee threat that demands evasion, more true of
+## Marauder than it ever was of the generic Swordsman it replaced).
+## Shieldbearer gets its own: low damage and slow, so it isn't really a
+## "kite it" threat the way Marauder is - what actually matters is its
+## pronounced weakness to magic (1.7x, heaviest armor conducts it best),
+## so "press" (Archer/Mage brought forward alongside the existing front
+## line) puts our own ranged damage in early, frequent contact with the
+## one thing it's specifically bad against. Deliberately "press," not
+## "guard" - a real bug caught in the "balanced" mirror matchup: guard
+## sends *our own* Shieldbearer to the back rank too (it exists to hide a
+## magic-vulnerable tank from an enemy Mage threat, which isn't what's
+## happening here), and since a mirror matchup has both sides seeing each
+## other as Shieldbearer-dominant, both StrategistAIs picked the same
+## preset and sent both teams' tanks to the back at once while their
+## Archers took the front unprotected. "press" keeps Shieldbearer/Marauder
+## in the front rank where they belong and just adds ranged units
+## alongside them, with nothing sent backward.
+## Outrider/Trapper aren't in the damage triangle at all (both flat 1.0
+## everywhere), so their entries are reasoned from behavior instead: an
+## Outrider-dominant enemy is fast but fragile and doesn't kite, so "rush"
+## (close distance fast, minimize exposure to whatever else they're
+## bringing) beats it in a straight fight; a Trapper-dominant enemy's whole
+## threat is negating mobility-dependent play via the slow debuff, so
+## "press" (low melee_avoid_radius, front line already holds ground rather
+## than relying on kiting) sidesteps that threat instead of walking into
+## it - same reasoning as the old "guard" mapping, but without that
+## preset's unrelated (and here counterproductive) tank retreat.
+## None of these are deeply tested/tuned yet.
 const COUNTER_PRESET := {
-	CombatUnit.UnitType.SWORDSMAN: "skirmish",
+	CombatUnit.UnitType.SHIELDBEARER: "press",
+	CombatUnit.UnitType.MARAUDER: "skirmish",
 	CombatUnit.UnitType.ARCHER: "rush",
 	CombatUnit.UnitType.MAGE: "guard",
 	CombatUnit.UnitType.OUTRIDER: "rush",
-	CombatUnit.UnitType.TRAPPER: "guard",
+	CombatUnit.UnitType.TRAPPER: "press",
 }
 ## Used when the enemy has no living units left to react to, or (not
 ## currently reachable, since "dominant by HP" always picks some type when

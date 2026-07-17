@@ -18,6 +18,56 @@ const BUILDING_PROPERTIES := [
 const INITIAL_TREE_COUNT := 12
 const INITIAL_TREE_RADIUS := 5.0
 
+## --- Fast-forward -----------------------------------------------------
+## Companion to slowing base movement/work speed down by a factor of 2 (see
+## Character.MOVE_SPEED/Workstation.work_interval's own doc comments) - lets
+## a player compress the resulting downtime back down instead of just
+## sitting through it. Same Engine.time_scale mechanism CombatTestManager's
+## own speed control already uses (see its own SPEED_MULTIPLIERS), applied
+## here to the town scene instead of a battle - a global engine setting, so
+## _exit_tree() resets it to 1.0 on every way out of this scene, same reason
+## that scene resets it too (otherwise 4x would carry into whatever loads
+## next - a menu, a save-load animation, even a deployed battle before its
+## own _apply_speed() overrides it in _ready()).
+const SPEED_MULTIPLIERS := [1.0, 2.0, 4.0]
+var speed_index := 0
+
+## --- Battle deployment -----------------------------------------------------
+## See _on_attack_pressed/BattleState.gd for the full handoff. CombatTest.tscn
+## is the same standalone sandbox scene the main menu's "Battle Test" button
+## and F6 already use - branching on BattleState.active is what tells it
+## apart from a real deployment, see CombatTestManager's own doc comment.
+const COMBAT_TEST_SCENE := "res://scenes/combat/CombatTest.tscn"
+
+## Round-robin distribution for citizens trained in "melee_combat" - that one
+## skill can't disambiguate which of CombatUnit's four melee archetypes
+## (Shieldbearer/Marauder/Outrider/Trapper) a citizen becomes, since nothing
+## on CharacterData tracks a sub-specialization (see Outpost_Survival/Ideas/
+## Combat Units.md's deferred-integration note - no existing design answer
+## to honor here). Cycling through all four by squad-roster order is a
+## deliberately simple first pass - keeps a defending squad from being an
+## all-Shieldbearer wall (a weak, easily-baited composition per the point-
+## cost table in Ideas/Combat Units.md) without inventing a new stat/UI just
+## for this. Revisit once there's a real archetype-selection mechanic.
+const MELEE_ARCHETYPES := [
+	CombatUnit.UnitType.SHIELDBEARER, CombatUnit.UnitType.MARAUDER,
+	CombatUnit.UnitType.OUTRIDER, CombatUnit.UnitType.TRAPPER,
+]
+
+## --- Day/night visual tint ------------------------------------------------
+## Multiplies onto every world CanvasItem (ground, buildings, characters,
+## trees) via $DayNightTint - a CanvasModulate, which only affects the same
+## canvas it sits in, not any CanvasLayer (every UI panel, including HUD, is
+## a CanvasLayer - see CLAUDE.md - so none of them darken at night).
+## Deliberately a moderate dusk-blue rather than near-black - work/haul
+## loops keep running unchanged through the night (see DayNightCycle's own
+## doc comment - only the clock + this tint + the recruit cooldown are wired
+## up so far), so night shouldn't read as "nothing is visible," just
+## atmospheric.
+const DAY_TINT := Color(1.0, 1.0, 1.0)
+const NIGHT_TINT := Color(0.38, 0.42, 0.58)
+const DAY_NIGHT_TRANSITION_SECONDS := 8.0
+
 ## --- Building system -----------------------------------------------------
 ## Placing a building no longer completes it instantly - it spawns a
 ## ConstructionSite instead (see _confirm_placement/_spawn_construction_site),
@@ -45,14 +95,22 @@ const MIN_LABOR_REQUIRED := 10.0
 ## fully felt. Numbers below are a first pass, not iterated on via
 ## playtesting.
 const HAPPINESS_TICK_INTERVAL := 5.0
-const HAPPINESS_EASE_RATE := 3.0
+## Lowered 3.0 -> 1.0 via Outpost_Survival/Balance.md's edit-and-hand-back
+## workflow - a condition change now takes noticeably longer to fully felt.
+const HAPPINESS_EASE_RATE := 1.0
 const HAPPINESS_BASELINE := 50.0
-const HAPPINESS_WATER_BONUS := 15.0
-const HAPPINESS_FOOD_BONUS := 15.0
+## Lowered 15.0 -> 5.0 via Outpost_Survival/Balance.md's edit-and-hand-back
+## workflow.
+const HAPPINESS_WATER_BONUS := 5.0
+## Lowered 15.0 -> 10.0 via Outpost_Survival/Balance.md's edit-and-hand-back
+## workflow.
+const HAPPINESS_FOOD_BONUS := 10.0
 const HAPPINESS_STARVING_PENALTY := 20.0
 const HAPPINESS_PER_FOOD_VARIETY := 5.0
 ## Below this, a citizen is "unhappy" and starts accumulating toward leaving.
-const UNHAPPY_THRESHOLD := 20.0
+## Lowered 20.0 -> 15.0 via Outpost_Survival/Balance.md's edit-and-hand-back
+## workflow.
+const UNHAPPY_THRESHOLD := 15.0
 ## Consecutive ticks (at HAPPINESS_TICK_INTERVAL each) of sustained
 ## unhappiness before a citizen leaves for good - 12 * 5s = 60s.
 const LEAVE_AFTER_UNHAPPY_TICKS := 12
@@ -79,11 +137,14 @@ const CHARACTER_SCENE := preload("res://scenes/character/Character.tscn")
 @onready var build_menu: BuildMenu = $BuildMenu
 @onready var recruit_panel: RecruitPanel = $RecruitPanel
 @onready var crop_panel: CropPanel = $CropPanel
+@onready var training_ground_panel: TrainingGroundPanel = $TrainingGroundPanel
 @onready var system_menu: SystemMenu = $SystemMenu
 @onready var slot_panel: SlotPanel = $SlotPanel
 @onready var hud: HUD = $HUD
 @onready var iso_ground: IsoGround = $IsoGround
 @onready var camera: RtsCamera = $Camera2D
+@onready var day_night_tint: CanvasModulate = $DayNightTint
+@onready var nav_region: NavigationRegion2D = $NavigationRegion2D
 @onready var characters: Array[Character] = [$Aldric, $Brenna, $Cass]
 
 var posts: Array[Node] = []
@@ -102,6 +163,22 @@ var construction_sites: Array[ConstructionSite] = []
 ## can be open at a time (opening a new one closes any other panel first,
 ## same as recruit/build), so a single field is enough - no stack needed.
 var _crop_target: Farm = null
+
+## Which TrainingGround (if any) opened recruit_panel - null means the
+## Outpost Hall's own normal recruitment instead. _on_candidate_selected
+## reads this to decide which cooldown to mark (DayNightCycle's shared one
+## for the Outpost Hall, or this specific building's own independent one -
+## see TrainingGround.mark_recruited) - same single-field-no-stack reasoning
+## as _crop_target, since recruit_panel can likewise only be open for one
+## source at a time.
+var _recruit_source: TrainingGround = null
+
+## Which TrainingGround training_ground_panel is currently open for - set by
+## _on_training_ground_clicked, consumed by _on_training_ground_option_chosen.
+## Same single-field-no-stack reasoning as _crop_target/_recruit_source,
+## since training_ground_panel can likewise only be open for one building at
+## a time.
+var _training_ground_target: TrainingGround = null
 
 ## Which SystemMenu button opened slot_panel ("save" or "load") - slot_panel
 ## itself is purely presentational and just reports back which slot number
@@ -137,6 +214,7 @@ func _ready() -> void:
 	## below - _load_game() overwrites every one of these fields from the
 	## save data regardless of what they were reset to first.
 	GameState.reset_to_defaults()
+	DayNightCycle.reset_to_defaults()
 
 	var min_cell := Vector2i(iso_ground.start_x, iso_ground.start_y)
 	var max_cell := Vector2i(iso_ground.start_x + iso_ground.width - 1, iso_ground.start_y + iso_ground.depth - 1)
@@ -146,8 +224,11 @@ func _ready() -> void:
 
 	## Only the Outpost Hall starts built - a Cabbage Farm and Lumber Camp
 	## used to be fixed starting buildings too, but the player now has to
-	## build everything else themselves (starting resources - 10 cabbage, 10
-	## wood - comfortably cover a Lumber Camp's 5 wood cost to get going).
+	## build everything else themselves - see GameState.DEFAULT_RESOURCES for
+	## why the starting cabbage/wood amounts are what they are (a Lumber
+	## Camp/Cabbage Farm/half a House outright, plus enough cabbage to
+	## recruit immediately without starving before the first farm is built
+	## and staffed).
 	## Not appended to `posts` - it's never a job post (see _job_posts), only
 	## a stockpile drop-off point.
 	$OutpostHall.set_meta("save_id", "outpost_hall")
@@ -155,6 +236,15 @@ func _ready() -> void:
 	_reserve_existing_footprint($OutpostHall, BuildingCatalog.get_option("outpost_hall")["grid_size"])
 
 	_scatter_initial_trees()
+
+	## Baked once here (after every starting cell reservation above) and
+	## re-baked on every subsequent WorldGrid.occupancy_changed (a building
+	## placed/completed, a tree planted/harvested) rather than once at boot -
+	## see WorldGrid.occupancy_changed's own doc comment for why the town's
+	## navmesh can't be treated as fixed-for-the-session the way the battle
+	## sandbox's is.
+	_rebake_navigation()
+	WorldGrid.occupancy_changed.connect(_rebake_navigation)
 
 	for character in characters:
 		character.clicked.connect(_on_character_selected)
@@ -179,12 +269,17 @@ func _ready() -> void:
 
 	build_menu.option_selected.connect(_on_build_option_selected)
 	hud.build_pressed.connect(_on_build_pressed)
+	hud.attack_pressed.connect(_on_attack_pressed)
+	hud.speed_pressed.connect(_on_speed_button_pressed)
 	hud.menu_pressed.connect(_open_system_menu)
 
 	recruit_panel.candidate_selected.connect(_on_candidate_selected)
+	training_ground_panel.option_chosen.connect(_on_training_ground_option_chosen)
 	$OutpostHall.clicked.connect(_on_outpost_hall_clicked)
 
 	crop_panel.option_selected.connect(_on_crop_selected)
+	DayNightCycle.day_started.connect(_on_day_started)
+	DayNightCycle.night_started.connect(_on_night_started)
 
 	system_menu.save_pressed.connect(func() -> void: _open_slot_panel("save"))
 	system_menu.load_pressed.connect(func() -> void: _open_slot_panel("load"))
@@ -202,12 +297,25 @@ func _ready() -> void:
 	GameState.happiness_output_multiplier = initial_band["multiplier"]
 	hud.set_happiness(initial_average, initial_band["name"])
 
+	## Returning from a battle deployment (_on_attack_pressed sent the player
+	## to CombatTest.tscn) takes priority over the two boot paths below -
+	## town_blob is only ever non-empty on the scene reload right after
+	## CombatTestManager hands control back (see _apply_battle_result), never
+	## on a genuine main-menu boot. Checked and cleared before either of the
+	## other two so a stale blob can't leak into some later "New Game"/
+	## "Continue" boot.
+	if not BattleState.town_blob.is_empty():
+		var blob := BattleState.town_blob
+		var battle_result := BattleState.result
+		BattleState.clear()
+		_apply_state(blob)
+		_apply_battle_result(battle_result)
 	## MainMenu's "Continue"/"Load Game" set this before switching into this
 	## scene; "New Game" leaves it false so this boot stays on the fresh
 	## state everything above just set up. Consumed once and cleared so a
 	## later F9/in-game load doesn't re-trigger this on some future scene
 	## reload (e.g. Main Menu -> Continue again).
-	if SaveManager.should_load_on_start:
+	elif SaveManager.should_load_on_start:
 		SaveManager.should_load_on_start = false
 		_load_game()
 	else:
@@ -216,6 +324,39 @@ func _ready() -> void:
 		## fresh "New Game" path, which never calls _load_game() at all.
 		_run_job_assignment()
 
+	## Snapped immediately (no tween) to whatever phase DayNightCycle ended
+	## up in above - deliberately placed after every load/apply-state branch,
+	## not right where day_started/night_started got connected, since a save
+	## load or a battle-spanning-a-day-boundary return can leave DayNightCycle
+	## on night even though it was freshly reset_to_defaults() (day) at the
+	## very top of this function. Only day_started/night_started firing
+	## *after* this point should tween - see _on_day_started/_on_night_started.
+	day_night_tint.color = DAY_TINT if DayNightCycle.is_day else NIGHT_TINT
+	hud.set_day_label(DayNightCycle.day_number, DayNightCycle.is_day)
+
+	## Fast-forward always boots at 1x - a transient display preference, not
+	## saved game state, same as CombatTestManager's own speed_index never
+	## persisting across that scene's own reloads.
+	_apply_speed()
+
+
+## Safety net alongside the explicit key-triggered changes in
+## _unhandled_input - covers every other way this scene could end up
+## removed from the tree (System Menu -> Main Menu, a battle deployment,
+## quitting) without leaving Engine.time_scale stuck elevated for whatever
+## loads next. Mirrors CombatTestManager._exit_tree() exactly, same reason.
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
+
+
+func _apply_speed() -> void:
+	Engine.time_scale = SPEED_MULTIPLIERS[speed_index]
+	hud.set_speed_label(SPEED_MULTIPLIERS[speed_index])
+
+
+func _on_speed_button_pressed() -> void:
+	speed_index = (speed_index + 1) % SPEED_MULTIPLIERS.size()
+	_apply_speed()
 
 
 func _configure_camera_limits(min_cell: Vector2i, max_cell: Vector2i) -> void:
@@ -231,6 +372,87 @@ func _configure_camera_limits(min_cell: Vector2i, max_cell: Vector2i) -> void:
 		min_pos = min_pos.min(corner)
 		max_pos = max_pos.max(corner)
 	camera.configure_limits(min_pos, max_pos)
+
+
+## Fraction of a full tile diamond a single occupied cell's obstruction
+## outline actually covers - shrunk well below 1.0 (not a full tile) so a
+## building's own WorkSpot marker, deliberately placed right at its
+## footprint's near edge (see e.g. Farm.tscn's WorkSpot vs. its front cell's
+## own diamond corners), never ends up *inside* the hole its own building
+## creates - that would leave NavigationAgent2D.is_navigation_finished()
+## permanently false for anyone walking there (see Character._move_to),
+## freezing that citizen's whole work loop. Verified against every current
+## WorkSpot offset (all sit at local y=26-30, versus a shrunk cell's own
+## near-corner at TILE_HEIGHT*0.5*this = 19.2px) before picking this value.
+const NAV_OBSTACLE_SHRINK := 0.6
+
+
+## Baked in code (see CombatTestManager._setup_navigation's identical
+## pattern for the battle sandbox) rather than authored in the editor, so it
+## can't drift out of sync with the ground's actual size - and re-baked on
+## every WorldGrid.occupancy_changed (see _ready()) rather than once at
+## boot, since the town's walkable area keeps changing shape all session
+## (buildings built, trees planted/harvested) unlike a single fight's fixed
+## terrain. One obstruction outline per occupied WorldGrid cell (buildings,
+## construction sites, and trees alike - see WorldGrid.get_occupied_cells)
+## rather than one polygon per building, so this doesn't need to know
+## anything about footprint anchoring/shapes at all, just the same cell
+## occupancy building placement/tree planting already maintain.
+func _rebake_navigation() -> void:
+	var nav_poly := NavigationPolygon.new()
+	nav_poly.add_outline(_ground_outline())
+	var source_geometry := NavigationMeshSourceGeometryData2D.new()
+	for cell in WorldGrid.get_occupied_cells():
+		source_geometry.add_obstruction_outline(_cell_obstacle_outline(cell))
+	NavigationServer2D.bake_from_source_geometry_data(nav_poly, source_geometry)
+	nav_region.navigation_polygon = nav_poly
+
+
+## The ground's own isometric footprint (see WorldGrid.bounds_min/bounds_max),
+## not an axis-aligned rectangle - same reasoning as CombatTestManager's
+## _iso_ground_corners (a rectangular navmesh around a diamond map would let
+## citizens path into the rectangle's corners, past the last visible tile).
+func _ground_outline() -> PackedVector2Array:
+	var gx0 := float(WorldGrid.bounds_min.x) - 0.5
+	var gx1 := float(WorldGrid.bounds_max.x) + 0.5
+	var gy0 := float(WorldGrid.bounds_min.y) - 0.5
+	var gy1 := float(WorldGrid.bounds_max.y) + 0.5
+	return PackedVector2Array([
+		WorldGrid.grid_to_local(Vector2(gx0, gy0)),
+		WorldGrid.grid_to_local(Vector2(gx1, gy0)),
+		WorldGrid.grid_to_local(Vector2(gx1, gy1)),
+		WorldGrid.grid_to_local(Vector2(gx0, gy1)),
+	])
+
+
+## A NAV_OBSTACLE_SHRINK-sized diamond centered on a single occupied cell -
+## see that const's own doc comment for why it's shrunk rather than a full
+## tile.
+func _cell_obstacle_outline(cell: Vector2i) -> PackedVector2Array:
+	var center := WorldGrid.grid_to_local(Vector2(cell.x, cell.y))
+	var half_w := IsoUtils.TILE_WIDTH * 0.5 * NAV_OBSTACLE_SHRINK
+	var half_h := IsoUtils.TILE_HEIGHT * 0.5 * NAV_OBSTACLE_SHRINK
+	return PackedVector2Array([
+		center + Vector2(0, -half_h),
+		center + Vector2(half_w, 0),
+		center + Vector2(0, half_h),
+		center + Vector2(-half_w, 0),
+	])
+
+
+func _on_day_started(day: int) -> void:
+	_tween_day_night_tint(DAY_TINT)
+	hud.set_day_label(day, true)
+
+
+func _on_night_started(day: int) -> void:
+	_tween_day_night_tint(NIGHT_TINT)
+	hud.set_day_label(day, false)
+
+
+func _tween_day_night_tint(target: Color) -> void:
+	var tween := create_tween()
+	tween.tween_property(day_night_tint, "color", target, DAY_NIGHT_TRANSITION_SECONDS)
 
 
 func _scatter_initial_trees() -> void:
@@ -331,6 +553,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			_load_game()
 			return
+		elif event.keycode == KEY_EQUAL or event.keycode == KEY_KP_ADD:
+			get_viewport().set_input_as_handled()
+			speed_index = mini(speed_index + 1, SPEED_MULTIPLIERS.size() - 1)
+			_apply_speed()
+			return
+		elif event.keycode == KEY_MINUS or event.keycode == KEY_KP_SUBTRACT:
+			get_viewport().set_input_as_handled()
+			speed_index = maxi(speed_index - 1, 0)
+			_apply_speed()
+			return
 	## SystemMenu/SlotPanel handle their own Esc-to-close via their own
 	## _input() (which always runs before _unhandled_input regardless of
 	## tree order - see CLAUDE.md's RtsCamera note for the same mechanism),
@@ -353,6 +585,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if crop_panel.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
 		crop_panel.close()
+		return
+	if training_ground_panel.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
+		training_ground_panel.close()
 		return
 	if _selected_character == null:
 		## Esc only reaches here once nothing else above had anything to
@@ -400,6 +635,7 @@ func _on_build_pressed() -> void:
 		_deselect()
 	recruit_panel.close()
 	crop_panel.close()
+	training_ground_panel.close()
 	build_menu.open_for(BuildingCatalog.placeable_options())
 
 
@@ -414,14 +650,101 @@ func _open_system_menu() -> void:
 	build_menu.close()
 	recruit_panel.close()
 	crop_panel.close()
+	training_ground_panel.close()
 	system_menu.open()
 
 
+## Gated by DayNightCycle.can_recruit() - the panel doesn't even open on
+## cooldown (rather than opening it and rejecting a candidate pick after the
+## fact), same "block the action upfront" shape _on_attack_pressed's empty-
+## squad guard already uses.
 func _on_outpost_hall_clicked() -> void:
+	if not DayNightCycle.can_recruit():
+		var days := DayNightCycle.days_until_next_recruit()
+		hud.flash_message("Recruiting available in %d more day%s" % [days, "" if days == 1 else "s"])
+		return
 	_cancel_placement()
 	build_menu.close()
 	crop_panel.close()
+	training_ground_panel.close()
+	_recruit_source = null
 	recruit_panel.open_for(RecruitCatalog.generate_candidates())
+
+
+## A built combat-training building offers two independent actions -
+## Recruit (its own additional recruit per day, on its own cooldown - see
+## TrainingGround.can_recruit/mark_recruited's doc comments for why this is
+## sound, each type capped at one via BuildingCatalog's "max_count") and
+## Upgrade (raises its unit cap - see TrainingGround.get_unit_cap/
+## mark_upgraded's doc comments). Neither gates the other, so unlike
+## _on_outpost_hall_clicked's "block the action upfront" shape, this always
+## opens training_ground_panel and lets it show Recruit as disabled (with
+## the cooldown message baked into its label) rather than refusing to open
+## at all - Upgrade needs to stay reachable even mid-recruit-cooldown.
+func _on_training_ground_clicked(building: TrainingGround) -> void:
+	_cancel_placement()
+	build_menu.close()
+	crop_panel.close()
+	recruit_panel.close()
+	_training_ground_target = building
+
+	var options: Array[Dictionary] = []
+	if building.can_recruit():
+		options.append({"id": "recruit", "label": "Recruit"})
+	else:
+		var days := building.days_until_next_recruit()
+		options.append({
+			"id": "recruit",
+			"label": "Recruit (ready in %d day%s)" % [days, "" if days == 1 else "s"],
+			"enabled": false,
+		})
+	options.append({
+		"id": "upgrade",
+		"label": "Upgrade (%s)\nUnit cap %d -> %d" % [_format_cost(TrainingGround.UPGRADE_COST), building.get_unit_cap(), building.get_unit_cap() + TrainingGround.UNIT_CAP_PER_UPGRADE],
+	})
+	training_ground_panel.open_for(building.display_name, options)
+
+
+## training_ground_panel's own signal handler - branches into the same
+## recruit-panel-opening code _on_training_ground_clicked used to run
+## directly, or the upgrade spend/grant flow (same spend-then-apply shape
+## as _on_house_clicked, but repeatable - no "already upgraded" guard).
+func _on_training_ground_option_chosen(option_id: String) -> void:
+	if not is_instance_valid(_training_ground_target):
+		return
+	var building := _training_ground_target
+	match option_id:
+		"recruit":
+			if not building.can_recruit():
+				hud.flash_message("%s's recruit is ready again tomorrow" % building.display_name)
+				return
+			_recruit_source = building
+			var skill_id := building.get_skill_id()
+			var candidate := RecruitCatalog.generate_combat_candidate(skill_id, SkillTitles.JOB_NOUNS[skill_id])
+			recruit_panel.open_for([candidate])
+		"upgrade":
+			if not GameState.can_afford(TrainingGround.UPGRADE_COST):
+				hud.flash_message("Not enough brick")
+				return
+			GameState.spend(TrainingGround.UPGRADE_COST)
+			building.mark_upgraded()
+			hud.flash_message("%s upgraded (unit cap %d)" % [building.display_name, building.get_unit_cap()])
+			## A higher unit cap may free up a slot right now for whoever's
+			## currently hauling with nothing better to do - same reasoning
+			## _on_post_disabled_changed re-runs assignment on a capacity
+			## change in the other direction.
+			_run_job_assignment()
+
+
+## "10 Brick" - a smaller version of RecruitPanel._cost_text for a non-food
+## cost (TrainingGround.UPGRADE_COST is brick, not a HUD.FOOD_BREAKDOWN_
+## LABELS entry), kept separate rather than reusing that one since it lives
+## on a different node and its food-label lookup doesn't apply here.
+func _format_cost(cost: Dictionary) -> String:
+	var parts: Array[String] = []
+	for resource_name in cost:
+		parts.append("%d %s" % [int(cost[resource_name]), String(resource_name).capitalize()])
+	return " + ".join(parts)
 
 
 ## Connects a Farm-family building's clicked signal (see Farm.gd) so
@@ -437,6 +760,11 @@ func _wire_farm_clicks(building: Node) -> void:
 func _wire_house_clicks(building: Node) -> void:
 	if building is House:
 		building.clicked.connect(_on_house_clicked.bind(building))
+
+
+func _wire_training_ground_clicks(building: Node) -> void:
+	if building is TrainingGround:
+		building.clicked.connect(_on_training_ground_clicked.bind(building))
 
 
 ## A House's `clicked` signal always means "try to upgrade" - unlike a
@@ -459,12 +787,13 @@ func _on_farm_clicked(farm: Farm) -> void:
 	_cancel_placement()
 	build_menu.close()
 	recruit_panel.close()
+	training_ground_panel.close()
 	_crop_target = farm
 	crop_panel.open_for(BuildingCatalog.farm_family_options(), farm.display_name)
 
 
-## Right-click toggles any job post (Farm/LumberCamp/StoneMine/CropStation -
-## every Workstation subclass) disabled/re-enabled - see Workstation.disabled's
+## Right-click toggles any job post (Farm/LumberCamp/StoneMine/Brickmaker/
+## Workshop - every Workstation subclass) disabled/re-enabled - see Workstation.disabled's
 ## doc comment. Left-click on a Farm-family post is already spoken for
 ## (opens the crop panel, see _on_farm_clicked), so this deliberately uses
 ## the other mouse button rather than competing with it.
@@ -672,6 +1001,13 @@ func _apply_crop_option(building: Node, option: Dictionary) -> void:
 	building.refresh_visual()
 
 
+## _recruit_source (set by _on_outpost_hall_clicked/_on_training_ground_
+## clicked just before recruit_panel opens) decides which cooldown this
+## recruitment marks - the Outpost Hall's shared DayNightCycle one if null,
+## or the specific TrainingGround's own independent one otherwise - see
+## TrainingGround.mark_recruited's doc comment for why marking the wrong one
+## would either double-dip the Outpost Hall's cooldown or let a combat
+## building's recruit compete with it instead of adding to it.
 func _on_candidate_selected(candidate: Dictionary) -> void:
 	if GameState.population_count >= GameState.population_capacity:
 		hud.flash_message("No housing available")
@@ -686,6 +1022,10 @@ func _on_candidate_selected(candidate: Dictionary) -> void:
 
 	GameState.population_count += 1
 	GameState.population_changed.emit(GameState.population_count, GameState.population_capacity)
+	if _recruit_source:
+		_recruit_source.mark_recruited()
+	else:
+		DayNightCycle.mark_recruited()
 	hud.flash_message("%s joined the outpost" % character.data.character_name)
 	## A new arrival might out-qualify whoever currently holds a matching
 	## job - see _run_job_assignment's doc comment.
@@ -763,8 +1103,30 @@ func _update_ghost(local_pos: Vector2) -> void:
 		_footprint_in_bounds(_ghost_origin, size)
 		and _footprint_free(_ghost_origin, size)
 		and GameState.can_afford(_placing_option["cost"])
+		and _under_max_count(_placing_option)
 	)
 	_ghost.modulate = VALID_TINT if _ghost_valid else INVALID_TINT
+
+
+## True unless `option` has a "max_count" cap (see BuildingCatalog's combat-
+## training entries) and that many already exist - counting both completed
+## buildings (_placed_buildings) and still-under-construction sites
+## (construction_sites), since a site that hasn't finished yet still
+## represents a committed instance the player is already paying labor/
+## materials toward. _confirm_placement doesn't need its own separate check -
+## it already bails out unconditionally on `not _ghost_valid`, so this being
+## folded into that one computation is enough.
+func _under_max_count(option: Dictionary) -> bool:
+	if not option.has("max_count"):
+		return true
+	var count := 0
+	for entry in _placed_buildings:
+		if entry["option_id"] == option["id"]:
+			count += 1
+	for site in construction_sites:
+		if is_instance_valid(site) and site.target_option_id == option["id"]:
+			count += 1
+	return count < int(option["max_count"])
 
 
 ## Confirming placement no longer instantiates the real building - it starts
@@ -884,6 +1246,7 @@ func _materialize_building(option: Dictionary, origin: Vector2i, save_id: String
 	add_child(building)
 	_wire_farm_clicks(building)
 	_wire_house_clicks(building)
+	_wire_training_ground_clicks(building)
 	_wire_workstation_disable(building)
 
 	if option.has("population_capacity"):
@@ -986,8 +1349,96 @@ func _on_slot_panel_chosen(slot: int) -> void:
 		_load_game()
 
 
+## HUD's "Simulate Attack" button - the current stand-in for the roadmap's
+## eventual raid/siege trigger (Docs/roadmap.md's Long-Term Design Vision),
+## since there's no wandering-raider AI yet. Every citizen currently
+## assigned to a TrainingGround (Barracks/Archery Range/Mage Tower) deploys
+## as their own squad against a generated enemy roster in CombatTest.tscn -
+## see BattleState's doc comment for the full handoff shape, and
+## MELEE_ARCHETYPES for why a "melee_combat"-trained citizen's concrete unit
+## type is a round-robin guess rather than a real stat lookup. A citizen NOT
+## currently assigned to a TrainingGround never deploys, same as any other
+## job - "soldier" is just whatever a citizen's current post happens to be,
+## consistent with how every other job skill already works (see Combat
+## Units.md's "whether they keep their town job meanwhile" question - they
+## do, this reads assignment directly rather than unassigning first).
+func _on_attack_pressed() -> void:
+	var squad := characters.filter(func(c: Character) -> bool: return c.assigned_post is TrainingGround)
+	if squad.is_empty():
+		hud.flash_message("No soldiers stationed to defend!")
+		return
+
+	var pending: Array = []
+	var melee_index := 0
+	for citizen in squad:
+		var post: TrainingGround = citizen.assigned_post
+		var unit_type: CombatUnit.UnitType
+		if post.skill_id == "archery":
+			unit_type = CombatUnit.UnitType.ARCHER
+		elif post.skill_id == "spellcasting":
+			unit_type = CombatUnit.UnitType.MAGE
+		else:
+			unit_type = MELEE_ARCHETYPES[melee_index % MELEE_ARCHETYPES.size()]
+			melee_index += 1
+		pending.append({
+			"citizen_id": citizen.data.id,
+			"unit_type": unit_type,
+			"skill_level": citizen.data.get_skill_level(post.skill_id),
+		})
+
+	BattleState.pending_squad = pending
+	## In-memory only - see _serialize_state's doc comment for why this
+	## deliberately doesn't go through SaveManager/a disk slot.
+	BattleState.town_blob = _serialize_state()
+	BattleState.active = true
+	get_tree().change_scene_to_file(COMBAT_TEST_SCENE)
+
+
+## Called once from _ready(), right after _apply_state() restores
+## BattleState.town_blob on the scene reload CombatTestManager triggers when
+## a deployment battle ends - see that call site's doc comment. Removes any
+## citizen CombatTestManager reported as dead (BattleState.result's doc
+## comment) via the exact same cleanup a happiness-driven departure already
+## uses (_character_leaves) - a battle death isn't mechanically different
+## from any other permanent citizen loss, and this is the documented (if
+## previously unbuilt) intent per Docs/roadmap.md's "Perma-death for
+## citizens" long-term item. Silently skips a casualty_id with no living
+## match (shouldn't happen - town_blob was captured from this exact roster
+## moments before deployment - but a missing citizen isn't a reason to
+## surface an error on a load).
+func _apply_battle_result(result: Dictionary) -> void:
+	if result.is_empty():
+		return
+
+	var casualty_ids: Array = result.get("casualty_ids", [])
+	for casualty_id in casualty_ids:
+		var match_list := characters.filter(func(c: Character) -> bool: return c.data.id == casualty_id)
+		if not match_list.is_empty():
+			_character_leaves(match_list[0])
+
+	var outcome_text: String = {"win": "Victory", "lose": "Defeat", "draw": "Draw"}.get(result.get("outcome", "draw"), "Battle over")
+	var loss_text := " - no losses" if casualty_ids.is_empty() else " - %d soldier%s lost" % [casualty_ids.size(), "" if casualty_ids.size() == 1 else "s"]
+	hud.flash_message(outcome_text + loss_text)
+
+
 func _save_game() -> void:
-	var data := {
+	SaveManager.save_game(SaveManager.active_slot, _serialize_state())
+	hud.flash_message("Saved")
+
+
+## The in-memory half of _save_game - split out so battle deployment
+## (_on_attack_pressed) can capture the exact same Dictionary a real save
+## would produce and stash it on BattleState.town_blob without touching
+## SaveManager.active_slot or disk at all. Deploying used to be tempting to
+## implement as "just call _save_game() to the active slot" - don't: that
+## slot may be the player's real save (active_slot defaults to 1 even for a
+## fresh New Game that was never manually saved), so a battle would silently
+## clobber it. Keeping the capture in memory means losslessness is "does
+## _apply_state round-trip this Dictionary," which is fully in this file's
+## control, not "does the whole on-disk format happen to capture everything
+## a mid-battle round trip needs."
+func _serialize_state() -> Dictionary:
+	return {
 		"version": 1,
 		"saved_at": int(Time.get_unix_time_from_system()),
 		"resources": GameState.resources.duplicate(),
@@ -1000,9 +1451,11 @@ func _save_game() -> void:
 		"construction_sites": _serialize_construction_sites(),
 		"post_buffers": _serialize_post_buffers(),
 		"characters": _serialize_characters(),
+		"day_number": DayNightCycle.day_number,
+		"is_day": DayNightCycle.is_day,
+		"phase_elapsed": DayNightCycle.phase_elapsed,
+		"last_recruit_day": DayNightCycle.last_recruit_day,
 	}
-	SaveManager.save_game(SaveManager.active_slot, data)
-	hud.flash_message("Saved")
 
 
 func _load_game() -> void:
@@ -1010,7 +1463,17 @@ func _load_game() -> void:
 	if data.is_empty():
 		hud.flash_message("No save found")
 		return
+	_apply_state(data)
+	hud.flash_message("Loaded")
 
+
+## The in-memory half of _load_game - split out so the battle-return flow
+## (_on_battle_finished, called once CombatTestManager hands control back)
+## can restore BattleState.town_blob the same way a real load restores a
+## disk save, without going through SaveManager/a slot at all. See
+## _serialize_state's doc comment for why this pairing avoids disk/slot
+## entirely rather than reusing SaveManager.save_game/load_game.
+func _apply_state(data: Dictionary) -> void:
 	_cancel_placement()
 	_deselect()
 	build_menu.close()
@@ -1036,6 +1499,15 @@ func _load_game() -> void:
 	GameState.storage_capacity = float(data.get("storage_capacity", GameState.storage_capacity))
 	GameState.storage_capacity_changed.emit(GameState.storage_capacity)
 
+	## Restores the clock to the exact moment it was saved at, rather than
+	## letting a fresh reset_to_defaults() (already called unconditionally in
+	## _ready() - see that call site) stand: a load should resume exactly
+	## where the player left off, same as every other piece of state here.
+	DayNightCycle.day_number = int(data.get("day_number", DayNightCycle.day_number))
+	DayNightCycle.is_day = bool(data.get("is_day", DayNightCycle.is_day))
+	DayNightCycle.phase_elapsed = float(data.get("phase_elapsed", DayNightCycle.phase_elapsed))
+	DayNightCycle.last_recruit_day = int(data.get("last_recruit_day", DayNightCycle.last_recruit_day))
+
 	## Buildings are restored before trees: WorldGrid.plant_tree() doesn't
 	## check cell occupancy, and a stale placed building torn down after
 	## trees are replanted could release a cell a just-restored tree also
@@ -1055,7 +1527,6 @@ func _load_game() -> void:
 		GameState.population_count = characters.size()
 		GameState.population_changed.emit(GameState.population_count, GameState.population_capacity)
 
-	hud.flash_message("Loaded")
 	## Normalizes assignments against the current automatic system - a no-op
 	## diff in the common case (the save was itself produced under this same
 	## system), but self-heals an older save's stale/now-invalid assignment
@@ -1093,6 +1564,10 @@ func _serialize_placed_buildings() -> Array:
 		var out_entry := {"save_id": entry["save_id"], "option_id": entry["option_id"], "origin": [origin.x, origin.y]}
 		if entry["node"] is House and entry["node"].upgraded:
 			out_entry["upgraded"] = true
+		if entry["node"] is TrainingGround and entry["node"].last_recruit_day > 0:
+			out_entry["last_recruit_day"] = entry["node"].last_recruit_day
+		if entry["node"] is TrainingGround and entry["node"].upgrade_level > 0:
+			out_entry["upgrade_level"] = entry["node"].upgrade_level
 		if entry["node"] is Workstation and entry["node"].disabled:
 			out_entry["disabled"] = true
 		out.append(out_entry)
@@ -1134,9 +1609,14 @@ func _restore_placed_buildings(entries: Array) -> void:
 		add_child(building)
 		_wire_farm_clicks(building)
 		_wire_house_clicks(building)
+		_wire_training_ground_clicks(building)
 		_wire_workstation_disable(building)
 		if building is House and entry.get("upgraded", false):
 			building.mark_upgraded()
+		if building is TrainingGround and entry.has("last_recruit_day"):
+			building.last_recruit_day = int(entry["last_recruit_day"])
+		if building is TrainingGround and entry.has("upgrade_level"):
+			building.restore_upgrade_level(int(entry["upgrade_level"]))
 		if building is Workstation and entry.get("disabled", false):
 			building.disabled = true
 		if building.has_method("add_worker"):

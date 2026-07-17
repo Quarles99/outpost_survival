@@ -10,15 +10,44 @@ const BOB_AMPLITUDE := 2.5
 const BOB_SPEED := 1.4
 ## Deliberately slow ("realistic travel time" over instant snapping) - a
 ## work post sitting a few tiles from the stockpile should read as a real
-## walk, not a blip.
-const MOVE_SPEED := 140.0
-const MIN_MOVE_DURATION := 0.3
-const MAX_MOVE_DURATION := 4.0
+## walk, not a blip. Halved (140.0 -> 70.0), with MIN/MAX_MOVE_DURATION
+## doubled to match, per an explicit request to slow the whole town economy
+## down by a factor of 2 - see Base's fast-forward system (Engine.time_scale)
+## for the companion feature letting a player compress that back down when
+## they don't need to watch every trip in real time.
+const MOVE_SPEED := 70.0
+const MIN_MOVE_DURATION := 0.6
+## Lowered 8.0 -> 2.0, then raised 2.0 -> 20.0, via Outpost_Survival/
+## Balance.md's edit-and-hand-back workflow - a very long haul can now take
+## noticeably longer than a short one (opposite of the brief 2.0s pass).
+const MAX_MOVE_DURATION := 20.0
 const IDLE_RETRY_DELAY := 2.5
-## Flat xp granted per gather tick/chop, regardless of skill or output -
-## xp is for time-worked, not scaled by level (which would make high levels
-## snowball even faster on top of their output multiplier).
+## Flat xp granted per action, regardless of output - still used for
+## strength (per haul trip, see _haul_to_stockpile/_deliver_to_post/
+## _deliver_construction_material), construction labor, and training drill,
+## none of which represent a real GameState resource amount to scale
+## against. No longer used by the three actual resource-production loops
+## (_run_generic_work_loop, _run_farm_loop, _run_lumberjack_loop) - see
+## XP_PER_RESOURCE_UNIT below for those, per an explicit request that xp
+## gained should scale with resources collected instead of being flat.
 const XP_PER_GATHER := 4.0
+## Xp per unit of resource actually produced this tick, for the three real-
+## resource-production loops only (see XP_PER_GATHER's doc comment for which
+## ones still use the flat rate instead). Calibrated so a level-1 worker at
+## a 1.0-output_per_tick post (e.g. Cabbage Farm) still grants exactly
+## XP_PER_GATHER's old 4.0 xp/tick - level 1 unchanged, only levels above it
+## diverge, since `amount` grows with the worker's own skill multiplier
+## (data.get_skill_multiplier) from here on. That growth is deliberately
+## *not* left to snowball unchecked, unlike the flat-rate era's explicit
+## "would make high levels snowball even faster" concern above: see
+## SkillCurve._ensure_table's multiplier_for_level scaling, added alongside
+## this, which grows the xp *required* per level by that exact same factor -
+## per an explicit request that xp needed should scale at the same rate xp
+## gained does, so the number of actions needed to clear a level stays what
+## the base RuneScape-style curve alone would have given, even though both
+## the granted and required numbers are now bigger at high level than the
+## unscaled curve would show.
+const XP_PER_RESOURCE_UNIT := 4.0
 ## Brief hold at the stockpile while dropping off/picking up, so even a
 ## short haul doesn't read as an instant teleport-and-return.
 const STOCKPILE_PAUSE := 0.3
@@ -35,8 +64,22 @@ const HAUL_MIN_THRESHOLD := 1.0
 ## work_interval tick, before their own construction skill/the settlement's
 ## happiness multiplier - see _run_construction_loop. A first-pass number,
 ## not tuned via playtesting (see Base._labor_required_for for how a site's
-## total labor_required is derived from it).
+## total labor_required is derived from it). Tried raising to 1.2 (flat 20%
+## build-speed request), then lowering to 0.26 (a uniform slowdown so the
+## whole Lumber Camp -> Farm -> House progression would track Day 1's
+## clock) - both rolled back. The actual chosen fix for "first House about
+## halfway through Day 1" was on the resource side instead, not this
+## constant: see GameState.DEFAULT_RESOURCES's wood comment - starting wood
+## only covers the Lumber Camp now, so both the Farm and the House have to
+## be earned via real wood gathering (naturally paced by production, not
+## an artificial labor-speed knob) before either can be built.
 const CONSTRUCTION_LABOR_PER_TICK := 1.0
+## Flavor "drill" amount shown in a TrainingGround worker's gather feedback
+## (see _run_training_loop) - purely cosmetic, nothing accumulates it
+## toward a target the way ConstructionSite.labor_completed does, since
+## training has no "finished" state. Same value as CONSTRUCTION_LABOR_PER_
+## TICK for consistency, not because the two are mechanically linked.
+const TRAINING_DRILL_PER_TICK := 1.0
 ## "speed" and "strength" are universal skills every citizen trains just by
 ## moving/carrying, regardless of what post (if any) they're assigned to -
 ## unlike XP_PER_GATHER's per-tick skills, which only train while actively
@@ -60,6 +103,7 @@ var is_selected := false
 @onready var select_sound: AudioStreamPlayer2D = $SelectSound
 @onready var assign_sound: AudioStreamPlayer2D = $AssignSound
 @onready var gather_sound: AudioStreamPlayer2D = $GatherSound
+@onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 
 var _base_position: Vector2
 var _home_position: Vector2
@@ -83,6 +127,7 @@ func _ready() -> void:
 	_base_position = position
 	_home_position = position
 	selection_outline.modulate.a = 0.0
+	label.modulate.a = 0.0
 	_update_label()
 	if not assigned_post:
 		_start_hauling()
@@ -112,10 +157,17 @@ func _on_mouse_exited() -> void:
 	tween.tween_property(sprite, "modulate", Color.WHITE, 0.15)
 
 
+## The floating name/title label only shows while this citizen is selected
+## (whatever selected them - a mouse click today, some other trigger down
+## the line) - per an explicit request, rather than persistently floating
+## over every citizen at once. Faded alongside the same selection outline,
+## same duration, so both read as one "you've selected this citizen" cue.
 func set_selected(value: bool) -> void:
 	is_selected = value
 	var tween := create_tween()
+	tween.set_parallel()
 	tween.tween_property(selection_outline, "modulate:a", 1.0 if value else 0.0, 0.15)
+	tween.tween_property(label, "modulate:a", 1.0 if value else 0.0, 0.15)
 
 
 ## Called by Base when this citizen departs the settlement for good
@@ -178,16 +230,61 @@ func assign_to(post: Node, grant_move_xp: bool = true) -> void:
 ## indefinitely via F9 spam, defeating the "reward time spent moving, not
 ## just calling _move_to" principle SPEED_XP_PER_SECOND's doc comment
 ## already establishes.
-func _move_to(target: Vector2, grant_xp: bool = true) -> float:
+##
+## Nav-agent-driven (see Base._rebake_navigation/WorldGrid.occupancy_changed
+## for the town's navmesh) rather than a single straight-line Tween - a
+## citizen now actually routes around buildings/trees instead of cutting
+## through them. Static obstacle avoidance only (Character.tscn's
+## NavigationAgent2D has avoidance_enabled = false) - unlike combat's
+## RVO-driven CombatUnit, citizens don't dodge each other, only the map's
+## fixed obstacles, per an explicit scoping decision to keep this port
+## simpler than the battle sandbox's.
+##
+## This is what makes every one of this function's ~9 call sites able to
+## just `await _move_to(...)` directly (no wrapping `get_tree().create_
+## timer(...).timeout` the way the old fixed-duration-return version
+## needed) - a real nav path's true travel time can't be known up front the
+## way straight-line distance/speed could, so this function itself is now
+## the awaitable, only returning once the citizen has actually arrived.
+## MIN_MOVE_DURATION is still a floor (holds position a few extra frames
+## after physically arriving, for a very short hop, so it never reads as an
+## instant teleport) - MAX_MOVE_DURATION is no longer a hard cap on how long
+## a trip can *take* (a genuinely long haul now really does take longer,
+## correctly routing around obstacles instead of secretly speeding up to
+## make an old artificial deadline), only a cap on how much of it counts
+## toward speed xp, preserving the old per-trip xp ceiling without risking
+## stranding a citizen mid-detour by force-stopping them short of the target.
+func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 	if _move_tween:
 		_move_tween.kill()
+		_move_tween = null
 	var speed_multiplier := data.get_skill_multiplier("speed") if data else 1.0
-	var duration := clampf(_base_position.distance_to(target) / (MOVE_SPEED * speed_multiplier), MIN_MOVE_DURATION, MAX_MOVE_DURATION)
-	_move_tween = create_tween()
-	_move_tween.tween_property(self, "_base_position", target, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	var move_speed := MOVE_SPEED * speed_multiplier
+	nav_agent.target_position = target
+	var elapsed := 0.0
+	## Hard escape hatch, not just a "typical trip" bound - a target outside
+	## the baked navmesh (off the ground entirely, or unreachable for any
+	## other reason) leaves is_navigation_finished() permanently false, and
+	## without this the loop below would await forever, freezing this
+	## citizen's whole work loop (verified: reproduced a real hang in
+	## testing before this existed). Generous on purpose since a legitimate
+	## long haul across the whole map can genuinely take this long now that
+	## MAX_MOVE_DURATION no longer caps physical trip time (see this
+	## function's own doc comment) - this is only meant to catch the
+	## pathological "never going to finish" case, not cut a real walk short.
+	const MOVE_HANG_SAFETY_SECONDS := 60.0
+	while not nav_agent.is_navigation_finished() and elapsed < MOVE_HANG_SAFETY_SECONDS:
+		var delta := get_process_delta_time()
+		var next_pos: Vector2 = nav_agent.get_next_path_position()
+		var direction := _base_position.direction_to(next_pos)
+		_base_position += direction * move_speed * delta
+		elapsed += delta
+		await get_tree().process_frame
+	while elapsed < MIN_MOVE_DURATION:
+		elapsed += get_process_delta_time()
+		await get_tree().process_frame
 	if grant_xp:
-		_gain_skill_xp("speed", SPEED_XP_PER_SECOND * duration)
-	return duration
+		_gain_skill_xp("speed", SPEED_XP_PER_SECOND * minf(elapsed, MAX_MOVE_DURATION))
 
 
 func _punch() -> void:
@@ -198,18 +295,18 @@ func _punch() -> void:
 	_scale_tween.tween_property(self, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
+## Only name + title are shown in-world (see set_selected for why they only
+## show at all while this citizen is selected) - the old third "(Hauling)" /
+## "(Lumber Camp · Lv 3)" status line was removed per an earlier explicit
+## request to declutter floating citizen text (name/title/xp-and-loot
+## feedback stay, everything else goes). That status is still fully
+## knowable - it's just not shown here - via the (unchanged) skill panel on
+## click.
 func _update_label() -> void:
 	if not data:
 		return
-	## "Hauling" for no job assignment - job assignment is fully automatic
-	## (see Base._run_job_assignment), so this is every citizen without an
-	## open matching post right now, not a manual idle state.
-	var status: String = "Hauling" if not assigned_post else assigned_post.display_name
-	var skill_id := _current_skill_id()
-	if not skill_id.is_empty():
-		status += " · Lv %d" % data.get_skill_level(skill_id)
-	var title := SkillTitles.get_title(data, skill_id)
-	label.text = "%s\n%s\n(%s)" % [data.character_name, title, status]
+	var title := SkillTitles.get_title(data, _current_skill_id())
+	label.text = "%s\n%s" % [data.character_name, title]
 
 
 ## Maps the current assignment to the skill it trains. Empty string for no
@@ -259,12 +356,14 @@ func _carry_capacity(post: Workstation) -> float:
 func _start_work(post: Node) -> void:
 	_work_active = true
 	_work_session += 1
-	if post is Farm:
+	if post is Farm or post is Brickmaker or post is Workshop:
 		_run_farm_loop(post, _work_session)
 	elif post is LumberCamp:
 		_run_lumberjack_loop(post, _work_session)
 	elif post is ConstructionSite:
 		_run_construction_loop(post, _work_session)
+	elif post is TrainingGround:
+		_run_training_loop(post, _work_session)
 	elif post is Workstation:
 		_run_generic_work_loop(post, _work_session)
 
@@ -313,7 +412,7 @@ func _execute_haul_job(job: Dictionary, session: int) -> bool:
 	var post: Workstation = job["post"]
 
 	if job["type"] == "output":
-		await get_tree().create_timer(_move_to(post.get_worker_spot())).timeout
+		await _move_to(post.get_worker_spot())
 		if session != _work_session:
 			return false
 		if post.output_buffer < HAUL_MIN_THRESHOLD:
@@ -396,17 +495,32 @@ func _find_haul_job() -> Dictionary:
 	return {}
 
 
-## The single most valuable construction-material delivery across every
+## Picks the *smallest* outstanding construction-material need across every
 ## in-progress Base.construction_sites entry (a site can need several
-## different resources at once - see ConstructionSite.materials_needed) -
-## bounded by this character's own _carry_capacity, same as any other haul
-## amount. Returns {} if nothing clears HAUL_MIN_THRESHOLD or the stockpile
-## has none of whatever's needed to bring. Split out of _find_haul_job so
-## it can be checked first, unconditionally, ahead of routine output/input
-## hauling - see that function's doc comment for why.
+## different resources at once - see ConstructionSite.materials_needed),
+## capped by this character's own _carry_capacity same as any other haul
+## amount, so a single trip can fully clear it when possible. Deliberately
+## smallest-first, not largest-first (an earlier version of this function
+## picked whichever need was biggest) - per an explicit diagnosis: with
+## several sites competing for a resource that's actually scarce (own
+## wood insufficient to cover every site's total cost at once - see
+## GameState.DEFAULT_RESOURCES's wood comment for the exact scenario this
+## was built for), largest-first systematically drains the stockpile into
+## whichever site is *most* expensive before any cheaper site gets
+## anything, which can permanently strand a cheap-but-critical site (e.g.
+## a Lumber Camp, the only source of *more* wood) with a partial delivery
+## it can never complete - headless-verified as a real, permanent soft-
+## lock: 200+ simulated seconds with zero further progress, every haul
+## trip re-confirming the same starved site. Smallest-first instead
+## finishes cheap sites fast (unlocking whatever they produce sooner) and
+## never leaves a small need dangling while resources are funneled into a
+## big one. Returns {} if nothing clears HAUL_MIN_THRESHOLD or the
+## stockpile has none of whatever's needed to bring. Split out of
+## _find_haul_job so it can be checked first, unconditionally, ahead of
+## routine output/input hauling - see that function's doc comment for why.
 func _find_construction_haul_job(base: Base) -> Dictionary:
 	var best_site: ConstructionSite = null
-	var best_amount := HAUL_MIN_THRESHOLD
+	var best_amount := INF
 	var best_resource := ""
 
 	for site in base.construction_sites:
@@ -414,7 +528,9 @@ func _find_construction_haul_job(base: Base) -> Dictionary:
 			continue
 		for resource_name in site.materials_needed:
 			var needed: float = minf(site.materials_needed[resource_name], _carry_capacity(site))
-			if needed > best_amount and GameState.resources.get(resource_name, 0.0) > 0.0:
+			if needed < HAUL_MIN_THRESHOLD or GameState.resources.get(resource_name, 0.0) <= 0.0:
+				continue
+			if needed < best_amount:
 				best_site = site
 				best_amount = needed
 				best_resource = resource_name
@@ -442,7 +558,7 @@ func _find_construction_haul_job(base: Base) -> Dictionary:
 ## doc comment for why xp scales with time/frequency of the activity rather
 ## than with quantity carried.
 func _haul_to_stockpile(post: Workstation, session: int, drop_resource: String, pickup_resource: String) -> bool:
-	await get_tree().create_timer(_move_to(WorldGrid.nearest_stockpile(global_position))).timeout
+	await _move_to(WorldGrid.nearest_stockpile(global_position))
 	if session != _work_session:
 		return false
 
@@ -477,7 +593,7 @@ func _haul_to_stockpile(post: Workstation, session: int, drop_resource: String, 
 ## multi-leg trip could - see below). Returns false if a reassignment
 ## interrupted the trip.
 func _deliver_to_post(post: Workstation, session: int, resource: String) -> bool:
-	await get_tree().create_timer(_move_to(WorldGrid.nearest_stockpile(global_position))).timeout
+	await _move_to(WorldGrid.nearest_stockpile(global_position))
 	if session != _work_session:
 		return false
 
@@ -493,7 +609,7 @@ func _deliver_to_post(post: Workstation, session: int, resource: String) -> bool
 		GameState.add_resource(resource, take)
 		return false
 
-	await get_tree().create_timer(_move_to(post.get_worker_spot())).timeout
+	await _move_to(post.get_worker_spot())
 	if session != _work_session:
 		GameState.add_resource(resource, take)
 		return false
@@ -530,7 +646,7 @@ func _deliver_to_post(post: Workstation, session: int, resource: String) -> bool
 ## safety as _deliver_to_post, for the same reason (multiple haulers
 ## converging on the same site from an identical "still needed" snapshot).
 func _deliver_construction_material(site: ConstructionSite, session: int, resource: String) -> bool:
-	await get_tree().create_timer(_move_to(WorldGrid.nearest_stockpile(global_position))).timeout
+	await _move_to(WorldGrid.nearest_stockpile(global_position))
 	if session != _work_session:
 		return false
 
@@ -545,7 +661,7 @@ func _deliver_construction_material(site: ConstructionSite, session: int, resour
 		GameState.add_resource(resource, take)
 		return false
 
-	await get_tree().create_timer(_move_to(site.get_worker_spot())).timeout
+	await _move_to(site.get_worker_spot())
 	if session != _work_session:
 		GameState.add_resource(resource, take)
 		return false
@@ -587,7 +703,7 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 			## Without this, a Stone Mine (or any other generic post)
 			## worker would get stranded at the stockpile forever after
 			## their first haul trip, "producing" from there indefinitely.
-			await get_tree().create_timer(_move_to(post.get_worker_spot())).timeout
+			await _move_to(post.get_worker_spot())
 			if session != _work_session:
 				return
 			continue
@@ -600,8 +716,9 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 		var amount: float = post.output_per_tick * multiplier * GameState.happiness_output_multiplier
 		post.output_buffer += amount
 		gather_sound.play()
-		_gain_skill_xp(post.get_skill_id(), XP_PER_GATHER)
-		_show_gather_feedback(post.resource_type, amount, XP_PER_GATHER)
+		var xp: float = amount * XP_PER_RESOURCE_UNIT
+		_gain_skill_xp(post.get_skill_id(), xp)
+		_show_gather_feedback(post.resource_type, amount, xp)
 
 
 ## A construction site is only ever assigned to a worker once its materials
@@ -637,15 +754,45 @@ func _run_construction_loop(site: ConstructionSite, session: int) -> void:
 			return
 
 
+## Trains a TrainingGround's combat skill (melee_combat/archery/
+## spellcasting) with flat per-tick xp, same "reward time worked, not
+## output" principle every other work loop follows - but with no input/
+## output/haul cycle at all, same shape as _run_construction_loop's labor-
+## only loop, except it never completes: a TrainingGround has no
+## labor_required-style target to reach, a citizen just keeps training for
+## as long as they're assigned here (this is the "convert a citizen into a
+## soldier" step - see training_ground.gd's doc comment). Feeding the
+## resulting skill level into CombatUnit stats is a separate, not-yet-built
+## piece (see combat_unit.gd's own doc comment) - this loop's whole job is
+## making that trained level exist and be visible (title/skill panel) as xp
+## accrues here.
+func _run_training_loop(post: Workstation, session: int) -> void:
+	while _work_active and session == _work_session:
+		await get_tree().create_timer(post.work_interval).timeout
+		if session != _work_session:
+			return
+
+		var multiplier: float = data.get_skill_multiplier(post.get_skill_id())
+		var drill: float = TRAINING_DRILL_PER_TICK * multiplier * GameState.happiness_output_multiplier
+		gather_sound.play()
+		_gain_skill_xp(post.get_skill_id(), XP_PER_GATHER)
+		_show_gather_feedback("training", drill, XP_PER_GATHER)
+
+
 ## Converts input_resource into resource_type: consumes input_per_tick from
 ## input_buffer, produces output_per_tick into output_buffer, every
 ## work_interval. Hauls to the stockpile whenever the input buffer can't
 ## cover the next tick's cost, or the output buffer is full - whichever
 ## comes first, so a single trip handles both directions when possible.
-## Despite the parameter name, `farm` covers every Farm-class building -
-## raw crops and refinement buildings alike (see farm.gd). Runs until
-## reassigned (session changes).
-func _run_farm_loop(farm: Farm, session: int) -> void:
+## Despite the parameter name, `post` covers every converter-shaped
+## building - the raw-crop Farm-class buildings (see farm.gd), Brickmaker
+## (see brickmaker.gd), and Workshop (Mill/Bakery/Brewery - see
+## workshop.gd), all of which share this one loop by structural typing
+## alone (input_per_tick/input_resource live on Workstation itself, not
+## Farm) without joining the Farm-family crop-panel retool system, which
+## only Farm-class buildings are part of. Runs until reassigned (session
+## changes).
+func _run_farm_loop(post: Workstation, session: int) -> void:
 	while _work_active and session == _work_session:
 		## Skill only scales output, not input_needed - a higher-level
 		## worker converts the same input into more output (a genuine
@@ -655,16 +802,16 @@ func _run_farm_loop(farm: Farm, session: int) -> void:
 		## sibling doc comments) - they scale movement/carry capacity
 		## directly instead of a conversion ratio, since there's no
 		## "input" for them to hold fixed.
-		var multiplier: float = data.get_skill_multiplier(farm.get_skill_id())
-		var input_needed: float = farm.input_per_tick
+		var multiplier: float = data.get_skill_multiplier(post.get_skill_id())
+		var input_needed: float = post.input_per_tick
 
-		if farm.input_buffer < input_needed or farm.output_buffer >= _carry_capacity(farm):
-			if not await _haul_to_stockpile(farm, session, farm.resource_type, farm.get_input_resource()):
+		if post.input_buffer < input_needed or post.output_buffer >= _carry_capacity(post):
+			if not await _haul_to_stockpile(post, session, post.resource_type, post.get_input_resource()):
 				return
-			await get_tree().create_timer(_move_to(farm.get_worker_spot())).timeout
+			await _move_to(post.get_worker_spot())
 			if session != _work_session:
 				return
-			if farm.input_buffer < input_needed:
+			if post.input_buffer < input_needed:
 				# Stockpile didn't have enough input to fully restock -
 				# help haul somewhere else useful in the meantime rather
 				# than just standing around waiting.
@@ -672,7 +819,7 @@ func _run_farm_loop(farm: Farm, session: int) -> void:
 					return
 				continue
 
-		await get_tree().create_timer(farm.work_interval).timeout
+		await get_tree().create_timer(post.work_interval).timeout
 		if session != _work_session:
 			return
 
@@ -683,16 +830,25 @@ func _run_farm_loop(farm: Farm, session: int) -> void:
 		# wait before touching it. Consuming unconditionally here would let
 		# both decrement, driving input_buffer negative. Skipping this cycle
 		# is safe: the loop just comes back around and hauls more in.
-		if farm.input_buffer < input_needed:
+		if post.input_buffer < input_needed:
 			continue
 
-		var water_bonus: float = WATER_FARM_OUTPUT_BONUS if GameState.has_water() else 1.0
-		farm.input_buffer -= input_needed
-		var amount: float = farm.output_per_tick * multiplier * GameState.happiness_output_multiplier * water_bonus
-		farm.output_buffer += amount
+		# Water's irrigation bonus is a Farm-specific (crop-growing) effect,
+		# not a generic "any converter" one - gated on `post is Farm` so
+		# neither Brickmaker nor Workshop (Mill/Bakery/Brewery) sharing this
+		# loop also pick up a well bonus for masonry/milling/baking/brewing,
+		# which wouldn't make sense. Mill/Bakery/Brewery used to get this
+		# bonus back when they were Farm instances themselves - losing it is
+		# an intended consequence of disassociating them into their own
+		# Workshop class, not an oversight.
+		var water_bonus: float = WATER_FARM_OUTPUT_BONUS if (post is Farm and GameState.has_water()) else 1.0
+		post.input_buffer -= input_needed
+		var amount: float = post.output_per_tick * multiplier * GameState.happiness_output_multiplier * water_bonus
+		post.output_buffer += amount
 		gather_sound.play()
-		_gain_skill_xp(farm.get_skill_id(), XP_PER_GATHER)
-		_show_gather_feedback(farm.resource_type, amount, XP_PER_GATHER)
+		var xp: float = amount * XP_PER_RESOURCE_UNIT
+		_gain_skill_xp(post.get_skill_id(), xp)
+		_show_gather_feedback(post.resource_type, amount, xp)
 
 
 ## Walk to a nearby tree and chop it (accumulating wood in the camp's
@@ -719,7 +875,7 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 			var plant_cell = WorldGrid.find_plantable_cell(camp_cell, camp.search_radius)
 			if plant_cell != null:
 				var target := WorldGrid.grid_to_local(Vector2(plant_cell.x, plant_cell.y))
-				await get_tree().create_timer(_move_to(target)).timeout
+				await _move_to(target)
 				if session != _work_session:
 					return
 				WorldGrid.plant_tree(plant_cell, false)
@@ -737,7 +893,7 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 
 		tree.claimed = true
 		_claimed_tree = tree
-		await get_tree().create_timer(_move_to(tree.global_position)).timeout
+		await _move_to(tree.global_position)
 		if session != _work_session:
 			return
 
@@ -752,8 +908,9 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 				var amount: float = gained * data.get_skill_multiplier(camp.get_skill_id()) * GameState.happiness_output_multiplier
 				camp.output_buffer += amount
 				gather_sound.play()
-				_gain_skill_xp(camp.get_skill_id(), XP_PER_GATHER)
-				_show_gather_feedback("wood", amount, XP_PER_GATHER)
+				var xp: float = amount * XP_PER_RESOURCE_UNIT
+				_gain_skill_xp(camp.get_skill_id(), xp)
+				_show_gather_feedback("wood", amount, xp)
 
 		if is_instance_valid(tree) and tree.wood_remaining > 0.0:
 			tree.claimed = false

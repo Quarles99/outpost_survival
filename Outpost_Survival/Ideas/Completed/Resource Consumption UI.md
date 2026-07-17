@@ -1,0 +1,12 @@
+
+Major resources such as food can be shown with a vertical resource bar in the bottom right of the UI. The empty container of the bar would represent the total resource capacity while the fill would represent how much of that resource (ie. total food) was available. Then there would also be a red overlay bar that would represent the net change in their food in the next change period. This would help players gauge their current food situation.
+
+## Completion write-up (2026-07-16)
+
+Implemented as a vertical Food bar in `scenes/ui/HUD.tscn` (`FoodBarPanel` - Label + `FoodBarFrame` Control + numeric value Label, stacked in a `VBoxContainer`) and `scripts/hud.gd`'s `_update_food_bar()`, positioned bottom-right per the idea's own spec. Scope was narrowed to Food only (the aggregate `GameState.get_total_food()` against `storage_capacity`) rather than every resource, to keep the new element minimal.
+
+- **Fill**: `food_bar_fill` grows from the bottom of `food_bar_frame`, sized as `total/capacity`.
+- **Overlay**: extended beyond the idea's "red only" spec to both directions - red inside the top of the current fill if the projected total (30s out, `FOOD_BAR_PREVIEW_SECONDS`, extrapolated from the new `GameState.get_food_income_per_minute()`) is lower than the current fill; green just above the fill if it's higher. Both clamp to the frame's bounds.
+- **Known gap fixed during implementation, not part of the original idea**: `food_bar_frame`'s actual pixel size isn't reliable until the containing `VBoxContainer` completes a layout pass (it stretches the frame wider than its own `custom_minimum_size`) - a call made synchronously in `_ready()` computed against a stale, too-narrow size. Fixed by connecting `food_bar_frame.resized` to `_update_food_bar()` (the same pattern the rest of `hud.gd` already uses for `pivot_offset` on other labels), which also keeps the bar correctly sized across a window resize, which a one-shot `_ready()` call never would have.
+- Verified headlessly (temporary autoload) that `food_bar_frame.size`, `food_bar_fill.position/size`, and `food_bar_overlay` all compute correctly against live `GameState` state, both before and after the `resized`-signal fix.
+- Not done: bars for other resources (wood/stone) - deliberately out of scope per this pass's narrowed goal, not a gap. See `Docs/mechanics.md#resources` and `Docs/stats.md#food-bar-hud` for the promoted, player-facing description.

@@ -5,12 +5,18 @@ signal population_changed(count: int, capacity: int)
 signal water_changed(available: bool)
 signal storage_capacity_changed(capacity: float)
 
-## Food each citizen eats per second, drained continuously regardless of
-## whether they're assigned to a post. Lowered from the original 0.3 - early
-## playtesting showed the entire economy had to be devoted to farming just
-## to keep the population fed, leaving little room to build anything else.
-const FOOD_PER_CITIZEN := 0.2
-const CONSUMPTION_INTERVAL := 1.0
+## Food each citizen eats per meal - per an explicit request, consumption is
+## no longer a continuous per-second drain but two flat hits per full
+## day/night cycle, timed off DayNightCycle.day_started/night_started (see
+## _on_meal_time below), with the *same* amount charged at both regardless
+## of day being twice as long as night - simplicity was an explicit
+## request, not an oversight. Originally derived to reproduce the old
+## continuous-drain model's exact total (18.0/meal, 36.0/citizen/cycle),
+## then lowered to 10.0 (20.0/citizen/cycle) via Outpost_Survival/
+## Balance.md's edit-and-hand-back workflow - a deliberate easing back off
+## that derived value, not a re-derivation; see GameState.DEFAULT_RESOURCES'
+## "cabbage" comment for the resulting first-meal-affordability math.
+const FOOD_PER_CITIZEN_PER_MEAL := 10.0
 
 ## Every resource that satisfies hunger - a citizen doesn't care which kind
 ## it's eating. Consumption (see _consume_food) splits the need *evenly*
@@ -32,7 +38,30 @@ const FOOD_RESOURCES := ["cabbage", "potato", "fruit", "bread", "beer"]
 ## below) so reset_to_defaults() can restore exactly this without a second,
 ## driftable copy of the same starting values.
 const DEFAULT_RESOURCES := {
-	"cabbage": 10.0,
+	## Set via Outpost_Survival/Balance.md's edit-and-hand-back workflow -
+	## lowered from 50.0 back toward the pre-slowdown-session original
+	## (30.0), a deliberate hardening back off the "make a first recruit
+	## trivially easy" tuning from earlier this session, in keeping with
+	## this session's broader direction (gather-gated early buildings,
+	## periodic lump-sum meal consumption) toward a slower, more careful
+	## early game rather than an easy one. Consequence worth knowing: the
+	## very first meal (see FOOD_PER_CITIZEN_PER_MEAL) costs 10.0/citizen -
+	## 30.0 for the starting population of 3 - which exactly matches this
+	## starting amount, so the very first day/night transition drains
+	## cabbage to precisely 0 (no other FOOD_RESOURCES have any starting
+	## stock either) regardless of how quickly a Farm gets running.
+	"cabbage": 30.0,
+	## Set via Outpost_Survival/Balance.md's edit-and-hand-back workflow -
+	## raised from 5.0 to 10.0 alongside the matching Lumber Camp cost raise
+	## (5.0 -> 10.0, see BuildingCatalog.OPTIONS's "woodpile" entry) - still
+	## exactly enough for a Lumber Camp outright and nothing more, so the
+	## "gather for Farm/House" design from earlier this session (see
+	## Character.CONSTRUCTION_LABOR_PER_TICK's doc comment for the full
+	## history) is unchanged in shape, just scaled up alongside the costs
+	## that now require more wood to match. Previously 5.0, 11.0 (Lumber
+	## Camp + Farm outright), 21.0 (all three outright), and 16.0 (half the
+	## House) before that. See BuildingCatalog.OPTIONS for current costs;
+	## re-derive this if the Lumber Camp's cost ever changes again.
 	"wood": 10.0,
 	"stone": 0.0,
 	"grain": 0.0,
@@ -42,6 +71,7 @@ const DEFAULT_RESOURCES := {
 	"beer": 0.0,
 	"fruit": 0.0,
 	"potato": 0.0,
+	"brick": 0.0,
 }
 var resources := DEFAULT_RESOURCES.duplicate()
 
@@ -54,8 +84,11 @@ var population_capacity := DEFAULT_POPULATION
 ## one independently (so e.g. food filling up doesn't crowd out wood).
 ## Baseline exists even with zero Storage Facilities built, both so the
 ## game isn't unplayable from turn one and so it's comfortably above the
-## starting resources dict - Storage Facilities add on top of it.
-const BASE_STORAGE_CAPACITY := 30.0
+## starting resources dict - Storage Facilities add on top of it. Doubled
+## from 60.0 to 120.0 per an explicit request to double all storage
+## baseline/bonus across the board - see BuildingCatalog's "storage_facility"
+## entry for the matching Storage Facility bonus doubling.
+const BASE_STORAGE_CAPACITY := 120.0
 var storage_capacity := BASE_STORAGE_CAPACITY
 
 ## Water is deliberately not in `resources` - a Well provides unlimited
@@ -71,8 +104,6 @@ var water_wells := 0
 ## needs, and this needs to be readable without a Base reference.
 var happiness_output_multiplier := 1.0
 
-var _consumption_timer: Timer
-
 ## Rolling history of resource-pool snapshots, used to compute an income/min
 ## readout for the HUD. Sampled on its own timer rather than piggybacking on
 ## every add_resource() call, since production arrives in bursty haul-trip
@@ -85,11 +116,12 @@ var _income_sample_timer: Timer
 
 
 func _ready() -> void:
-	_consumption_timer = Timer.new()
-	_consumption_timer.wait_time = CONSUMPTION_INTERVAL
-	_consumption_timer.timeout.connect(_on_consumption_timeout)
-	add_child(_consumption_timer)
-	_consumption_timer.start()
+	## DayNightCycle already exists as a valid autoload node by the time any
+	## autoload's own _ready() runs (every autoload is added to the tree in
+	## one batch before _ready() fires on any of them) - connecting here
+	## doesn't depend on project.godot's [autoload] declaration order.
+	DayNightCycle.day_started.connect(_on_meal_time)
+	DayNightCycle.night_started.connect(_on_meal_time)
 
 	_income_sample_timer = Timer.new()
 	_income_sample_timer.wait_time = INCOME_SAMPLE_INTERVAL
@@ -99,8 +131,12 @@ func _ready() -> void:
 	_sample_income_history()
 
 
-func _on_consumption_timeout() -> void:
-	_consume_food(FOOD_PER_CITIZEN * population_count * CONSUMPTION_INTERVAL)
+## Fired on both DayNightCycle.day_started and night_started - see
+## FOOD_PER_CITIZEN_PER_MEAL's doc comment for why the same handler and
+## amount serve both. `_day` is unused; the signal's payload only matters to
+## listeners that care which day it is (Base's tint/HUD label), not this one.
+func _on_meal_time(_day: int) -> void:
+	_consume_food(FOOD_PER_CITIZEN_PER_MEAL * population_count)
 
 
 ## Drains up to `amount` total hunger need, split evenly across whichever
@@ -145,6 +181,22 @@ func get_total_food() -> float:
 	var total := 0.0
 	for resource_name in FOOD_RESOURCES:
 		total += resources.get(resource_name, 0.0)
+	return total
+
+
+## Aggregate net rate across every FOOD_RESOURCES entry - the get_total_food()
+## equivalent for get_income_per_minute(), used by HUD's Food bar (see
+## Outpost_Survival/Ideas/Completed/Resource Consumption UI.md) to project
+## where the aggregate total is headed rather than showing one ingredient's
+## own rate. Summing each resource's own already-computed rate rather than
+## re-deriving from _income_history directly, since a resource crossing 0
+## mid-window (e.g. cabbage runs out, bread picks up the slack) nets out
+## correctly either way - each ingredient's own interpolated rate already
+## accounts for that individually.
+func get_food_income_per_minute() -> float:
+	var total := 0.0
+	for resource_name in FOOD_RESOURCES:
+		total += get_income_per_minute(resource_name)
 	return total
 
 

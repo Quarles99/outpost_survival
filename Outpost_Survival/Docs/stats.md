@@ -7,7 +7,7 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 | | Value |
 |---|---|
 | Starting cabbage | 30 |
-| Starting wood | 10 |
+| Starting wood | 10 (a Lumber Camp outright, nothing more - Cabbage Farm and House must be earned via gathering, see mechanics.md#building--placement) |
 | Starting stone / grain / flour / bread / hops / beer / fruit / potato / brick | 0 each |
 | Starting population | 3 (Aldric, Brenna, Cass) |
 | Starting population capacity | 3 |
@@ -19,17 +19,26 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 
 | | Value |
 |---|---|
-| Baseline storage capacity (per resource, with no Storage Facility) | 30 |
-| Storage Facility bonus | +30 (stacks per facility built) |
+| Baseline storage capacity (per resource, with no Storage Facility) | 120 |
+| Storage Facility bonus | +60 (stacks per facility built) |
 | Overflow behavior | Excess above capacity is lost, not refunded |
 | Food-equivalent resources (drawn down for hunger, split evenly across whichever are in stock) | cabbage, potato, fruit, bread, beer ("Ale") |
+
+## Food Bar (`HUD`)
+
+| | Value |
+|---|---|
+| Location | Bottom-right corner, HUD |
+| Fill | Aggregate food total (`GameState.get_total_food()`) against `storage_capacity` |
+| Overlay preview window | 30s (`HUD.FOOD_BAR_PREVIEW_SECONDS`) |
+| Overlay color | Red (shrinking) inside the top of the current fill / green (growing) just above it |
 
 ## Resource Consumption
 
 | | Value |
 |---|---|
-| Food (or food-equivalent) eaten per citizen | 0.2 / second |
-| Consumption tick interval | every 1 second |
+| Food (or food-equivalent) eaten per citizen per meal | 18.0 |
+| Meal timing | Twice per day/night cycle - at dawn (`DayNightCycle.day_started`) and dusk (`night_started`), same amount both times |
 | Applies to | every citizen, regardless of work assignment |
 | Floor | resources can't go below 0 |
 
@@ -37,34 +46,37 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 
 | Building | Footprint | Cost | Grants | Notes |
 |---|---|---|---|---|
-| Outpost Hall | 2×2 | 20 wood | — | A stockpile drop-off/pickup point - haulers use whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest. |
-| Cabbage Farm | 2×2 | 6 wood | — | Converts wood → cabbage. See production table below. |
-| Lumber Camp | 1×1 | 5 wood | — | Produces wood by chopping trees. See production table below. |
-| House | 2×2 | 10 wood | +2 population capacity | Passive — no worker slot. Clickable once placed for a one-time upgrade: 10 brick + 15 wood for +2 more population capacity (denied if already upgraded or unaffordable). Deliberately no raw stone in the upgrade cost - an upgraded ("stone") house is built from worked brick, not the raw ore. |
-| Stone Mine | 1×1 | 8 wood | — | Produces stone, no input needed. See production table below. |
-| Well | 1×1 | 10 stone + 4 wood | +1 to water-well count (unlocks water access) | Passive — no worker slot. |
-| Storage Facility | 2×4 | 15 wood + 10 stone | +30 storage capacity (all resources) | Also a stockpile drop-off/pickup point, same as the Outpost Hall, and assignable as a hauler post (see Assigning Citizens). Not upgradeable in place yet; build another for more capacity. |
-| Brickmaker | 1×1 | 8 wood + 6 stone | — | Converts stone → brick. Not part of the Farm-family retool group (see below) - a dedicated, single-recipe building. See production table below. |
-| Grain Farm | 2×2 | 6 wood | — | Converts wood → grain. Crop-chain building; see table below. |
-| Mill | 2×2 | 8 wood + 6 brick | — | Converts grain → flour. |
-| Bakery | 2×2 | 8 wood + 4 stone | — | Converts flour → bread (edible). |
-| Hops Farm | 2×2 | 6 wood | — | Converts wood → hops. |
-| Brewery | 2×2 | 10 wood + 4 stone + 6 brick | — | Converts hops → beer (luxury good, not edible). |
-| Fruit Orchard | 2×2 | 8 wood | — | Produces fruit (edible), no input needed — slower but reliable. |
-| Potato Farm | 2×2 | 6 wood | — | Produces potato (edible), no input needed. |
+| Outpost Hall | 2×2 | Not placeable (fixed starting building) | — | A stockpile drop-off/pickup point - haulers use whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest. |
+| Cabbage Farm | 2×2 | 10 wood | — | Converts wood → cabbage. See production table below. |
+| Lumber Camp | 1×1 | 10 wood | — | Produces wood by chopping trees. See production table below. |
+| House | 2×2 | 20 wood | +2 population capacity | Passive — no worker slot. Clickable once placed for a one-time upgrade: 10 brick + 20 wood for +2 more population capacity (denied if already upgraded or unaffordable). Deliberately no raw stone in the upgrade cost - an upgraded ("stone") house is built from worked brick, not the raw ore. |
+| Stone Mine | 1×1 | 10 wood | — | Produces stone, no input needed. See production table below. |
+| Well | 1×1 | 10 stone + 5 wood | +1 to water-well count (unlocks water access) | Passive — no worker slot. |
+| Storage Facility | 2×4 | 25 wood + 25 stone | +60 storage capacity (all resources) | Also a stockpile drop-off/pickup point, same as the Outpost Hall, and assignable as a hauler post (see Assigning Citizens). Not upgradeable in place yet; build another for more capacity. |
+| Brickmaker | 1×1 | 10 wood + 10 stone | — | Converts stone → brick. Not part of the Farm-family retool group (see below) - a dedicated, single-recipe building. See production table below. |
+| Grain Farm | 2×2 | 10 wood | — | Converts wood → grain. Crop-chain building; see table below. |
+| Mill | 2×2 | 10 wood + 10 brick | — | Converts grain → flour. |
+| Bakery | 2×2 | 10 wood + 5 stone | — | Converts flour → bread (edible). |
+| Hops Farm | 2×2 | 10 wood | — | Converts wood → hops. |
+| Brewery | 2×2 | 10 wood + 5 stone + 5 brick | — | Converts hops → beer (luxury good, not edible). |
+| Fruit Orchard | 2×2 | 20 wood | — | Produces fruit (edible), no input needed — slower but reliable. |
+| Potato Farm | 2×2 | 10 wood | — | Produces potato (edible), no input needed. |
+| Barracks | 2×2 | 20 wood + 10 stone | — | Trains `melee_combat`. No input/output - pure time-worked xp (see Skills & Leveling). Max 1 built at once - see Combat-Building Recruit below. |
+| Archery Range | 2×2 | 10 wood + 5 stone | — | Trains `archery`. Same no-input/output shape as Barracks. Max 1 built at once. |
+| Mage Tower | 2×2 | 10 wood + 10 stone + 5 brick | — | Trains `spellcasting`. Same no-input/output shape as Barracks. Max 1 built at once. |
 
-All 8 of the above (Farm through Potato Farm) can be clicked once placed to retool into any other one of the 8, for free, at any time - see [mechanics.md](mechanics.md#building--placement). Brickmaker is deliberately excluded from this group (see its own Buildings row above) despite sharing the same converter work loop as Farm.
+All 8 of the above (Farm through Potato Farm) can be clicked once placed to retool into any other one of the 8, for free, at any time - see [mechanics.md](mechanics.md#building--placement). Brickmaker and the three combat-training buildings (Barracks/Archery Range/Mage Tower, sharing `TrainingGround.tscn`) are deliberately excluded from this group.
 
 ## Workstation Production
 
 | | Farm | Lumber Camp | Stone Mine | Brickmaker |
 |---|---|---|---|---|
 | Output resource | cabbage | wood | stone | brick |
-| Output per work cycle | 1.0 × skill multiplier | 2.0 × skill multiplier (per chop) | 0.5 × skill multiplier | 1.0 × skill multiplier |
+| Output per work cycle | 1.0 × skill multiplier | 1.0 × skill multiplier (per chop) | 0.5 × skill multiplier | 0.5 × skill multiplier |
 | Input resource | wood | — | — | stone |
 | Input cost per work cycle | 0.5 wood flat (not scaled by skill) | — | — | 1.0 stone flat (not scaled by skill) |
-| Work cycle interval | 1.5 s | 1.2 s (per chop) | 1.5 s | 1.5 s (default) |
-| Carry limit (output buffer cap / haul size) | 6.0 | 6.0 | 6.0 | 6.0 |
+| Work cycle interval | 3.0 s | 2.4 s (per chop) | 3.0 s | 3.0 s (default) |
+| Carry limit (output buffer cap / haul size) | 8.0 | 8.0 | 8.0 | 8.0 |
 | Search radius (tree-finding, Lumber Camp only) | — | 4.5 tiles | — | — |
 | Target forest size maintained (Lumber Camp only) | — | 16 trees within search radius | — | — |
 | Skill trained | `farming` | `lumberjacking` | `mining` | `masonry` |
@@ -77,6 +89,7 @@ Brickmaker shares `Character._run_farm_loop` with the Farm class (input_per_tick
 | | Value |
 |---|---|
 | Max workers per Workstation (Farm-family, Lumber Camp, Stone Mine) | 1 |
+| Max workers per military building (Barracks/Archery Range/Mage Tower) | 3, +3 per upgrade - see Military Building Unit Cap below |
 
 Each post's status label shows live occupancy as `"<name>\n<active_workers>/<max_workers>"` (e.g. `"Lumber Camp 1/1"`), refreshed on every automatic assignment/unassignment. The Outpost Hall and Storage Facilities are never job posts - haulers are never explicitly "assigned" to either (see Automatic Job Assignment below), so they carry no worker count.
 
@@ -94,13 +107,13 @@ The **Farm** class is a generic single-input/single-output converter (exported `
 
 | Building | Input → Output | Input/tick | Output/tick | Work interval | Skill trained |
 |---|---|---|---|---|---|
-| Grain Farm | wood → grain | 0.5 | 1.0 | 1.5 s (default) | `farming` |
-| Mill | grain → flour | 1.0 | 1.0 | 1.5 s (default) | `milling` |
-| Bakery | flour → bread | 1.0 | 1.0 | 1.5 s (default) | `baking` |
-| Hops Farm | wood → hops | 0.5 | 1.0 | 1.5 s (default) | `farming` |
-| Brewery | hops → beer | 1.0 | 1.0 | 1.5 s (default) | `brewing` |
-| Fruit Orchard | none → fruit | 0 | 0.6 | 3.0 s (slower) | `farming` |
-| Potato Farm | none → potato | 0 | 1.0 | 1.5 s (default) | `farming` |
+| Grain Farm | wood → grain | 0.5 | 1.0 | 3.0 s (default) | `farming` |
+| Mill | grain → flour | 1.0 | 1.0 | 3.0 s (default) | `milling` |
+| Bakery | flour → bread | 1.0 | 1.0 | 3.0 s (default) | `baking` |
+| Hops Farm | wood → hops | 0.5 | 1.0 | 3.0 s (default) | `farming` |
+| Brewery | hops → beer | 1.0 | 1.0 | 3.0 s (default) | `brewing` |
+| Fruit Orchard | none → fruit | 0 | 2.0 | 6.0 s (slower) | `farming` |
+| Potato Farm | none → potato | 0 | 1.0 | 3.0 s (default) | `farming` |
 
 Output/tick scales by the worker's skill multiplier the same way the base Farm's does; input/tick does not - a higher-level worker gets more output from the same input, not just more of both at a fixed ratio. Fruit Orchard and Potato Farm never haul input (no delivery trip is ever triggered) — matching the design intent of a "consistent" crop that isn't gated on deliveries.
 
@@ -117,18 +130,19 @@ A Farm-class post's haul trip triggers when its input buffer can't cover the nex
 
 ## Skill Curve (`SkillCurve`)
 
-RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1..L-1] floor(n + 300 * 2^(n/7)))`.
+RuneScape-style exponential 1–99 curve: `xp_for_level(L) = floor(1/4 * sum[n=1..L-1] floor(n + 300 * 2^(n/7)) * multiplier_for_level(n))`. The `* multiplier_for_level(n)` factor is what makes xp *required* scale at the same rate xp *granted* does (see below) - without it, a worker's growing output multiplier would grant more xp per action every level while the requirement stayed fixed, snowballing level-up speed on top of the output bonus itself.
 
 | | Value |
 |---|---|
 | Max level | 99 |
 | Output multiplier per level above 1 | +2% |
 | Multiplier at level 99 | ~2.96× a level-1 worker |
-| XP granted per gather action (chop or production tick) | 4.0 flat, regardless of level or output |
+| XP granted per resource-production action (farming/lumberjacking/mining/masonry/milling/baking/brewing) | `amount produced this tick × 4.0` - a level-1 Cabbage Farm worker still grants exactly 4.0/tick (unchanged from the old flat rate), but a higher-level (higher-output) worker now grants proportionally more |
+| XP granted per action (construction labor, training drill, strength per haul trip) | 4.0 flat, regardless of level or amount - these don't represent a real resource amount to scale against |
 
 ## Skill Titles (`SkillTitles`)
 
-Only the eight job skills (farming, lumberjacking, mining, masonry, milling, baking, brewing, construction) count - speed/strength are excluded, since they train passively and don't represent a trade.
+Eleven skills count: the eight job skills (farming, lumberjacking, mining, masonry, milling, baking, brewing, construction) plus the three combat skills (melee_combat, archery, spellcasting) - speed/strength are excluded, since they train passively and don't represent a trade. Job nouns for the three combat skills: melee_combat → Soldier, archery → Archer, spellcasting → Mage (e.g. "Master Archer").
 
 | Level | Tier |
 |---|---|
@@ -146,9 +160,9 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 |---|---|
 | Skill trained | `construction` |
 | Materials delivery | Any idle/hauling citizen, same mechanism as output pickup/input delivery - see Gathering & Hauling |
-| Labor required | `max(total units in the option's cost * 2.0, 10.0)` (`Base.LABOR_PER_MATERIAL_UNIT`/`MIN_LABOR_REQUIRED`) - e.g. a 5-wood Lumber Camp needs 10 labor (floor applies), a 25-wood+stone Storage Facility needs 50 |
-| Labor added per work cycle | 1.0 (`Character.CONSTRUCTION_LABOR_PER_TICK`) × the worker's construction skill multiplier × the settlement's happiness output multiplier |
-| Work cycle interval | 1.5 s (`Workstation.work_interval` default, unchanged for a construction site) |
+| Labor required | `max(total units in the option's cost * 2.0, 10.0)` (`Base.LABOR_PER_MATERIAL_UNIT`/`MIN_LABOR_REQUIRED`) - e.g. a 10-wood Lumber Camp needs 20 labor, a 50-wood+stone Storage Facility needs 100 |
+| Labor added per work cycle | 1.2 (`Character.CONSTRUCTION_LABOR_PER_TICK`, raised from 1.0 for a ~20% build-speed increase) × the worker's construction skill multiplier × the settlement's happiness output multiplier |
+| Work cycle interval | 3.0 s (`Workstation.work_interval` default, unchanged for a construction site) |
 | Max workers per site | 1 |
 | What happens on completion | Site is freed; the real building is instantiated in its place and granted its capacity/water/storage bonus then, not at placement time; a fresh job-assignment pass runs immediately |
 | What's spent, and when | The option's full cost, deducted resource-by-resource as each haul trip actually delivers it - nothing is spent at placement-confirm time |
@@ -157,9 +171,9 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 
 | | Value |
 |---|---|
-| Move speed | 140 px/s (before the speed skill's multiplier) |
-| Min move duration (even for very short trips) | 0.3 s |
-| Max move duration (even for very long trips) | 4.0 s |
+| Move speed | 70 px/s (before the speed skill's multiplier) |
+| Min move duration (even for very short trips) | 0.6 s |
+| Max move duration (even for very long trips) | 20.0 s |
 | Pause at stockpile per haul trip | 0.3 s |
 | Idle retry delay (no work found / target too empty) | 2.5 s |
 | Minimum buffer amount worth an idle-hauler trip | 1.0 |
@@ -176,9 +190,18 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 |---|---|
 | Speed xp per second spent moving | 2.5 |
 | Strength xp per haul trip that moved anything | 4.0 (same flat amount as XP_PER_GATHER) |
-| Effect of speed | Multiplies move speed (140 px/s base), same +2%/level curve as any other skill |
+| Effect of speed | Multiplies move speed (70 px/s base), same +2%/level curve as any other skill |
 | Effect of strength | Multiplies a workstation's base carry_limit for that character's own haul trips |
 | Trained by | Existing/moving (speed) and completing a haul trip (strength) - regardless of work assignment, unlike every other skill |
+
+## Fast Forward (`Base`)
+
+| | Value |
+|---|---|
+| Speed multipliers | 1x, 2x, 4x (cycles on click/key, wraps back to 1x) |
+| Mechanism | `Engine.time_scale` - speeds up everything uniformly (movement, work, hunger, happiness, the day/night clock), not just one system |
+| Controls | HUD "Speed" button (click to cycle), or `+`/`-` keys |
+| Resets to 1x | On leaving Base (menu, battle deployment, quit) - a transient display preference, not saved game state |
 
 ## Camera (`RtsCamera`)
 
@@ -206,13 +229,13 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 | Happiness range | 0–100 |
 | Starting happiness | 50 |
 | Happiness re-target tick interval | 5 s |
-| Ease rate (max change per tick) | 3.0 toward target |
+| Ease rate (max change per tick) | 1.0 toward target |
 | Baseline target (before bonuses/penalties) | 50 |
-| Water access bonus/penalty | ±15 |
-| Food-in-stock bonus | +15 |
+| Water access bonus/penalty | ±5 |
+| Food-in-stock bonus | +10 |
 | Starving (no food at all) penalty | −20 |
 | Bonus per distinct food-equivalent resource in stock | +5 (see food-equivalent list above) |
-| Unhappy threshold | below 20 |
+| Unhappy threshold | below 15 |
 | Consecutive unhappy ticks before a citizen leaves | 12 (12 × 5 s = 60 s) |
 
 ### Happiness Bands (production multiplier)
@@ -230,11 +253,48 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 |---|---|
 | Candidates offered per visit | 3, distinct food tiers where possible |
 | Food tiers (lowest to highest) | cabbage, potato, fruit, bread, beer ("Ale") |
-| Cost per food type in a candidate's cost | 15 |
-| Cost formula | 15 of the candidate's own tier's food, plus 15 of every cheaper tier's food (e.g. a bread-tier (index 3) candidate costs 15 cabbage + 15 potato + 15 fruit + 15 bread) |
-| Starting level | 5 at tier 0 (cabbage), +5 per tier above that (5/10/15/20/25) |
+| Cost per food type in a candidate's cost | 20 |
+| Cost formula | 20 of the candidate's own tier's food, plus 20 of every cheaper tier's food (e.g. a bread-tier (index 3) candidate costs 20 cabbage + 20 potato + 20 fruit + 20 bread) |
+| Starting level | 10 at tier 0 (cabbage), +10 per tier above that (10/20/30/40/50) |
 | Possible specializations | farming, lumberjacking, mining, masonry, milling, baking, brewing, construction |
-| Gated on | open population capacity, and affording that candidate's own (tier-scaled) cost |
+| Gated on | open population capacity, affording that candidate's own (tier-scaled) cost, and the once-per-day recruit cooldown (see Day & Night below) |
+
+## Combat-Building Recruit (`TrainingGround`, `Base`)
+
+| | Value |
+|---|---|
+| Buildings | Barracks (melee_combat/"Soldier"), Archery Range (archery/"Archer"), Mage Tower (spellcasting/"Mage") |
+| Max built at once | 1 each (`BuildingCatalog`'s `"max_count"`) |
+| Candidates offered | 1, always that building's own combat skill |
+| Cost | Tier-0 (cabbage only), same 20/food-type rate as a normal recruit |
+| Starting level | 10 (same as a tier-0 normal recruit) |
+| Cooldown | Once per day, independent per building - does not consume or compete with the Outpost Hall's own cooldown |
+
+## Military Building Unit Cap (`TrainingGround`, `Base`)
+
+Barracks/Archery Range/Mage Tower each override `Workstation`'s normal 1-worker cap with their own, upgradeable one - clicking a built one now opens a panel offering both Recruit (see above) and Upgrade rather than jumping straight to a recruit candidate.
+
+| | Value |
+|---|---|
+| Base unit cap (unupgraded) | 3 |
+| Unit cap gained per upgrade | 3 |
+| Upgrade cost | 10 brick, flat per upgrade (not yet scaled by level) |
+| Max upgrade level | None - repeatable indefinitely |
+| Effect | Raises that specific building's `max_workers`, so up to that many citizens can train there / deploy from it at once |
+
+## Day & Night (`DayNightCycle`)
+
+| | Value |
+|---|---|
+| Day length | 480s (8 minutes) |
+| Night length | 240s (4 minutes) |
+| Day:Night ratio | 2:1 |
+| Full cycle length | 720s (12 minutes) |
+| Day counter | Increments at dawn (start of the day phase); starts at 1 |
+| Recruit cooldown | 1 full day-number increment by default (`recruit_cooldown_days`) - a var, not a const, so a future upgrade can lower it; nothing does yet |
+| World tint transition (dawn/dusk) | 8s tween between day/night colors |
+| Persistence | Day number, phase, elapsed time within the phase, and last-recruit day all survive save/load and a battle deployment round trip |
+| Food consumption | A flat meal (see Resource Consumption above) is charged at both `day_started` and `night_started` |
 
 ## Map Size (`IsoGround`, `Base.tscn`)
 

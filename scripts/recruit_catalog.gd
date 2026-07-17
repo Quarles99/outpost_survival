@@ -17,7 +17,9 @@ const FOOD_TIERS := ["cabbage", "potato", "fruit", "bread", "beer"]
 ## particular food tier as well as an equal amount of all food from lower
 ## tiers", so a Grandmaster-tier recruit still keeps cabbage/potato/fruit
 ## relevant instead of obsoleting them the moment Bread/Ale come online.
-const RECRUIT_UNIT_COST := 15.0
+## Raised 15.0 -> 20.0 via Outpost_Survival/Balance.md's edit-and-hand-back
+## workflow.
+const RECRUIT_UNIT_COST := 20.0
 
 const NAMES := [
 	"Brom", "Ysolde", "Garrick", "Merida", "Torvald", "Elowen",
@@ -26,12 +28,13 @@ const NAMES := [
 
 ## skill_id -> display label, for showing "Lv 5 Farming" etc. on cards.
 ## Covers every skill a Farm-family Workstation can currently train (see
-## farm.gd) plus lumberjacking/mining - deliberately not "labor", the dead
-## generic Workstation default.
+## farm.gd) plus lumberjacking/mining/masonry - deliberately not "labor",
+## the dead generic Workstation default.
 const SPECIALIZATIONS := {
 	"farming": "Farming",
 	"lumberjacking": "Lumberjacking",
 	"mining": "Mining",
+	"masonry": "Masonry",
 	"milling": "Milling",
 	"baking": "Baking",
 	"brewing": "Brewing",
@@ -43,8 +46,10 @@ const SPECIALIZATIONS := {
 ## design doc) without being able to out-level what a citizen earns
 ## through play. Each tier above that adds TIER_LEVEL_STEP more, so a
 ## tier-4 (beer/Ale) candidate starts at STARTING_LEVEL + 4*TIER_LEVEL_STEP.
-const STARTING_LEVEL := 5
-const TIER_LEVEL_STEP := 5
+## Both raised 5 -> 10 via Outpost_Survival/Balance.md's edit-and-hand-back
+## workflow.
+const STARTING_LEVEL := 10
+const TIER_LEVEL_STEP := 10
 
 
 ## `count` candidates - distinct names AND distinct food tiers where
@@ -85,3 +90,25 @@ static func _cost_for_tier(tier_index: int) -> Dictionary:
 	for i in tier_index + 1:
 		cost[FOOD_TIERS[i]] = RECRUIT_UNIT_COST
 	return cost
+
+
+## A single fixed-skill candidate for a combat-training building's own
+## additional recruit (see TrainingGround.clicked/can_recruit and
+## Base._on_training_ground_clicked) - always tier-0 cost/level, unlike
+## generate_candidates' random tier spread, since there's no "which food
+## tier" choice for this recruit - just "do you want this building's
+## specific combat skill or not." skill_id/skill_label come from the calling
+## building (melee_combat/"Soldier", archery/"Archer", spellcasting/"Mage" -
+## see SkillTitles.JOB_NOUNS, not duplicated into SPECIALIZATIONS above
+## since combat skills aren't part of the normal Outpost Hall pool).
+static func generate_combat_candidate(skill_id: String, skill_label: String) -> Dictionary:
+	var names := NAMES.duplicate()
+	names.shuffle()
+	return {
+		"name": names[0],
+		"skill_id": skill_id,
+		"skill_label": skill_label,
+		"starting_xp": SkillCurve.xp_for_level(STARTING_LEVEL),
+		"level": STARTING_LEVEL,
+		"cost": _cost_for_tier(0),
+	}

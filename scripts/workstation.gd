@@ -28,13 +28,29 @@ const RESOURCE_VISUALS := {
 @export var display_name: String = "Workstation"
 @export var resource_type: String = "cabbage"
 @export var output_per_tick: float = 1.0
+## Input side of a single-input/single-output converter (Farm-class
+## buildings, Brickmaker) - moved up here (like work_interval already was,
+## for StoneMine's benefit) so Character._run_farm_loop can drive any
+## converter-shaped post generically rather than requiring the Farm class
+## specifically. A post with no input (LumberCamp, StoneMine,
+## ConstructionSite) just leaves input_per_tick at 0 / input_resource at ""
+## and never worries about either - get_input_resource() below returns ""
+## by default, which is also what marks a post as "no input delivery
+## needed" to Character._find_haul_job().
+@export var input_per_tick: float = 0.0
+@export var input_resource: String = ""
 ## Max units of resource_type a worker will accumulate here before hauling
 ## the lot to the stockpile - also how much a single haul trip carries.
-@export var carry_limit: float = 6.0
+## Raised 6.0 -> 8.0 via Outpost_Survival/Balance.md's edit-and-hand-back
+## workflow.
+@export var carry_limit: float = 8.0
 ## Seconds between production ticks. Used directly by Character's generic
 ## work loop (e.g. StoneMine); Farm reads it too even though it has its own
 ## specialized loop, and LumberCamp ignores it in favor of chop_interval.
-@export var work_interval: float = 1.5
+## Doubled from 1.5 per an explicit request to slow work pace by a factor of
+## 2 (see Character.MOVE_SPEED's doc comment for the matching movement
+## slowdown, and Base's fast-forward system for the companion speed-up).
+@export var work_interval: float = 3.0
 ## How many citizens can be assigned here at once - most Workstations only
 ## have room for one at a time now (a first-pass default, not tuned via
 ## playtesting - a handful of catalog entries may still want to override it
@@ -156,9 +172,11 @@ func get_skill_id() -> String:
 ## Resource this post needs delivered into input_buffer before it can
 ## produce, or "" if it doesn't use one (the default - LumberCamp has no
 ## input). A hauler treats a non-empty return as "this post is a valid
-## input-delivery target".
+## input-delivery target". Just reads the input_resource export directly -
+## overridden by nothing anymore now that every converter-style post
+## (Farm-class, Brickmaker) shares this same field.
 func get_input_resource() -> String:
-	return ""
+	return input_resource
 
 
 func add_worker() -> void:

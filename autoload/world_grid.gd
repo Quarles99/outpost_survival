@@ -4,6 +4,15 @@ extends Node
 ## trees (via lumberjack replanting) both reserve cells here, so neither can
 ## ever be placed on top of the other.
 
+## Fired whenever a cell's occupancy changes (reserve or release) -
+## Base listens once (see Base._rebake_navigation) and re-bakes the town's
+## navmesh on every fire, so a citizen's pathing always reflects the current
+## building/tree layout rather than whatever it was at boot. Unlike the
+## battle sandbox's terrain (baked once per fight, see
+## CombatTestManager._setup_navigation), the town's walkable area keeps
+## changing for the whole session.
+signal occupancy_changed
+
 const TREE_SCENE := preload("res://scenes/nature/Tree.tscn")
 
 var ground_origin := Vector2.ZERO
@@ -79,10 +88,23 @@ func is_free(cell: Vector2i) -> bool:
 
 func reserve(cell: Vector2i) -> void:
 	_occupied[cell] = true
+	occupancy_changed.emit()
 
 
 func release(cell: Vector2i) -> void:
 	_occupied.erase(cell)
+	occupancy_changed.emit()
+
+
+## Every currently-occupied cell (buildings, construction sites, and trees
+## all reserve through the same dict) - fed to Base._rebake_navigation as
+## the navmesh's obstruction set, so pathing avoids all three uniformly
+## without needing to enumerate each source separately.
+func get_occupied_cells() -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for cell in _occupied:
+		cells.append(cell)
+	return cells
 
 
 func plant_tree(cell: Vector2i, mature: bool) -> WorldTree:

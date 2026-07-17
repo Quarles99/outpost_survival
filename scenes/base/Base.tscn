@@ -1,6 +1,6 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene format=3 uid="uid://cj40g2p4kxsno"]
 
-[ext_resource type="Script" path="res://scripts/base.gd" id="1"]
+[ext_resource type="Script" uid="uid://du5pncfmoepcm" path="res://scripts/base.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/character/Character.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/ui/SkillPanel.tscn" id="4"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="5"]
@@ -10,52 +10,59 @@
 [ext_resource type="PackedScene" path="res://scenes/world/IsoGround.tscn" id="9"]
 [ext_resource type="PackedScene" path="res://scenes/ui/BuildMenu.tscn" id="12"]
 [ext_resource type="PackedScene" path="res://scenes/building/OutpostHall.tscn" id="13"]
-[ext_resource type="Script" path="res://scripts/rts_camera.gd" id="15"]
+[ext_resource type="Script" uid="uid://datem3c4kvgsy" path="res://scripts/rts_camera.gd" id="15"]
 [ext_resource type="PackedScene" path="res://scenes/ui/RecruitPanel.tscn" id="16"]
 [ext_resource type="PackedScene" path="res://scenes/ui/CropPanel.tscn" id="17"]
 [ext_resource type="PackedScene" path="res://scenes/ui/SystemMenu.tscn" id="18"]
 [ext_resource type="PackedScene" path="res://scenes/ui/SlotPanel.tscn" id="19"]
+[ext_resource type="PackedScene" path="res://scenes/ui/TrainingGroundPanel.tscn" id="20"]
 
-[node name="Base" type="Node2D"]
-script = ExtResource("1")
+[node name="Base" type="Node2D" unique_id=1711824295]
 y_sort_enabled = true
+script = ExtResource("1")
 
-[node name="Camera2D" type="Camera2D" parent="."]
+[node name="DayNightTint" type="CanvasModulate" parent="."]
+color = Color(1, 1, 1, 1)
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="."]
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1600357395]
 script = ExtResource("15")
-current = true
 
-[node name="IsoGround" parent="." instance=ExtResource("9")]
+[node name="IsoGround" parent="." unique_id=757546459 instance=ExtResource("9")]
 position = Vector2(576, 170)
-start_x = -12
-start_y = -12
 width = 28
 depth = 28
+start_x = -12
+start_y = -12
 
-[node name="OutpostHall" parent="." instance=ExtResource("13")]
+[node name="OutpostHall" parent="." unique_id=1153227806 instance=ExtResource("13")]
 position = Vector2(576, 298)
 
-[node name="Aldric" parent="." instance=ExtResource("3")]
+[node name="Aldric" parent="." unique_id=1597373154 instance=ExtResource("3")]
 position = Vector2(384, 458)
 data = ExtResource("6")
 
-[node name="Brenna" parent="." instance=ExtResource("3")]
+[node name="Brenna" parent="." unique_id=1735596929 instance=ExtResource("3")]
 position = Vector2(576, 458)
 data = ExtResource("7")
 
-[node name="Cass" parent="." instance=ExtResource("3")]
+[node name="Cass" parent="." unique_id=984473410 instance=ExtResource("3")]
 position = Vector2(768, 458)
 data = ExtResource("8")
 
-[node name="SkillPanel" parent="." instance=ExtResource("4")]
+[node name="SkillPanel" parent="." unique_id=1118909189 instance=ExtResource("4")]
 
-[node name="BuildMenu" parent="." instance=ExtResource("12")]
+[node name="BuildMenu" parent="." unique_id=1256575717 instance=ExtResource("12")]
 
-[node name="RecruitPanel" parent="." instance=ExtResource("16")]
+[node name="RecruitPanel" parent="." unique_id=557214937 instance=ExtResource("16")]
 
-[node name="CropPanel" parent="." instance=ExtResource("17")]
+[node name="CropPanel" parent="." unique_id=1961894849 instance=ExtResource("17")]
 
-[node name="SystemMenu" parent="." instance=ExtResource("18")]
+[node name="TrainingGroundPanel" parent="." unique_id=2094817342 instance=ExtResource("20")]
 
-[node name="SlotPanel" parent="." instance=ExtResource("19")]
+[node name="SystemMenu" parent="." unique_id=1410083182 instance=ExtResource("18")]
 
-[node name="HUD" parent="." instance=ExtResource("5")]
+[node name="SlotPanel" parent="." unique_id=180305758 instance=ExtResource("19")]
+
+[node name="HUD" parent="." unique_id=1498026724 instance=ExtResource("5")]

@@ -22,6 +22,20 @@
             }
           },
           {
+            "id": "5e15df50ae4cb4ec",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Balance.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Balance"
+            }
+          },
+          {
             "id": "a7ed06d8733493fd",
             "type": "leaf",
             "state": {
@@ -41,16 +55,16 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Docs/stats.md",
+                "file": "Ideas/Combat Units.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "stats"
+              "title": "Combat Units"
             }
           }
         ],
-        "currentTab": 2
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -123,7 +137,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Docs/stats.md",
+                "file": "Docs/controls.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -133,7 +147,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for stats"
+              "title": "Backlinks for controls"
             }
           },
           {
@@ -142,12 +156,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Docs/stats.md",
+                "file": "Docs/controls.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from stats"
+              "title": "Outgoing links from controls"
             }
           },
           {
@@ -185,13 +199,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Docs/stats.md",
+                "file": "Balance.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of stats"
+              "title": "Outline of Balance"
             }
           }
         ],
@@ -212,34 +226,38 @@
       "bases:Create new base": false
     }
   },
-  "active": "a45c1ce4cf2c0337",
+  "active": "5e15df50ae4cb4ec",
   "lastOpenFiles": [
-    "Ideas/Combat System.md.tmp.13816.dcc92a6c8c0f",
-    "Docs/mechanics.md",
-    "Planning/Planning.md",
-    "Ideas/Combat System.md.tmp.13816.249bca74ea58",
-    "Ideas/Combat Units.md.tmp.13816.cc839e025020",
-    "Ideas/Combat System.md.tmp.13816.b1b88386dc63",
-    "Ideas/Combat Units.md.tmp.13816.6847f15112d5",
-    "Home.md",
-    "Ideas/Combat Units.md",
-    "Journal/2026-07-15.md",
-    "Ideas/Formation Strategy AI.md.tmp.13816.da8e26a84813",
-    "Ideas/Combat System.md.tmp.13816.8321edec3b75",
-    "Planning/Strategist AI (Combat Sandbox).md",
-    "Ideas/Formation Strategy AI.md",
-    "Planning/Strategist AI (Combat Sandbox).md.tmp.13816.8e16cd590fe0",
-    "Ideas/Formation Strategy AI.md.tmp.13816.85e690ab75bb",
-    "Ideas/Formation Strategy AI.md.tmp.13816.35450a8b9ffe",
+    "Docs/roadmap.md.tmp.10230.057342563d3c",
+    "Docs/mechanics.md.tmp.10230.3d411677a4c8",
+    "Balance Changelog.md.tmp.10230.6044b960390f",
+    "Balance.md.tmp.10230.161c93b1adca",
+    "Balance Changelog.md.tmp.10230.2895944eeeb0",
+    "Docs/stats.md.tmp.10230.c71b69362b28",
+    "Docs/stats.md.tmp.10230.acbac4584f18",
+    "Docs/stats.md.tmp.10230.1bb74aa3efb4",
+    "Docs/stats.md.tmp.10230.920b210e19d8",
+    "Balance Changelog.md.tmp.10230.28f95cf21a4c",
+    "Docs/stats.md.tmp.10230.e6a03e5667c1",
+    "Balance Changelog.md",
+    "Balance.md",
+    "Ideas/Day-Night Cycle.md",
     "Ideas/Ideas.md",
-    "Planning/Planning.md.tmp.13816.d50c3a2f773f",
-    "Planning/Formation System (Combat Sandbox).md",
+    "Ideas/Combat System.md",
+    "Docs/controls.md",
+    "Docs/mechanics.md",
     "Docs/README.md",
     "Docs/roadmap.md",
+    "Ideas/Completed/Resource Consumption UI.md",
+    "Journal/2026-07-15.md",
+    "Planning/Planning.md",
+    "Ideas/Resource Consumption UI.md",
+    "Ideas/Formation Strategy AI.md",
+    "Home.md",
     "Docs/stats.md",
-    "Docs/controls.md",
-    "Ideas/Combat System.md",
-    "Ideas/Day-Night Cycle.md",
+    "Ideas/Combat Units.md",
+    "Planning/Strategist AI (Combat Sandbox).md",
+    "Planning/Formation System (Combat Sandbox).md",
     "Ideas/Unique Building Art.md",
     "Welcome.md"
   ]

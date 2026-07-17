@@ -3,6 +3,8 @@ class_name HUD
 
 signal build_pressed
 signal menu_pressed
+signal attack_pressed
+signal speed_pressed
 
 const COUNT_DURATION := 0.35
 const PUNCH_SCALE := Vector2(1.15, 1.15)
@@ -30,11 +32,30 @@ const FOOD_BREAKDOWN_LABELS := {
 @onready var water_label: Label = $Control/Rows/WaterLabel
 @onready var population_label: Label = $Control/Rows/PopulationLabel
 @onready var happiness_label: Label = $Control/Rows/HappinessLabel
+@onready var day_label: Label = $Control/Rows/DayLabel
 @onready var build_button: Button = $Control/Rows/BuildButton
+@onready var attack_button: Button = $Control/Rows/AttackButton
+@onready var speed_button: Button = $Control/Rows/SpeedButton
 @onready var menu_button: Button = $Control/Rows/MenuButton
 @onready var save_indicator: Label = $SaveIndicator
+@onready var food_bar_frame: Control = $FoodBarPanel/FoodBarFrame
+@onready var food_bar_fill: ColorRect = $FoodBarPanel/FoodBarFrame/Fill
+@onready var food_bar_meal_warning: ColorRect = $FoodBarPanel/FoodBarFrame/MealWarning
+@onready var food_bar_overlay: ColorRect = $FoodBarPanel/FoodBarFrame/Overlay
+@onready var food_bar_value: Label = $FoodBarPanel/FoodBarValue
 
 const RATE_REFRESH_INTERVAL := 1.0
+
+## How far ahead the Food bar's green growth overlay projects, extrapolated
+## from the current GameState.get_food_income_per_minute() rate - short
+## enough to read as "about to happen" rather than a full-minute projection
+## that would overshoot the bar entirely for anything gaining food quickly.
+## Only used for the growth side now - see food_bar_meal_warning's doc
+## comment on _update_food_bar for why the loss side no longer uses a rate
+## extrapolation at all.
+const FOOD_BAR_PREVIEW_SECONDS := 30.0
+const FOOD_BAR_GAIN_COLOR := Color(0.4, 0.75, 0.35, 0.85)
+const FOOD_BAR_MEAL_WARNING_COLOR := Color(0.85, 0.25, 0.25, 0.85)
 
 ## Only wood/stone go through the single-resource tween/label path now -
 ## the food family has its own multi-resource aggregate handling below
@@ -57,12 +78,23 @@ func _ready() -> void:
 	population_label.resized.connect(func() -> void: population_label.pivot_offset = population_label.size / 2)
 	happiness_label.resized.connect(func() -> void: happiness_label.pivot_offset = happiness_label.size / 2)
 	food_button.resized.connect(func() -> void: food_button.pivot_offset = food_button.size / 2)
+	## food_bar_frame's actual size isn't reliable until the VBoxContainer it
+	## sits in has completed a layout pass (it stretches the frame to the
+	## container's own width, wider than the frame's own custom_minimum_size)
+	## - a call made synchronously in _ready(), before that pass has
+	## necessarily happened, can compute against a stale/too-narrow size.
+	## Listening for resized (also fires on a window resize, unlike a single
+	## _ready()-time call) keeps the fill/overlay correctly sized regardless
+	## of exactly when layout resolves.
+	food_bar_frame.resized.connect(_update_food_bar)
 	food_button.pressed.connect(_on_food_button_pressed)
 	GameState.resources_changed.connect(_on_resources_changed)
 	GameState.population_changed.connect(_on_population_changed)
 	GameState.water_changed.connect(_on_water_changed)
 	GameState.storage_capacity_changed.connect(_on_storage_capacity_changed)
 	build_button.pressed.connect(func() -> void: build_pressed.emit())
+	attack_button.pressed.connect(func() -> void: attack_pressed.emit())
+	speed_button.pressed.connect(func() -> void: speed_pressed.emit())
 	menu_button.pressed.connect(func() -> void: menu_pressed.emit())
 
 	for food_resource in FOOD_BREAKDOWN_ORDER:
@@ -73,6 +105,7 @@ func _ready() -> void:
 	for resource_name in _resource_labels:
 		_set_display(resource_name, GameState.resources[resource_name])
 	_update_food_display()
+	_update_food_bar()
 	_set_population(GameState.population_count, GameState.population_capacity)
 	_set_water(GameState.has_water())
 	save_indicator.modulate.a = 0.0
@@ -107,6 +140,7 @@ func flash_message(text: String) -> void:
 func _on_resources_changed(resource_name: String, total: float) -> void:
 	if resource_name in FOOD_BREAKDOWN_ORDER:
 		_update_food_display(true)
+		_update_food_bar()
 		return
 	if not _resource_labels.has(resource_name):
 		return
@@ -163,6 +197,70 @@ func _update_food_display(punch: bool = false) -> void:
 		_punch_control(food_button)
 
 
+## Vertical Food bar in the bottom-right corner (per Ideas/Completed/Resource
+## Consumption UI.md) - a graphical companion to the existing text Food row
+## above (Control/Rows/FoodButton), not a replacement, so a player can gauge
+## stock and trend at a glance without opening the breakdown. food_bar_fill
+## grows from the bottom of food_bar_frame same as any "tank" gauge.
+##
+## Two independent overlay bands, not one that switches between them (the
+## original single-overlay version did, before GameState moved consumption
+## off a continuous per-second drain onto two flat meals a day/night cycle -
+## see FOOD_PER_CITIZEN_PER_MEAL): a smoothly-extrapolated rate no longer
+## means anything sensible for the *loss* side specifically, since
+## get_food_income_per_minute()'s rolling 60s window is mostly just
+## production between meals, then briefly reads a huge false spike right
+## after one (the meal itself scrolling through the window) before settling
+## back - extrapolating that spike 30s forward would predict a further drop
+## that isn't actually coming.
+## - food_bar_meal_warning (red, inside the top of the fill): not a
+##   projection at all - the *exact*, always-known cost of the next meal
+##   (FOOD_PER_CITIZEN_PER_MEAL * population_count), clamped to the fill's
+##   own height so it can't show losing more than currently in stock. Shown
+##   any time there's a population to feed, since a meal is coming
+##   regardless of current rate - this is "how big a bite is coming," not
+##   "are you currently trending down."
+## - food_bar_overlay (green, just above the fill): still the old rate-based
+##   growth preview over FOOD_BAR_PREVIEW_SECONDS - production genuinely is
+##   still continuous, so this half of the original design is still valid.
+##   Only shown when the rate is positive; hidden otherwise rather than
+##   trying to also express a negative rate here (that's what the meal
+##   warning band is for now).
+func _update_food_bar() -> void:
+	var capacity := GameState.storage_capacity
+	var total := GameState.get_total_food()
+	var frame_size := food_bar_frame.size
+	var fill_frac := clampf(total / capacity, 0.0, 1.0) if capacity > 0.0 else 0.0
+	var fill_height := frame_size.y * fill_frac
+	food_bar_fill.position = Vector2(0.0, frame_size.y - fill_height)
+	food_bar_fill.size = Vector2(frame_size.x, fill_height)
+
+	var meal_cost := GameState.FOOD_PER_CITIZEN_PER_MEAL * GameState.population_count
+	if meal_cost > 0.0 and capacity > 0.0:
+		var warning_frac := clampf(meal_cost / capacity, 0.0, fill_frac)
+		var warning_height := warning_frac * frame_size.y
+		food_bar_meal_warning.visible = true
+		food_bar_meal_warning.color = FOOD_BAR_MEAL_WARNING_COLOR
+		food_bar_meal_warning.position = Vector2(0.0, frame_size.y - fill_height)
+		food_bar_meal_warning.size = Vector2(frame_size.x, warning_height)
+	else:
+		food_bar_meal_warning.visible = false
+
+	var rate := GameState.get_food_income_per_minute()
+	if rate <= 0.0:
+		food_bar_overlay.visible = false
+	else:
+		var projected_total := clampf(total + rate * (FOOD_BAR_PREVIEW_SECONDS / 60.0), 0.0, capacity)
+		var projected_frac := clampf(projected_total / capacity, 0.0, 1.0) if capacity > 0.0 else 0.0
+		var band_height := (projected_frac - fill_frac) * frame_size.y
+		food_bar_overlay.visible = band_height > 0.0
+		food_bar_overlay.color = FOOD_BAR_GAIN_COLOR
+		food_bar_overlay.position = Vector2(0.0, frame_size.y - fill_height - band_height)
+		food_bar_overlay.size = Vector2(frame_size.x, band_height)
+
+	food_bar_value.text = "%d/%d" % [total, capacity]
+
+
 func _on_food_button_pressed() -> void:
 	_food_expanded = not _food_expanded
 	food_breakdown.visible = _food_expanded
@@ -173,6 +271,7 @@ func _refresh_rates() -> void:
 	for resource_name in _resource_labels:
 		_update_label_text(resource_name)
 	_update_food_display()
+	_update_food_bar()
 
 
 func _punch(resource_name: String) -> void:
@@ -216,6 +315,7 @@ func _on_storage_capacity_changed(_capacity: float) -> void:
 	for resource_name in _resource_labels:
 		_set_display(resource_name, _displayed[resource_name])
 	_update_food_display()
+	_update_food_bar()
 
 
 ## Called directly by Base after each happiness tick, rather than through a
@@ -230,3 +330,21 @@ func set_happiness(average: float, band_name: String) -> void:
 	happiness_label.scale = PUNCH_SCALE
 	var tween := create_tween()
 	tween.tween_property(happiness_label, "scale", Vector2.ONE, 0.2).set_ease(Tween.EASE_OUT)
+
+
+## Called directly by Base on DayNightCycle.day_started/night_started (and
+## once at boot/load to snap to whatever phase was restored) - same direct-
+## call shape as set_happiness above, since Base is what actually listens to
+## the autoload's signals.
+func set_day_label(day: int, is_day: bool) -> void:
+	day_label.text = "Day %d - %s" % [day, "Day" if is_day else "Night"]
+	day_label.scale = PUNCH_SCALE
+	var tween := create_tween()
+	tween.tween_property(day_label, "scale", Vector2.ONE, 0.2).set_ease(Tween.EASE_OUT)
+
+
+## Called directly by Base whenever the fast-forward multiplier changes
+## (button click or +/- keys - see Base._apply_speed) - same direct-call
+## shape as set_happiness/set_day_label above.
+func set_speed_label(multiplier: float) -> void:
+	speed_button.text = "Speed: %sx" % (str(int(multiplier)) if multiplier == floor(multiplier) else str(multiplier))

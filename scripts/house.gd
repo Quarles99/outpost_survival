@@ -12,7 +12,14 @@ signal clicked
 ## UPGRADE_CAPACITY_BONUS extra population capacity - see
 ## Base._on_house_clicked for the actual spend/grant flow (kept there, not
 ## here, since only Base/GameState know whether the player can afford it).
-const UPGRADE_COST := {"stone": 15.0}
+## Raw stone dropped entirely in favor of brick (explicit correction - an
+## upgraded ("stone") house should be built from worked brick, not the raw
+## ore itself) plus wood, so a Stone Mine -> Brickmaker chain becomes a real
+## prerequisite for upgrading a House, per the stone-brick backlog item
+## ("used for upgraded houses, brewery, mill, and other advanced buildings").
+## Wood raised 15.0 -> 20.0 via Outpost_Survival/Balance.md's edit-and-hand-
+## back workflow.
+const UPGRADE_COST := {"brick": 10.0, "wood": 20.0}
 const UPGRADE_CAPACITY_BONUS := 2
 
 @onready var label: Label = $Label

@@ -4,65 +4,44 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 
 ## Implemented
 
-**Save & load.** Local save/load (see [controls.md](controls.md) for `F5`/`F9`, or the in-game System Menu) covering resources, population, water access, storage capacity, every tree, every player-placed building, workstation buffers, and each citizen's skill progress and current job. 3 numbered local slots (see Main menu below), no cloud sync yet.
-
-**Realistic travel & labor.** Gathering is no longer instant/passive — citizens physically walk to workstations and haul goods to and from the stockpile (the Outpost Hall), with buffered output/input and per-post carry limits. Movement and work speed were deliberately slowed to read as "slow but consistent" rather than twitchy. Trees are a shared, sustainably-managed resource (Lumber Camps replant toward an area-wide target) rather than a one-time deposit. Idle citizens double as general haulers, picking whichever job (an output pickup or an input delivery) moves the most material across every workstation, with overshoot protection when multiple haulers converge on the same starved post. See [mechanics.md](mechanics.md#gathering--hauling) for the full loop.
-
-**Water resource.** A Well (built from stone + wood) grants unlimited water access rather than a depletable stockpile — the game just tracks whether water is available, not an amount. Not consumed by anything yet; the planned Happiness system below is what will eventually care whether a settlement has water.
-
-**Stone resource.** A Stone Mine produces stone with no input requirement, using the same generic produce-and-haul loop as any simple gatherer. Nothing costs stone except the Well and Storage Facility yet — a proper stone-consuming building lineup (walls, upgrades) is still to come.
-
-**Storage facility.** Resources are now capped (they weren't before) — each resource type independently caps at a shared "storage capacity" value, 30 by default even with no facilities built. A Storage Facility adds +30 more, and multiple can be built for cumulative capacity. Overflow past capacity is lost rather than refunded, which is an intentional consequence of the cap existing, not a bug. Not yet upgradeable in place (build another facility instead) — that needs a building-selection interaction that doesn't exist for passive structures yet.
-
-**Alternative crop types.** The full grain→flour→bread and hops→beer refinement chains, plus fruit and potato as simple no-input crops, are all buildable now (Grain Farm, Mill, Bakery, Hops Farm, Brewery, Fruit Orchard, Potato Farm — see [stats.md](stats.md#workstation-production) for the full chain). Rather than seven new subclasses, the `Farm` class was generalized into a configurable single-input/single-output converter that all seven (and the original wood→food Farm) share. Bread, potato, and fruit count toward hunger like plain food does; grain, flour, hops, and beer are intermediate/luxury goods that don't feed anyone directly — beer specifically is reserved for the happiness system below. The 7 new resource types aren't individually shown on the HUD yet (only Food/Wood/Stone/Water have rows there) — they're fully functional, just not surfaced in the compact corner panel.
-
-**Happiness system.** Each citizen has individual happiness (0–100) that eases toward a target recomputed from water access, food stock, and food variety, rather than jumping instantly. Settlement happiness (shown on the HUD) is the average across all citizens. A citizen whose happiness stays below threshold for a sustained stretch leaves the settlement for good — the game's first mechanic where a resource shortfall costs more than stalled production. This is what finally makes the Well's water access and food variety matter mechanically. See [mechanics.md](mechanics.md#happiness).
-
-**Citizen recruitment.** Clicking the Outpost Hall offers 3 candidates, each with a different randomly-chosen specialization pre-trained to a head-start level; recruiting spends food and requires an open House slot. The starting 3 citizens (Aldric, Brenna, Cass) are no longer the whole game's roster — the town can now grow. See [mechanics.md](mechanics.md#citizen-recruitment).
-
-**Resource income/minute.** The HUD's Food/Wood/Stone rows now show a rolling net income-per-minute rate alongside the current amount, computed from a trailing 60-second window of resource-pool snapshots so bursty haul-trip deposits read as a steady rate.
-
-**Condensed build menu.** The build menu is now a grid of square buttons with small keybind numbers, instead of a vertical list of full-width text buttons. Each square is a solid color (the building's own tint, or a neutral default) with its name in bold centered text — an earlier version used the building's actual in-world sprite as an icon, but most buildings share one generic silhouette differing only by tint, and shrinking any of the art down to button size read as an illegible smudge; the name is now the one thing that reliably identifies a building at a glance. Hover a button for its full name and cost. Applies identically to the crop-retooling panel (see below).
-
-**Larger map.** The playable grid is now 28×28 tiles (784 total), 4x the original 14×14 — a pure data change, since bounds/camera limits were already computed dynamically from the ground's size.
-
-**Speed and strength skills.** Two universal skills every citizen trains passively regardless of assignment — speed from moving, strength from completing haul trips. Speed multiplies movement speed; strength multiplies how much a citizen can carry per trip beyond a workstation's base carry limit. Visible in the per-citizen skill panel (see below). See [mechanics.md](mechanics.md#skills--leveling).
-
-**Happiness bonuses/debuffs.** Settlement happiness now falls into one of four named bands (Thriving/Content/Unhappy/Miserable, shown on the HUD) each applying a flat production multiplier (1.15x down to 0.6x) on top of every worker's own skill multiplier — the game's first happiness effect beyond "leave if sustained low." See [mechanics.md](mechanics.md#happiness).
-
-**Per-farm crop selection.** Any placed Farm-family building can be clicked to retool it into any other Farm-family recipe, free and instant, without disturbing an assigned worker or the building's footprint. See [mechanics.md](mechanics.md#building--placement).
-
-**Worker caps.** Every Workstation now caps out at 1 assigned worker (Wall Segments already capped at 1; Outpost Hall/Storage Facility stay at 10) - down from an earlier 3-worker default. See [mechanics.md](mechanics.md#gathering--hauling).
-
-**Task list removed, skill panel added.** Clicking a citizen no longer opens a menu of assignable posts - it selects them and opens a panel of all their skill levels instead. Assignment is now drag-and-drop, or click-citizen-then-click-post (denied with a message if that post is full); clicking an already-selected citizen again unassigns them. See [mechanics.md](mechanics.md#assigning-citizens).
-
-**Main menu with save/load UI.** The game now boots into a main menu (Continue / New Game / Load Game / Quit) instead of straight into the base, with 3 numbered save slots shown with their timestamp and population instead of one hidden fixed file. In-game, a new System Menu (`Esc`, or the HUD's Menu button) offers Save/Load/Main Menu/Quit alongside the existing `F5`/`F9` shortcuts. See [mechanics.md](mechanics.md#main-menu--saveload) and [controls.md](controls.md).
-
-**Distinct crop-chain skills.** Grain/Hops/Fruit/Potato farming trains "farming," but Mill/Bakery/Brewery each train their own distinct skill (milling/baking/brewing) - briefly unified into one "farming" skill and then reverted, since those refinement trades aren't really farming. See [mechanics.md](mechanics.md#skills--leveling).
-
-**Water farming bonus.** Any Farm-family building produces 25% more output for the same input cost once at least one Well is built. See [mechanics.md](mechanics.md#resources).
-
-**Multi-stockpile hauling.** A Storage Facility is now a real drop-off/pickup point for haulers, not just a storage-capacity bump - haul trips go to whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest, so building one near a cluster of workstations actually shortens their trips. See [mechanics.md](mechanics.md#gathering--hauling).
-
-**Explicit hauler assignment.** The Outpost Hall and any Storage Facility can now be dragged onto (or clicked while a citizen is selected) to explicitly assign that citizen as a hauler - the same logistics work an unassigned citizen already does automatically, now a deliberate, capped, savable assignment instead of only ever an implicit fallback. See [mechanics.md](mechanics.md#assigning-citizens).
-
-**Citizen position persists across save/load**, a blocked dedicated worker now assists hauling elsewhere instead of idling, and skill levels are a real efficiency gain (same input, more output) rather than just more throughput. See [mechanics.md](mechanics.md#saving--loading) and [mechanics.md](mechanics.md#gathering--hauling).
-
-**Resizable game window.** The window can now be resized/scale to different resolutions without stretching or distorting the image - see [stats.md](stats.md).
-
-**Minimal starting buildings.** Only the Outpost Hall starts built now - no fixed Cabbage Farm or Lumber Camp. Starting resources still comfortably afford building a Lumber Camp right away.
-
-**Live worker-slot labels.** Every post's status label now shows filled/max occupancy (e.g. "Lumber Camp 1/1"), updating immediately on assignment/unassignment, alongside the drop to a 1-worker default cap above. See [mechanics.md](mechanics.md#gathering--hauling).
-
-**Floating gather feedback.** Every production tick now spawns a small "+1.2 Food  +4 xp" text that floats up and fades at the worker's feet - minimal, one line, no screen clutter even with several citizens working. See [mechanics.md](mechanics.md#gathering--hauling).
-
-**House upgrade.** A placed House can now be clicked for a one-time stone-funded upgrade (+2 more population capacity on top of its base +2), persisted through save/load. See [mechanics.md](mechanics.md#population--housing).
-
-**Skill titles.** Every citizen now carries an earned title below their name (Apprentice → Journeyman → Master → Grandmaster → Legendary, paired with whichever job skill they've trained highest, e.g. "Master Lumberjack"). See [mechanics.md](mechanics.md#skills--leveling).
-
-**Crop-chain art fix.** Every Alternative Crop Type (Grain Farm, Mill, Bakery, Hops Farm, Brewery, Fruit Orchard, Potato Farm) now actually displays the Cabbage Farm's building art, tinted per its existing catalog color, instead of a tiny mis-proportioned placeholder icon. See [stats.md](stats.md#buildings).
-
-**Automatic job assignment.** Manual assignment (click/drag a citizen onto a post) is gone entirely - every citizen now automatically takes whichever job post trains the job skill they're currently best at, with a new citizen displacing a weaker incumbent on arrival and a citizen with no matching open post hauling instead until one opens up. Any job post can be right-clicked to temporarily disable it, evicting its worker on the spot. The unrelated, never-actually-used Wall Segment/Gate/corner defender system (dead code, never instantiated in any real game) was removed at the same time, along with the Outpost Hall/Storage Facility's old explicit-hauler-assignment option. See [mechanics.md](mechanics.md#assigning-citizens).
+- **Save & load.** 3 numbered local slots, no cloud sync. Covers resources, population, water, storage, trees, buildings, workstation buffers, and each citizen's skills/job. See [mechanics.md](mechanics.md#main-menu--saveload).
+- **Realistic travel & labor.** Citizens physically walk and haul rather than gathering instantly; trees are sustainably managed, not a one-time deposit; idle citizens double as general haulers. See [mechanics.md](mechanics.md#gathering--hauling).
+- **Water resource.** A Well grants unlimited access rather than a depletable stockpile - tracked as available/not. See [mechanics.md](mechanics.md#resources).
+- **Stone resource.** Mined with no input requirement; currently only spent on the Well and Storage Facility.
+- **Storage facility.** Resources are capped per-type; a facility raises the cap. Overflow is lost, not refunded. See [stats.md](stats.md#resource-storage).
+- **Alternative crop types.** Full grain→flour→bread and hops→beer chains, plus fruit/potato as no-input crops - all share one generalized converter class. See [stats.md](stats.md#workstation-production).
+- **Happiness system.** Per-citizen happiness eases toward a target from water/food/variety; sustained low happiness costs a citizen permanently. See [mechanics.md](mechanics.md#happiness).
+- **Citizen recruitment.** Outpost Hall offers 3 candidates with pre-trained specializations, costing food. See [mechanics.md](mechanics.md#citizen-recruitment).
+- **Resource income/minute.** HUD rows show a rolling net rate alongside the current amount.
+- **Condensed build menu.** Numbered grid of solid-color, tinted buttons instead of a full-width list; applies to the crop-retool panel too.
+- **Larger map.** 28×28 tiles, 4x the original size.
+- **Speed and strength skills.** Passive, trained regardless of assignment - speed from moving, strength from hauling. See [mechanics.md](mechanics.md#skills--leveling).
+- **Happiness bonuses/debuffs.** Four named bands apply a flat production multiplier on top of skill. See [mechanics.md](mechanics.md#happiness).
+- **Per-farm crop selection.** Any Farm-family building can be retooled into another recipe, free and instant. See [mechanics.md](mechanics.md#building--placement).
+- **Worker caps.** Every Workstation caps at 1 assigned worker.
+- **Skill panel.** Clicking a citizen opens a view-only skill panel instead of an assignment menu (assignment is now fully automatic). See [mechanics.md](mechanics.md#assigning-citizens).
+- **Main menu with save/load UI.** Boots into a menu (Continue/New Game/Load Game/Quit); in-game System Menu offers the same slot picker. See [controls.md](controls.md).
+- **Distinct crop-chain skills.** Mill/Bakery/Brewery each train their own skill rather than sharing "farming." See [mechanics.md](mechanics.md#skills--leveling).
+- **Water farming bonus.** Farm-family output +25% once a Well is built. See [stats.md](stats.md#water-farming-bonus-character).
+- **Multi-stockpile hauling.** Any Storage Facility is a real drop-off/pickup point, not just a capacity bump - haul trips go to the nearest one. See [mechanics.md](mechanics.md#gathering--hauling).
+- **Resizable game window.** Scales without stretching or distorting. See [stats.md](stats.md#display-projectgodot).
+- **Minimal starting buildings.** Only the Outpost Hall starts built.
+- **Live worker-slot labels.** Every post shows filled/max occupancy, updating immediately. See [mechanics.md](mechanics.md#gathering--hauling).
+- **Floating gather feedback.** A brief "+1.2 Food +4 xp" text floats at the worker's feet each production tick.
+- **House upgrade.** One-time stone/brick-funded upgrade for +2 more population capacity. See [mechanics.md](mechanics.md#population--housing).
+- **Skill titles.** Every citizen carries an earned title (Apprentice→Legendary, paired with their best job skill). See [mechanics.md](mechanics.md#skills--leveling).
+- **Automatic job assignment.** Manual assignment is gone - citizens auto-take the best-matching open post, displacing a weaker incumbent on arrival; any post can be right-click disabled. See [mechanics.md](mechanics.md#assigning-citizens).
+- **Combat training buildings.** Barracks/Archery Range/Mage Tower train melee_combat/archery/spellcasting exactly like any other job post (no input/output, pure time-worked xp). See [mechanics.md](mechanics.md#skills--leveling).
+- **Battle deployment.** The HUD's "Simulate Attack" button deploys every citizen assigned to a combat-training building into the Battle Test sandbox, using their real trained skill level, against a generated enemy raiding party - town state is preserved and restored around the fight, and a citizen who dies doesn't come home. Still a manual trigger, not a real raid/siege system - see [mechanics.md](mechanics.md#battle-deployment).
+- **Day/night cycle.** A background clock (8-minute day, 4-minute night) with a HUD counter and a world tint - foundation for food consumption/work-schedule mechanics down the line, not wired to either yet. Currently drives one real mechanic: recruiting is capped to once per day. See [mechanics.md](mechanics.md#day--night).
+- **Slower pace + fast forward.** Citizen movement and work both run at half their original speed, with food consumption halved to match so the economy stays in balance; a HUD Speed button (or `+`/`-`) cycles 1x/2x/4x to compress that back down. See [mechanics.md](mechanics.md#fast-forward).
+- **Early-game pace via gathering.** Starting wood only covers a Lumber Camp - the first Cabbage Farm and House both have to be earned through real wood gathering rather than affordable on turn one. Originally tuned so a first House lands roughly a third to halfway through Day 1; building costs and the Lumber Camp's own gather rate have both since moved via [[Balance]] edits, not re-verified against that target since. See [mechanics.md](mechanics.md#building--placement).
+- **Periodic meal consumption.** Food upkeep is now two flat meals per day/night cycle (dawn and dusk) instead of a continuous per-second drain, tied to the day/night clock. See [mechanics.md](mechanics.md#population--housing).
+- **Food bar (HUD).** A vertical fill-bar alternative to the text Food row, with a red overlay showing the next meal's exact cost and a green overlay previewing the next 30 seconds of production gain. See [mechanics.md](mechanics.md#resources).
+- **Output-scaled xp.** Resource-production actions now grant xp proportional to output instead of a flat amount, with the xp curve's own requirements scaled to match so level-up pacing is unchanged. See [mechanics.md](mechanics.md#skills--leveling).
+- **Combat-building recruits.** A built Barracks/Archery Range/Mage Tower each offer one additional recruit per day, pre-trained in that building's own combat skill, on an independent cooldown from the Outpost Hall's - each capped at one built at a time. See [mechanics.md](mechanics.md#citizen-recruitment).
+- **Military building unit cap.** Barracks/Archery Range/Mage Tower each start with a worker cap of 3 (rather than the usual 1) and can be repeatedly upgraded with brick for +3 more each time, uncapped. See [stats.md](stats.md#military-building-unit-cap-trainingground-base).
+- **Town pathfinding.** Citizens navigate around buildings/trees via `NavigationAgent2D`, the same system the Battle Test sandbox uses - the navmesh re-bakes on every building/tree change. See [mechanics.md](mechanics.md#pathfinding).
 
 ## Planned Next (from `Implement_Next.txt`)
 
@@ -73,7 +52,7 @@ Nothing is currently queued - every item in `Implement_Next.txt` has been implem
 From the original design notes (`Outpost Survival Game Ideas`) — not scheduled, but the direction the game is meant to grow toward:
 
 - A large explorable world with multiple possible base sites, not just the single fixed base that exists today.
-- Recruiting citizens with varied skills (today's 3 citizens are fixed and functionally identical aside from independently-trained skill levels — citizen recruitment above is the first step toward this).
+- Recruiting citizens with varied skills (today's 3 starting citizens are functionally identical aside from independently-trained levels).
 - Securing off-base resources on the wider map as supplemental income.
 - A simulated world economy, and other settlements to befriend or destroy.
 - Import/export via armed caravans — trade is deliberately risky given a dangerous world.

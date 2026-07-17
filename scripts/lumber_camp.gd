@@ -12,8 +12,13 @@ class_name LumberCamp
 ## a freshly-assigned worker starts topping the forest up right away rather
 ## than only once heavy chopping has thinned it out.
 @export var optimal_tree_count: int = 16
+## Halved 2.0 -> 1.0, then raised back 1.0 -> 2.0, via Outpost_Survival/
+## Balance.md's edit-and-hand-back workflow.
 @export var wood_per_chop: float = 2.0
-@export var chop_interval: float = 1.2
+## Doubled from 1.2 alongside Workstation.work_interval, per an explicit
+## request to halve work pace across the board; nudged 2.4 -> 2.0 via
+## Outpost_Survival/Balance.md's edit-and-hand-back workflow.
+@export var chop_interval: float = 2.0
 
 
 func get_skill_id() -> String:

@@ -19,6 +19,13 @@
 | Middle-mouse hold + drag | Pan camera |
 | Move cursor to screen edge | Pan camera continuously ("edge scroll") |
 
+## Fast Forward
+
+| Input | Action |
+|---|---|
+| Click the **Speed** button (HUD) | Cycle 1x → 2x → 4x → back to 1x |
+| `+`/`-` | Same cycle, one step at a time |
+
 ## Citizens
 
 Job assignment is fully automatic — there's no way to manually assign a citizen anymore (see [mechanics.md](mechanics.md#assigning-citizens)). Clicking a citizen is purely informational.
@@ -40,8 +47,10 @@ Job assignment is fully automatic — there's no way to manually assign a citize
 | Input | Action |
 |---|---|
 | Left-click the Outpost Hall | Open the recruitment panel (3 candidates) |
+| Left-click a built Barracks/Archery Range/Mage Tower | Open a panel offering Recruit (a single candidate in that building's own combat skill, on its own independent once-per-day cooldown) and Upgrade (spend brick to raise that building's unit cap by 3) |
 | `1`–`3` (with recruitment panel open) | Recruit the corresponding candidate |
-| Left-click empty ground, or Esc | Close the recruitment panel |
+| `1`/`2` (with a training building's Recruit/Upgrade panel open) | Choose the corresponding option |
+| Left-click empty ground, or Esc | Close whichever panel is open |
 
 ## Building
 
@@ -62,6 +71,15 @@ Job assignment is fully automatic — there's no way to manually assign a citize
 | Right-click an already-placed Farm-family building | Toggle it disabled/re-enabled (see Disabling a post above) — doesn't open the retool panel |
 | `1`–`9` (with the retool panel open) | Choose the corresponding recipe |
 | Left-click empty ground, or Esc | Close the retool panel |
+
+## Battle Deployment
+
+| Input | Action |
+|---|---|
+| Click the **Simulate Attack** button (HUD) | Deploy every citizen currently assigned to a Barracks/Archery Range/Mage Tower as a squad against a generated enemy raiding party (see [mechanics.md](mechanics.md#battle-deployment)) — no-op with a flashed warning if no citizen is currently stationed at one |
+| `R` (in the battle scene) | Restart the current fight with the same deployed squad against a freshly generated enemy |
+| `+`/`-` (in the battle scene) | Battle speed (0.5x–16x) |
+| Esc (in the battle scene) | Return to the settlement, applying the battle's outcome |
 
 ## System Menu (in-game)
 

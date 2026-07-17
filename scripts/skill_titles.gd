@@ -1,21 +1,29 @@
 extends RefCounted
 class_name SkillTitles
 
-## Only the six job skills earn a title - speed/strength train passively
-## just by existing (see character.gd's doc comments on them) rather than
-## representing a trade, so there's no natural "job noun" to pair a tier
-## word with (compare SKILL_LABELS in skill_panel.gd, which does show all
-## eight for the raw stats sheet).
-const TITLE_SKILLS := ["farming", "lumberjacking", "mining", "milling", "baking", "brewing", "construction"]
+## Eleven job skills earn a title now - the original eight trades plus the
+## three combat skills trained at a TrainingGround (Barracks/Archery Range/
+## Mage Tower - see training_ground.gd) - speed/strength still train
+## passively just by existing (see character.gd's doc comments on them)
+## rather than representing a trade, so there's no natural "job noun" to
+## pair a tier word with (compare SKILL_LABELS in skill_panel.gd, which does
+## show all skills for the raw stats sheet). Being in TITLE_SKILLS is also
+## what makes Base._job_posts()/_run_job_assignment treat a TrainingGround
+## as a normal assignable post, same as any other job.
+const TITLE_SKILLS := ["farming", "lumberjacking", "mining", "masonry", "milling", "baking", "brewing", "construction", "melee_combat", "archery", "spellcasting"]
 
 const JOB_NOUNS := {
 	"farming": "Farmer",
 	"lumberjacking": "Lumberjack",
 	"mining": "Miner",
+	"masonry": "Mason",
 	"milling": "Miller",
 	"baking": "Baker",
 	"brewing": "Brewer",
 	"construction": "Builder",
+	"melee_combat": "Soldier",
+	"archery": "Archer",
+	"spellcasting": "Mage",
 }
 
 ## [min_level, tier name] pairs, ascending - level 99 (SkillCurve.MAX_LEVEL)

@@ -14,13 +14,26 @@ const MULTIPLIER_PER_LEVEL := 0.02
 static var _xp_table: Array[float] = []
 
 
+## Each level's raw RuneScape-curve delta is scaled by multiplier_for_level
+## before accumulating - per an explicit request that xp *required* scale up
+## at the same rate xp *granted* now does (see Character.XP_PER_RESOURCE_UNIT,
+## which grants xp proportional to a worker's own output, itself already
+## scaled by this same multiplier). Without this, a worker's growing output
+## multiplier would grant more xp per action every level while the
+## requirement stayed fixed, snowballing level-up speed on top of the
+## output bonus itself. With it, that per-level growth factor cancels out of
+## "actions needed to clear a level" (both sides scale by the same amount),
+## leaving the underlying exponential curve shape - not the output
+## multiplier - as what actually governs how much slower level 90 is than
+## level 10, same as when xp was flat.
 static func _ensure_table() -> void:
 	if not _xp_table.is_empty():
 		return
 	_xp_table.append(0.0)
 	var points := 0.0
 	for level in range(1, MAX_LEVEL):
-		points += floor(level + 300.0 * pow(2.0, level / 7.0))
+		var raw_delta: float = floor(level + 300.0 * pow(2.0, level / 7.0))
+		points += raw_delta * multiplier_for_level(level)
 		_xp_table.append(floor(points / 4.0))
 
 

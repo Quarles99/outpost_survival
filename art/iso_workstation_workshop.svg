@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="264" height="230" viewBox="0 0 264 230">
+  <!-- Shared 2x2 "specialist workshop" silhouette for Mill/Bakery/Brewery -
+       a squat, flat-roofed industrial shed (stone base, low shed roof,
+       chimney + smoke, stacked barrels out front) distinct from both the
+       Cabbage Farm's flat tilled-soil plot and the House's peaked-roof
+       home. All three buildings share this one art asset, distinguished
+       only by sprite_tint (same pattern the old CropStation.tscn used) -
+       a real bespoke pass per building is the separate "Unique art for
+       every building" backlog item, not this one. -->
+
+  <!-- drop shadow: offset down-right of the footprint per the dimetric
+       lighting convention (~8% width right, ~4-5% height down) -->
+  <ellipse cx="141" cy="195" rx="76" ry="17" fill="#000000" opacity="0.32"/>
+
+  <!-- walls: front corner points down to align with the grid, same 2x2
+       footprint geometry as iso_house.svg -->
+  <polygon points="132,185 4,121 4,66 132,130" fill="#5a5850" stroke="#171009" stroke-width="2.5"/>
+  <polygon points="132,185 260,121 260,66 132,130" fill="#38362f" stroke="#171009" stroke-width="2.5"/>
+
+  <!-- wide work-bay opening (stands in for a house's door/windows - a
+       workshop's whole front is a working face, not a small doorway) -->
+  <rect x="70" y="128" width="70" height="38" fill="#171410" stroke="#0f0c07" stroke-width="2"/>
+  <rect x="18" y="92" width="18" height="16" fill="#2a2620" stroke="#14110b" stroke-width="1.5"/>
+  <rect x="206" y="100" width="18" height="16" fill="#1c1a16" stroke="#14110b" stroke-width="1.5"/>
+
+  <!-- low single-ridge shed roof - flatter/stubbier than the House's
+       peaked roof, reading as more utilitarian -->
+  <polygon points="132,130 4,66 132,42" fill="#4a4840" stroke="#0f0c07" stroke-width="2.5"/>
+  <polygon points="132,130 260,66 132,42" fill="#302e28" stroke="#0f0c07" stroke-width="2.5"/>
+
+  <!-- chimney + smoke - a universal "kiln/oven/still fire" signifier
+       fitting Mill, Bakery, and Brewery alike -->
+  <polygon points="168,58 180,58 180,30 168,30" fill="#726a5c" stroke="#0f0c07" stroke-width="1.5"/>
+  <polygon points="180,58 186,54.5 186,26.5 180,30" fill="#26241e" stroke="#0f0c07" stroke-width="1.2"/>
+  <circle cx="176" cy="20" r="6" fill="#c9c4b8" opacity="0.5"/>
+  <circle cx="182" cy="10" r="8" fill="#c9c4b8" opacity="0.35"/>
+  <circle cx="190" cy="2" r="9" fill="#c9c4b8" opacity="0.22"/>
+
+  <!-- stacked barrels out front - a universal "goods being processed"
+       signifier, fitting flour sacks/bread/beer alike -->
+  <g stroke="#14110b" stroke-width="1.5">
+    <ellipse cx="50" cy="176" rx="14" ry="6" fill="#7a5230"/>
+    <rect x="36" y="152" width="28" height="24" fill="#8f6338"/>
+    <ellipse cx="50" cy="152" rx="14" ry="6" fill="#a3733f"/>
+    <ellipse cx="50" cy="164" rx="14" ry="4" fill="none" stroke="#5c3d20" stroke-width="1.2"/>
+  </g>
+</svg>

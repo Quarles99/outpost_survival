@@ -9,7 +9,7 @@ Player/design-facing documentation for the game, kept in sync with the implement
 
 ## What the game is right now
 
-A single-base isometric (2:1 dimetric) survival/builder. Three fixed citizens (Aldric, Brenna, Cass) can be assigned to gather wood (Lumber Camp), mine stone (Stone Mine), or grow food (Farm, which consumes wood), housed around a starting Outpost Hall that also serves as the stockpile — with Houses for population capacity, Wells for water access, and Storage Facilities for stockpile capacity. There's no combat, no world map, no recruitment, and no enemies yet — just the economic loop of gathering, hauling, consumption, and slow per-character skill growth. See [roadmap.md](roadmap.md) for what's coming next.
+A single-base isometric (2:1 dimetric) survival/builder. Citizens (3 to start, growing via recruitment) automatically staff Farm-family, Lumber Camp, Stone Mine, and Brickmaker posts around a starting Outpost Hall, which also serves as the stockpile — Houses raise population capacity, Wells grant water access, Storage Facilities raise stockpile capacity. There's no combat, no world map, and no enemies yet — just the economic loop of gathering, hauling, consumption, happiness, and per-citizen skill growth. See [roadmap.md](roadmap.md) for what's coming next.
 
 ## Keeping this up to date
 
