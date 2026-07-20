@@ -10,8 +10,8 @@ Drift also runs the other way - a value can get changed directly in code (playte
 
 | Knob                                 | Value | File:Line                                            | Notes                                                                                                                                          |
 | ------------------------------------ | ----- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Starting cabbage                     | 60    | `autoload/game_state.gd` `DEFAULT_RESOURCES`         | The very first meal (36.0 for 3 citizens) now exceeds this outright - see Economy - Food Consumption below                                     |
-| Starting wood                        | 50    | `autoload/game_state.gd` `DEFAULT_RESOURCES`         | Covers Lumber Camp only - Farm/House must be gathered for, see Construction section                                                            |
+| Starting cabbage                     | 100   | `autoload/game_state.gd` `DEFAULT_RESOURCES`         | Comfortably covers the very first meal (36.0 for 3 citizens) - see Economy - Food Consumption below                                            |
+| Starting wood                        | 50    | `autoload/game_state.gd` `DEFAULT_RESOURCES`         | Covers a Lumber Camp (25 wood) with 25 to spare - Farm/House must be gathered for, see Construction section                                    |
 | Starting population / capacity       | 3     | `autoload/game_state.gd:66` `DEFAULT_POPULATION`     |                                                                                                                                                |
 | Base storage capacity (per resource) | 1000  | `autoload/game_state.gd:84` `BASE_STORAGE_CAPACITY`  | Raised via a direct code edit (bypassing this doc's usual edit-and-hand-back flow) - reconciled here after the fact, see [[Balance Changelog]] |
 | Income rate sample window            | 60.0s | `autoload/game_state.gd:106` `INCOME_WINDOW_SECONDS` | HUD's "X/min" readout                                                                                                                          |
@@ -75,7 +75,7 @@ All three are real feature work, not numeric tuning - say the word if you want a
 
 | Knob                             | Value        | File:Line                                       | Notes                                                                                                                                                           |
 | -------------------------------- | ------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Citizen move speed               | 65 px/s      | `scripts/character.gd:18` `MOVE_SPEED`          | Halved this session from 140.0                                                                                                                                  |
+| Citizen move speed               | 70 px/s      | `scripts/character.gd:18` `MOVE_SPEED`          | Halved this session from 140.0                                                                                                                                  |
 | Min/max move duration            | 0.6s / 20.0s | `scripts/character.gd:19-20`                    | Clamps a haul/walk trip's tween duration                                                                                                                        |
 | Default work cycle interval      | 6.0s         | `scripts/workstation.gd:78` `work_interval`     | Per-catalog-entry override possible - Fruit Orchard's own explicit override scales alongside this default to stay 2x slower (see Building Costs & Output above) |
 | Carry limit (haul size)          | 10           | `scripts/workstation.gd:66` `carry_limit`       | Scaled by hauler's strength skill multiplier                                                                                                                    |
@@ -95,7 +95,7 @@ All three are real feature work, not numeric tuning - say the word if you want a
 
 | Knob | Value | File:Line | Notes |
 |---|---|---|---|
-| Speed multipliers | 1x / 2x / 4x | `scripts/base.gd:47` `SPEED_MULTIPLIERS` | Cycled by HUD Speed button / `+`/`-` |
+| Speed multipliers | 1x / 2x / 4x | `scripts/base.gd:60` `SPEED_MULTIPLIERS` | Cycled by HUD Speed button / `+`/`-` |
 
 ## Happiness
 
@@ -110,7 +110,7 @@ All three are real feature work, not numeric tuning - say the word if you want a
 | Bonus per food-variety type stocked     | +5.0                                                                          | `scripts/base.gd:140` `HAPPINESS_PER_FOOD_VARIETY` |                                    |
 | Unhappy threshold                       | 15                                                                            | `scripts/base.gd:144` `UNHAPPY_THRESHOLD`          | Below this counts toward departure |
 | Ticks unhappy before a citizen leaves   | 12                                                                            | `scripts/base.gd:147` `LEAVE_AFTER_UNHAPPY_TICKS`  | At 5.0s/tick = 60s sustained       |
-| Happiness bands (production multiplier) | Thriving 80+ ×1.15 / Content 50+ ×1.0 / Unhappy 20+ ×0.85 / Miserable 0+ ×0.6 | `scripts/base.gd:158` `HAPPINESS_BANDS`            |                                    |
+| Happiness bands (production multiplier) | Thriving 80+ ×1.15 / Content 50+ ×1.0 / Unhappy 20+ ×0.85 / Miserable 0+ ×0.6 | `scripts/base.gd:191` `HAPPINESS_BANDS`            |                                    |
 
 ## Citizen Recruitment
 
@@ -124,16 +124,16 @@ All three are real feature work, not numeric tuning - say the word if you want a
 
 | Knob                        | Value               | File:Line                                              | Notes                                                           |
 | --------------------------- | ------------------- | ------------------------------------------------------ | --------------------------------------------------------------- |
-| Base unit cap               | 2                   | `scripts/training_ground.gd:88` `BASE_UNIT_CAP`        | Overrides Workstation's usual 1-worker cap                      |
-| Unit cap gained per upgrade | 2                   | `scripts/training_ground.gd:89` `UNIT_CAP_PER_UPGRADE` |                                                                 |
-| Upgrade cost                | 100 wood + 50 brick | `scripts/training_ground.gd:90` `UPGRADE_COST`         | Flat per upgrade, repeatable/uncapped - not yet scaled by level |
+| Base unit cap               | 3                   | `scripts/training_ground.gd:88` `BASE_UNIT_CAP`        | Overrides Workstation's usual 1-worker cap                      |
+| Unit cap gained per upgrade | 3                   | `scripts/training_ground.gd:89` `UNIT_CAP_PER_UPGRADE` |                                                                 |
+| Upgrade cost                | 25 brick            | `scripts/training_ground.gd:90` `UPGRADE_COST`         | Flat per upgrade, repeatable/uncapped - not yet scaled by level |
 
 ## Skill Curve (all job/combat skills)
 
 | Knob                        | Value | File:Line                                          | Notes              |
 | --------------------------- | ----- | -------------------------------------------------- | ------------------ |
 | Max level                   | 99    | `scripts/skill_curve.gd:10` `MAX_LEVEL`            |                    |
-| Output multiplier per level | 0.03  | `scripts/skill_curve.gd:12` `MULTIPLIER_PER_LEVEL` | ~2.96x at level 99 |
+| Output multiplier per level | 0.02  | `scripts/skill_curve.gd:12` `MULTIPLIER_PER_LEVEL` | ~2.96x at level 99 |
 
 ## Combat - Unit Stats (`scripts/combat/combat_unit.gd`)
 

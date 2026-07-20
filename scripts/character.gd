@@ -106,8 +106,10 @@ const CONSTRUCTION_MULTI_BUILDER_EXPONENT := 0.5
 ## combat/environment-themed, not farming/crafting-themed) rather than
 ## force-fitting an unrelated sound just to "replace everything" - see the
 ## "Implement Sounds from new sound pack" completion write-up for the full
-## per-building mapping and why select_chime.wav/assign_task.wav (pure UI
-## feedback, not diegetic action sounds) were left untouched too.
+## per-building mapping and why select_chime.wav (pure UI feedback, not a
+## diegetic action sound) was left untouched too. assign_task.wav/
+## AssignSound were removed outright per an explicit request - job
+## (re)assignment is silent now.
 const DEFAULT_GATHER_SOUNDS: Array[AudioStream] = [
 	preload("res://sound/resource_gain.wav"),
 ]
@@ -180,7 +182,6 @@ var current_task := "Idle"
 @onready var sprite: AnimatedSprite2D = $Sprite2D
 @onready var selection_outline: Sprite2D = $SelectionOutline
 @onready var select_sound: AudioStreamPlayer2D = $SelectSound
-@onready var assign_sound: AudioStreamPlayer2D = $AssignSound
 @onready var gather_sound: AudioStreamPlayer2D = $GatherSound
 @onready var level_up_sound: AudioStreamPlayer2D = $LevelUpSound
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
@@ -324,7 +325,6 @@ func assign_to(post: Node, grant_move_xp: bool = true) -> void:
 		_start_hauling()
 	_update_label()
 	_punch()
-	assign_sound.play()
 
 
 ## `grant_xp` is false only for Base._restore_characters' initial
@@ -454,9 +454,11 @@ func _gain_skill_xp(skill_id: String, amount: float) -> void:
 
 
 ## Dedicated LevelUpSound (Level_up_fireworks.ogg) rather than reusing
-## assign_sound the way this used to - that meant a level-up sounded
+## the old assign_sound (since removed) - a level-up used to sound
 ## identical to an ordinary job (re)assignment, with nothing distinguishing
-## the moment a citizen actually got better at their skill.
+## the moment a citizen actually got better at their skill. volume_db
+## halved (-6.0 -> -12.0 in Character.tscn) per an explicit request - the
+## sound read as too loud/prominent against everything else's -6.0 baseline.
 func _on_skill_level_up() -> void:
 	_punch()
 	_update_label()

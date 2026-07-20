@@ -110,3 +110,13 @@ Real tuning, not a doc correction this time - construction sped back up:
 - Labor required per material unit: 0.6 → 0.5
 - Minimum labor required (floor): 5.0 → 2.0
 - Starving penalty: doc previously showed the net effect (-20.0); corrected to show the actual constant (20.0, negated at its one call site)
+
+## 2026-07-20 (later)
+
+`tools/check_balance.py` flagged four more mismatches, all doc-stale rather than pending code changes (each already had an explanatory code comment recording the real value/reasoning) - [[Balance]] reconciled to match actual code, no code changed:
+- Citizen move speed: doc showed 65 px/s; actual code is 70.0 (140.0 halved, matching the row's own "Halved this session from 140.0" note)
+- Base unit cap: doc showed 2; actual code is 3 ("starting at 3 and increasing by 3 each time" per `training_ground.gd`'s own doc comment)
+- Unit cap gained per upgrade: doc showed 2; actual code is 3, same comment as above
+- Military building upgrade cost: doc showed 100 wood + 50 brick (House's upgrade cost, copy-pasted into the wrong row); actual code is 25 brick only, matching this file's own 2026-07-18 entry ("Military building upgrade cost: 10 brick → 25 brick")
+- Output multiplier per level: doc showed 0.03; actual code is 0.02 (the row's own "~2.96x at level 99" note already matched 0.02, not 0.03 - 1 + 98×0.02 = 2.96)
+- Starting cabbage: doc showed 60 (with backwards phrasing claiming the first meal "exceeds this outright"); actual code is 100.0, per `game_state.gd`'s own comment ("raised 30.0 -> 100.0, comfortably covering the very first meal"). Not caught by `check_balance.py` (`DEFAULT_RESOURCES` is a multi-key dict it can't diff) - found by manually re-checking the UNRESOLVED list against actual code.

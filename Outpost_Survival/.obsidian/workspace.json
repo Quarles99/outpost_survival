@@ -27,16 +27,58 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Actionable Ideas/Implement orc enemies present on the village map..md",
+                "file": "Game Systems/Balance.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Implement orc enemies present on the village map."
+              "title": "Balance"
+            }
+          },
+          {
+            "id": "993602b1cdf02a31",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Actionable Ideas/Add collisions to villagers so they can't stack up on the same spot.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Add collisions to villagers so they can't stack up on the same spot"
+            }
+          },
+          {
+            "id": "cca37cd06d8be191",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Actionable Ideas/Increase max zoom out level.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Increase max zoom out level"
+            }
+          },
+          {
+            "id": "7c197c0e18103c65",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Actionable Ideas/Increase max zoom out level.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Increase max zoom out level"
             }
           }
         ],
-        "currentTab": 1
+        "currentTab": 4
       }
     ],
     "direction": "vertical"
@@ -171,13 +213,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Actionable Ideas/Implement orc enemies present on the village map..md",
+                "file": "Actionable Ideas/Increase max zoom out level.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of Implement orc enemies present on the village map."
+              "title": "Outline of Increase max zoom out level"
             }
           }
         ],
@@ -198,28 +240,34 @@
       "bases:Create new base": false
     }
   },
-  "active": "3225adfc5596e98e",
+  "active": "7c197c0e18103c65",
   "lastOpenFiles": [
+    "Actionable Ideas/Add collisions to villagers so they can't stack up on the same spot.md",
+    "Docs/Balance Changelog.md.tmp.5943.4bfe5dd3f017",
+    "Game Systems/Balance.md.tmp.5943.56f55cc1d7f2",
+    "Actionable Ideas/Fix character stats sheet overflowing menu.md",
+    "Game Systems/Balance.md.tmp.5943.1f15e51f2d2d",
+    "Game Systems/Balance.md.tmp.5943.7e8618789df5",
+    "Actionable Ideas/Increase max zoom out level.md",
+    "Docs/Balance Changelog.md.tmp.5943.f91446770a35",
+    "Game Systems/Balance.md.tmp.5943.15cb232a8bf1",
+    "Game Systems/Balance.md.tmp.5943.80601b7ca904",
+    "Game Systems/Balance.md.tmp.5943.8943e48bac5b",
+    "Game Systems/Balance.md",
+    "Actionable Ideas/Implement New Art.md",
+    "Actionable Ideas/Implement orc enemies present on the village map..md",
     "Actionable Ideas/Completed/Expand map size 4x.md",
     "Actionable Ideas/Completed/Expand map size 4x.md.tmp.5943.3573ac5a84a4",
     "Docs/stats.md.tmp.5943.84f84d4ca075",
-    "feedback_consult_on_major_decisions.md.tmp.5943.6e413a038d35",
-    "Docs/stats.md.tmp.6571.47b165a98cb6",
     "Actionable Ideas/Completed/Replace the construction site sprite with a composite sprite made with current sprite packs.md",
-    "Actionable Ideas/Completed/Replace the construction site sprite with a composite sprite made with current sprite packs.md.tmp.6571.0d1a77c28dc3",
     "Actionable Ideas/Implement wolf enemies present on the village map..md",
-    "Actionable Ideas/Implement orc enemies present on the village map..md",
-    "Actionable Ideas/Implement New Art.md",
     "Actionable Ideas/Replace the construction site sprite with a composite sprite made with current sprite packs.md",
     "feedback_consult_on_major_decisions.md",
     "Actionable Ideas/Completed/Implement the ability to increase or decrease the desired amount of workers in a building between 0 and the maximum for that building.md",
-    "Actionable Ideas/Completed/Implement the ability to increase or decrease the desired amount of workers in a building between 0 and the maximum for that building.md.tmp.6571.1d290e292ef2",
     "Actionable Ideas/Implement the ability to increase or decrease the desired amount of workers in a building between 0 and the maximum for that building.md",
     "Actionable Ideas/Completed/Resource Consumption UI.md",
     "Actionable Ideas/Completed/Make the resource display consistent across all resources.md",
-    "Actionable Ideas/Completed/Make the resource display consistent across all resources.md.tmp.6571.bebdd668fc21",
     "Actionable Ideas/Completed/Mouseover tooltip system.md",
-    "Actionable Ideas/Completed/Mouseover tooltip system.md.tmp.6571.9bab1f19d29f",
     "Actionable Ideas/Completed/Allow multiple builders to work on one construction site at reduced effectiveness.md",
     "Actionable Ideas/Completed/Building click UI.md",
     "Actionable Ideas/Completed/Check balance sheet for adjustments.md",
@@ -229,14 +277,7 @@
     "Actionable Ideas/Completed/Maintain consistency on red shaded sprites when building location is invalid.md",
     "Actionable Ideas/Completed/New Icons.md",
     "Actionable Ideas/Mouseover tooltip system.md",
-    "Actionable Ideas/Make the resource display consistent across all resources.md",
-    "Game Systems/Balance.md",
-    "Actionable Ideas/Completed/Building click UI.md.tmp.192470.b2818b8c57aa",
-    "Actionable Ideas/Implement Sounds from new sound pack.md.tmp.192470.0f33a7ec33a0",
-    "Docs/Balance Changelog.md",
     "Art/items_sheet.png",
-    "Art/Food.png",
-    "Actionable Ideas/Fix bug with houses saying not enough stone to upgrade when you should have enough.md",
-    "Untitled 1.md"
+    "Art/Food.png"
   ]
 }
