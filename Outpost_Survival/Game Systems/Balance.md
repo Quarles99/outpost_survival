@@ -81,6 +81,8 @@ All three are real feature work, not numeric tuning - say the word if you want a
 | Carry limit (haul size)          | 10           | `scripts/workstation.gd:66` `carry_limit`       | Scaled by hauler's strength skill multiplier                                                                                                                    |
 | XP per gather/work tick          | 4.0          | `scripts/character.gd:33` `XP_PER_GATHER`       | Flat, not scaled by output                                                                                                                                      |
 | Speed-skill XP per second moving | 2.5          | `scripts/character.gd:96` `SPEED_XP_PER_SECOND` |                                                                                                                                                                 |
+| Citizen avoidance radius | 18 px | `scripts/character.gd:39` `AVOIDANCE_RADIUS` | RVO radius vs. other citizens, well under CollisionShape2D's 36px click-hitbox - new (Add collisions to villagers so they can't stack up on the same spot.md), first-pass, not tuned via playtesting |
+| Citizen avoidance neighbor distance / time horizon | 150 px / 1.5s | `scripts/character.gd:40-41` `AVOIDANCE_NEIGHBOR_DISTANCE`/`AVOIDANCE_TIME_HORIZON_AGENTS` | Pulled down from NavigationServer's crowd-sim defaults (500px/~20s), same reasoning as CombatUnit's own tuning above |
 
 ## Day / Night
 

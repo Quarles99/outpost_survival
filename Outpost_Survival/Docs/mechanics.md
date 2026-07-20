@@ -45,7 +45,7 @@ When several construction sites need the same resource at once and there isn't e
 
 ## Pathfinding
 
-Citizens route around buildings and trees rather than cutting through them - the same `NavigationAgent2D`-driven approach the Battle Test sandbox already used, ported to the settlement. The navmesh re-bakes automatically whenever a building is placed/completed or a tree is planted/harvested, so pathing always reflects the current layout. Unlike combat, citizens don't dodge each other while walking (no agent-vs-agent avoidance) - only the map's fixed obstacles.
+Citizens route around buildings and trees rather than cutting through them - the same `NavigationAgent2D`-driven approach the Battle Test sandbox already used, ported to the settlement. The navmesh re-bakes automatically whenever a building is placed/completed or a tree is planted/harvested, so pathing always reflects the current layout. Citizens also steer around each other while walking (RVO avoidance, same mechanism combat units use), so two crossing paths dodge rather than overlap - this only applies while actually moving, so several citizens stationed at the same shared work spot can still stand on top of each other once arrived.
 
 ## Sustainable Forestry
 

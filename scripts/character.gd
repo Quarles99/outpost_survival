@@ -17,6 +17,28 @@ const BOB_SPEED := 1.4
 ## they don't need to watch every trip in real time.
 const MOVE_SPEED := 70.0
 const MIN_MOVE_DURATION := 0.6
+## RVO avoidance radius/crowd tuning (Add collisions to villagers so they
+## can't stack up on the same spot.md) - same NavigationAgent2D.
+## avoidance_enabled mechanism CombatUnit already uses (see its own
+## UNIT_RADIUS doc comment), just for citizens instead of combat units.
+## Previously disabled here on purpose ("citizens don't dodge each other,
+## only the map's fixed obstacles, per an explicit scoping decision to keep
+## this port simpler than the battle sandbox's" - see _move_to's own doc
+## comment) - this is that decision being revisited. Radius kept well under
+## CollisionShape2D's own 36.0 click-hitbox radius (Character.tscn) -
+## that's sized generously for easy clicking, not a "how close can two
+## citizens stand" footprint; a smaller value here still stops literal
+## sprite-overlap without forcing citizens to keep an unrealistically wide
+## berth in tight spaces (e.g. clustered around one Workstation's
+## WorkSpot). neighbor_distance/time_horizon_agents pulled down from
+## NavigationServer's crowd-simulation defaults (500px/~20s, tuned for
+## large crowds reacting to far-off traffic) the same way CombatUnit's own
+## did, since a settlement's population is a similarly small handful of
+## agents - local, close-range dodges read better than wide preemptive
+## detours here too. First-pass values, not tuned via playtesting.
+const AVOIDANCE_RADIUS := 18.0
+const AVOIDANCE_NEIGHBOR_DISTANCE := 150.0
+const AVOIDANCE_TIME_HORIZON_AGENTS := 1.5
 ## Lowered 8.0 -> 2.0, then raised 2.0 -> 20.0, via Outpost_Survival/
 ## Balance.md's edit-and-hand-back workflow - a very long haul can now take
 ## noticeably longer than a short one (opposite of the brief 2.0s pass).
@@ -195,6 +217,13 @@ var current_task := "Idle"
 
 var _base_position: Vector2
 var _home_position: Vector2
+## Delta from whichever _process frame most recently called
+## nav_agent.set_velocity() inside _move_to's loop - avoidance computes
+## asynchronously, so _on_velocity_computed() needs a delta from whenever
+## it eventually fires, not necessarily the current frame's. Same reason
+## CombatUnit tracks its own `_delta` this way, see that class's own doc
+## comment on it.
+var _move_delta := 0.0
 var _move_tween: Tween
 var _scale_tween: Tween
 var _bob_phase := randf() * TAU
@@ -236,6 +265,11 @@ func _ready() -> void:
 	sprite.play("walk")
 	label.modulate.a = 0.0
 	_update_label()
+	nav_agent.radius = AVOIDANCE_RADIUS
+	nav_agent.avoidance_enabled = true
+	nav_agent.neighbor_distance = AVOIDANCE_NEIGHBOR_DISTANCE
+	nav_agent.time_horizon_agents = AVOIDANCE_TIME_HORIZON_AGENTS
+	nav_agent.velocity_computed.connect(_on_velocity_computed)
 	if not assigned_post:
 		_start_hauling()
 
@@ -349,11 +383,17 @@ func assign_to(post: Node, grant_move_xp: bool = true) -> void:
 ## Nav-agent-driven (see Base._rebake_navigation/WorldGrid.occupancy_changed
 ## for the town's navmesh) rather than a single straight-line Tween - a
 ## citizen now actually routes around buildings/trees instead of cutting
-## through them. Static obstacle avoidance only (Character.tscn's
-## NavigationAgent2D has avoidance_enabled = false) - unlike combat's
-## RVO-driven CombatUnit, citizens don't dodge each other, only the map's
-## fixed obstacles, per an explicit scoping decision to keep this port
-## simpler than the battle sandbox's.
+## through them. Also RVO-avoids other citizens the same way CombatUnit's
+## own NavigationAgent2D avoids other combat units (nav_agent.avoidance_
+## enabled = true, see _ready()) - two citizens crossing paths steer around
+## each other rather than overlapping/passing through, per Add collisions
+## to villagers so they can't stack up on the same spot.md. Only active
+## while actually moving through this loop, not once a citizen has stopped
+## at its destination - if several citizens are stationed at the very same
+## shared WorkSpot (e.g. multiple builders on one construction site), they
+## can still visually stack once arrived; a known, separate gap already
+## flagged in the "Allow multiple builders" completion write-up, not
+## addressed by this pass either.
 ##
 ## This is what makes every one of this function's ~9 call sites able to
 ## just `await _move_to(...)` directly (no wrapping `get_tree().create_
@@ -390,9 +430,10 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 	const MOVE_HANG_SAFETY_SECONDS := 60.0
 	while not nav_agent.is_navigation_finished() and elapsed < MOVE_HANG_SAFETY_SECONDS:
 		var delta := get_process_delta_time()
+		_move_delta = delta
 		var next_pos: Vector2 = nav_agent.get_next_path_position()
 		var direction := _base_position.direction_to(next_pos)
-		_base_position += direction * move_speed * delta
+		nav_agent.set_velocity(direction * move_speed)
 		if absf(direction.x) > 0.01:
 			sprite.flip_h = direction.x < 0.0
 		elapsed += delta
@@ -416,6 +457,17 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 		await get_tree().process_frame
 	if grant_xp:
 		_gain_skill_xp("speed", SPEED_XP_PER_SECOND * minf(elapsed, MAX_MOVE_DURATION))
+
+
+## NavigationAgent2D avoidance computes off-thread - set_velocity() (in the
+## loop above) doesn't move the citizen itself, this signal (fired once the
+## safe/collision-adjusted velocity is ready) is what actually does. Same
+## split CombatUnit._on_velocity_computed already uses, see that class's
+## own doc comment. A citizen not currently inside _move_to's loop never
+## calls set_velocity in the first place, so this simply doesn't fire for
+## someone standing still.
+func _on_velocity_computed(safe_velocity: Vector2) -> void:
+	_base_position += safe_velocity * _move_delta
 
 
 func _punch() -> void:

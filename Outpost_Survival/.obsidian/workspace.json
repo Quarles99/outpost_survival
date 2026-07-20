@@ -36,34 +36,6 @@
             }
           },
           {
-            "id": "993602b1cdf02a31",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Actionable Ideas/Add collisions to villagers so they can't stack up on the same spot.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Add collisions to villagers so they can't stack up on the same spot"
-            }
-          },
-          {
-            "id": "7c197c0e18103c65",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Actionable Ideas/Add collisions to villagers so they can't stack up on the same spot.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Add collisions to villagers so they can't stack up on the same spot"
-            }
-          },
-          {
             "id": "c837b2b0d2e8b8ab",
             "type": "leaf",
             "state": {
@@ -78,7 +50,7 @@
             }
           }
         ],
-        "currentTab": 4
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -242,6 +214,10 @@
   },
   "active": "39f47837cf23bea7",
   "lastOpenFiles": [
+    "Actionable Ideas/Completed/Add collisions to villagers so they can't stack up on the same spot.md",
+    "Actionable Ideas/Completed/Add collisions to villagers so they can't stack up on the same spot.md.tmp.5943.07e5713b851b",
+    "Docs/mechanics.md.tmp.5943.ce86f1e73cd9",
+    "Game Systems/Balance.md.tmp.5943.6068930624a2",
     "Actionable Ideas/Completed/Increase max zoom out level.md.tmp.5943.ed77b57b98c7",
     "Actionable Ideas/Completed/Fix character stats sheet overflowing menu.md",
     "Actionable Ideas/Completed/Fix character stats sheet overflowing menu.md.tmp.5943.70788663f7d8",
@@ -254,11 +230,7 @@
     "Actionable Ideas/Increase max zoom out level.md",
     "Actionable Ideas/Dynamic path building system.md",
     "Actionable Ideas/Add collisions to villagers so they can't stack up on the same spot.md",
-    "Docs/Balance Changelog.md.tmp.5943.4bfe5dd3f017",
-    "Game Systems/Balance.md.tmp.5943.56f55cc1d7f2",
     "Actionable Ideas/Fix character stats sheet overflowing menu.md",
-    "Game Systems/Balance.md.tmp.5943.1f15e51f2d2d",
-    "Game Systems/Balance.md.tmp.5943.7e8618789df5",
     "Game Systems/Balance.md",
     "Actionable Ideas/Implement New Art.md",
     "Actionable Ideas/Implement orc enemies present on the village map..md",
