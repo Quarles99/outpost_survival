@@ -1,3 +1,0 @@
-	- All sounds tied to villagers and local events on the ground should be almost inaudible when fully zoomed out
-	- Scale volume level with zoom level, up to realistic limits
-	- Also make sure all sound events linked to villagers or buildings are localized to that area so that they are quieter when offscreen or zoomed out

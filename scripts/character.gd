@@ -181,6 +181,13 @@ var current_task := "Idle"
 @onready var label: Label = $Label
 @onready var sprite: AnimatedSprite2D = $Sprite2D
 @onready var selection_outline: Sprite2D = $SelectionOutline
+## SelectSound stays on the Master bus - it's direct feedback for a
+## deliberate player click, the same "always audible regardless of zoom"
+## treatment UiSoundManager's button click gets, not an ambient/incidental
+## world sound. GatherSound/LevelUpSound are routed to the World bus
+## instead (Character.tscn) - passive, villager-driven events that
+## RtsCamera fades out the further the camera zooms out (see Increase max
+## zoom out level.md).
 @onready var select_sound: AudioStreamPlayer2D = $SelectSound
 @onready var gather_sound: AudioStreamPlayer2D = $GatherSound
 @onready var level_up_sound: AudioStreamPlayer2D = $LevelUpSound

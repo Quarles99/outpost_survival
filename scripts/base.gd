@@ -288,6 +288,17 @@ func _ready() -> void:
 	WorldGrid.configure(iso_ground.position, min_cell, max_cell, self, iso_ground)
 	WorldGrid.register_stockpile($OutpostHall.get_stockpile_spot())
 	_configure_camera_limits(min_cell, max_cell)
+	## RtsCamera's own _ready() sets an initial position guessed from
+	## viewport size alone (replicating the pre-camera framing on the old,
+	## much smaller map - see its own doc comment) - reliable back when the
+	## Outpost Hall always sat near world origin, but the 4x map expansion
+	## (Expand map size 4x.md) left that guess showing an empty patch of
+	## grass with neither the Hall nor any citizen in view on some boots.
+	## Overriding to focus on the Hall directly - same focus_on() the
+	## Citizens panel already uses to snap to a clicked citizen - guarantees
+	## every fresh game/load starts framed on the settlement regardless of
+	## map size, rather than a position that only happened to line up before.
+	camera.focus_on($OutpostHall.position)
 
 	## Only the Outpost Hall starts built - a Cabbage Farm and Lumber Camp
 	## used to be fixed starting buildings too, but the player now has to

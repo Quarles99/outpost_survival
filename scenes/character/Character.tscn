@@ -44,7 +44,9 @@ stream = ExtResource("4")
 [node name="GatherSound" type="AudioStreamPlayer2D" parent="." unique_id=434225189]
 stream = ExtResource("6")
 volume_db = -6.0
+bus = &"World"
 
 [node name="LevelUpSound" type="AudioStreamPlayer2D" parent="."]
 stream = ExtResource("7")
 volume_db = -12.0
+bus = &"World"

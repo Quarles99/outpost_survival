@@ -4,7 +4,14 @@ class_name RtsCamera
 ## Empirically (this Godot build): zoom > 1 magnifies (zoomed in), zoom < 1
 ## shows more world (zoomed out) — the reverse of what Camera2D's docs
 ## describe, so don't "fix" this back without re-testing in an actual window.
-@export var zoom_min := 0.5
+##
+## zoom_min lowered 0.5 -> 0.25 (Increase max zoom out level.md) - doubles
+## the previous max visible area again, on top of the map itself already
+## being expanded 4x (see Expand map size 4x.md). Not raised further than
+## this first pass since going much lower starts to make individual
+## villagers unreadably small (a few px tall) - "realistic limits" per that
+## note's own phrasing, not an arbitrary engine cap.
+@export var zoom_min := 0.25
 @export var zoom_max := 2.0
 @export var zoom_step := 0.1
 @export var zoom_tween_duration := 0.15
@@ -14,6 +21,16 @@ class_name RtsCamera
 
 ## Extra world-space room beyond the ground bounds the camera can pan into.
 @export var limit_margin := 320.0
+
+## World bus volume at zoom_max (fully zoomed in) vs zoom_min (fully zoomed
+## out) - see _update_world_audio_volume. 0.0 leaves GatherSound/
+## LevelUpSound at exactly their own authored volume_db when close up;
+## -40.0 is quiet enough to read as "almost inaudible" (Increase max zoom
+## out level.md) without relying on a hasty -80/mute, which would make an
+## abrupt cutoff right at zoom_min rather than a smooth fade.
+const WORLD_AUDIO_DB_AT_MAX_ZOOM := 0.0
+const WORLD_AUDIO_DB_AT_MIN_ZOOM := -40.0
+var _world_bus_index := -1
 
 var _zoom_level := 1.0
 var _zoom_tween: Tween
@@ -28,6 +45,8 @@ func _ready() -> void:
 	# Replicates the framing the game had with no camera at all (world origin
 	# at the viewport's top-left corner), regardless of window size.
 	position = get_viewport_rect().size / 2.0
+	_world_bus_index = AudioServer.get_bus_index("World")
+	_update_world_audio_volume()
 
 
 func configure_limits(min_local: Vector2, max_local: Vector2) -> void:
@@ -60,6 +79,7 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	_edge_scroll(delta)
+	_update_world_audio_volume()
 
 
 func _edge_scroll(delta: float) -> void:
@@ -108,3 +128,22 @@ func _zoom_by(amount: float) -> void:
 		_zoom_tween.kill()
 	_zoom_tween = create_tween()
 	_zoom_tween.tween_property(self, "zoom", Vector2.ONE * _zoom_level, zoom_tween_duration).set_ease(Tween.EASE_OUT)
+
+
+## Fades the World bus (GatherSound/LevelUpSound on every Character, see
+## character.gd's own doc comment on those two nodes) down as the camera
+## zooms out, on top of each AudioStreamPlayer2D's own distance-based
+## attenuation - Godot's built-in 2D positional audio has no concept of
+## camera zoom at all, so without this a villager sound reads exactly as
+## loud whether the camera is showing one house or the whole map. Reads
+## the actual interpolated `zoom.x` (not `_zoom_level`) so the fade tracks
+## the in-flight zoom tween smoothly frame-by-frame rather than jumping the
+## instant a scroll/keypress starts one. `_world_bus_index` is -1 (a no-op
+## AudioServer call - safe, just does nothing) only if default_bus_layout's
+## "World" bus somehow failed to load; never expected in practice.
+func _update_world_audio_volume() -> void:
+	if _world_bus_index < 0:
+		return
+	var t := inverse_lerp(zoom_min, zoom_max, zoom.x)
+	var volume_db := lerpf(WORLD_AUDIO_DB_AT_MIN_ZOOM, WORLD_AUDIO_DB_AT_MAX_ZOOM, clampf(t, 0.0, 1.0))
+	AudioServer.set_bus_volume_db(_world_bus_index, volume_db)

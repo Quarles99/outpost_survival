@@ -1,1 +1,0 @@
-	- Also replace skill names with icons that can be hovered over for more information

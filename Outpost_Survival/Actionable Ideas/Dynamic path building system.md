@@ -1,0 +1,4 @@
+- The more frequently villagers walk over the same tile the more progress it gets to becoming a dirt path tile.
+- This naturally creates pathways on the most traveled routes
+- Dirt paths give a small boost to movement speed for anyone traveling on them
+- If left untraveled for awhile they will revert back to grass

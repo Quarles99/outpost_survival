@@ -206,12 +206,13 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 
 | | Value |
 |---|---|
-| Zoom range | 0.5× (zoomed out) – 2.0× (zoomed in) |
+| Zoom range | 0.25× (zoomed out) – 2.0× (zoomed in) |
 | Zoom step per scroll click | 0.1 |
 | Zoom tween duration | 0.15 s |
 | Edge-scroll trigger margin | 24 px from screen edge |
 | Edge-scroll speed | 900 px/s (world space, scaled by zoom) |
 | Extra pan room beyond map bounds | 320 world units |
+| World-sound volume at max zoom-in / max zoom-out | 0 dB / -40 dB (linear fade with zoom) |
 
 ## Income Rate (`GameState`)
 

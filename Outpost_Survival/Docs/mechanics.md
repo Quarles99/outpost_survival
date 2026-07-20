@@ -112,7 +112,7 @@ A save captures the full resource pool, population, water access, storage capaci
 
 ## Camera
 
-Free-scrolling top-down RTS camera: scroll wheel zooms, middle-mouse drag pans, cursor-at-edge pans continuously. Panning and zooming are both bounded to the playable map with a small margin past the edge (see stats.md).
+Free-scrolling top-down RTS camera: scroll wheel zooms, middle-mouse drag pans, cursor-at-edge pans continuously. Panning and zooming are both bounded to the playable map with a small margin past the edge (see stats.md). Villager/work sounds (chopping, mining, level-ups, etc.) fade out the further the camera zooms out, on top of their normal distance-based falloff, so a fully zoomed-out view of the whole settlement stays quiet rather than layering every citizen's sound at once (see stats.md).
 
 ## Fast Forward
 

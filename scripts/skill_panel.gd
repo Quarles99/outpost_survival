@@ -31,14 +31,19 @@ const SKILL_LABELS := {
 	"strength": "Strength",
 }
 
+const ICON_SIZE := 20
+
 @onready var panel_control: Control = $Control
-@onready var name_label: Label = $Control/Panel/VBoxContainer/NameLabel
-@onready var task_label: Label = $Control/Panel/VBoxContainer/TaskLabel
-@onready var skill_list: VBoxContainer = $Control/Panel/VBoxContainer/SkillList
+@onready var name_label: Label = $Control/Margin/VBoxContainer/NameLabel
+@onready var task_label: Label = $Control/Margin/VBoxContainer/TaskLabel
+@onready var skill_list: GridContainer = $Control/Margin/VBoxContainer/SkillList
 
 var _base_position: Vector2
 var _anim_tween: Tween
-var _skill_labels: Array[Label] = []
+## One entry per currently-shown skill row (icon+level HBoxContainer) -
+## freed and rebuilt whole on every open_for() call, same as the old flat
+## Label list this replaced.
+var _skill_rows: Array[Control] = []
 
 
 func _ready() -> void:
@@ -49,9 +54,14 @@ func _ready() -> void:
 ## Always shows all 13 skills in SKILL_DISPLAY_ORDER, including untrained
 ## ones at level 1 - a fixed layout that doesn't reflow as a citizen picks
 ## up new skills reads more like a stats sheet than a shrinking/growing list.
-## task_label is a point-in-time snapshot of Character.current_task (see its
-## own doc comment) - re-open (re-click the citizen) for a fresh read rather
-## than watching it live-update.
+## Each skill is an icon (SkillIcons - hover for name/description via
+## TooltipManager, see Fix character stats sheet overflowing menu.md) plus
+## a bare "Lv N" label, laid out 2-per-row in SkillList's GridContainer -
+## replaces the old single column of "Skill Name: Lv N" text labels, which
+## is what was overflowing the panel (13 full-width rows plus name/task/
+## esc). task_label is a point-in-time snapshot of Character.current_task
+## (see its own doc comment) - re-open (re-click the citizen) for a fresh
+## read rather than watching it live-update.
 func open_for(character: Character) -> void:
 	name_label.text = character.data.character_name if character.data else "Unknown"
 	task_label.text = character.current_task
@@ -59,10 +69,25 @@ func open_for(character: Character) -> void:
 
 	for skill_id in SKILL_DISPLAY_ORDER:
 		var level := character.data.get_skill_level(skill_id) if character.data else 1
+		var row := HBoxContainer.new()
+
+		var icon := TextureRect.new()
+		icon.texture = SkillIcons.get_icon(skill_id)
+		icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_STOP
+		var title: String = SKILL_LABELS[skill_id]
+		var body := SkillIcons.get_description(skill_id)
+		icon.mouse_entered.connect(func() -> void: TooltipManager.request(title, body))
+		icon.mouse_exited.connect(func() -> void: TooltipManager.cancel())
+		row.add_child(icon)
+
 		var label := Label.new()
-		label.text = "%s: Lv %d" % [SKILL_LABELS[skill_id], level]
-		skill_list.add_child(label)
-		_skill_labels.append(label)
+		label.text = "Lv %d" % level
+		row.add_child(label)
+
+		skill_list.add_child(row)
+		_skill_rows.append(row)
 
 	visible = true
 	panel_control.position = _base_position + SLIDE_OFFSET
@@ -87,6 +112,6 @@ func close() -> void:
 
 
 func _clear_skill_labels() -> void:
-	for label in _skill_labels:
-		label.queue_free()
-	_skill_labels.clear()
+	for row in _skill_rows:
+		row.queue_free()
+	_skill_rows.clear()
