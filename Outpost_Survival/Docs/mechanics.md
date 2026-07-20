@@ -6,7 +6,9 @@ How each system in the game currently works. For exact numbers, see [stats.md](s
 
 One shared pool, capped independently per resource type by storage capacity - filling up on one resource doesn't crowd out another. Overflow past capacity is lost, not refunded. Each resource shows a rolling income/minute rate reflecting what actually reached the stockpile (a workstation whose output is being lost to a full cap won't show positive income for it).
 
-Alongside the text Food row, a vertical Food bar in the HUD's bottom-right corner shows the aggregate food total as a fill against storage capacity - a graphical at-a-glance alternative, not a replacement. An overlay band previews where that fill is headed over the next 30 seconds at the current net rate: red inside the top of the fill if shrinking, green just above it if growing.
+Every resource is represented by an icon (`scripts/resource_icons.gd`, `ResourceIcons.get_icon()`) rather than its name, in both the HUD's Wood/Stone rows and Food breakdown, and the Build menu's cost readout on each building button - the amount/rate numbers are still text, only the resource name itself is replaced.
+
+Alongside the text Food row, a vertical Food bar in the HUD's bottom-right corner shows the aggregate food total as a fill against storage capacity - a graphical at-a-glance alternative, not a replacement. A red overlay band inside the top of the fill always shows the exact cost of the next meal (see Population & Housing below) whenever there's a population to feed - not a rate projection, since production arrives in discrete haul trips on a schedule unrelated to the day/night meal timing, so a smoothly-extrapolated growth preview wouldn't correspond to anything actually about to happen.
 
 | Resource                            | Notes                                                                                                                 |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -91,14 +93,14 @@ The Build button opens a numbered grid of buildable options; picking one drops a
 
 Starting wood only covers a Lumber Camp - the Cabbage Farm and House both have to be earned by actually running it for a while first, a deliberate early-game pace-setter (see stats.md's Starting State). A placement ghost only checks *momentary* stock, though, so a player can place all three right away if they want - the Farm and House's construction sites will just sit waiting on materials until the Lumber Camp is built, staffed, and producing (see Gathering & Hauling above for how haulers prioritize a scarce resource across several waiting sites).
 
-Any placed Farm-family building can be clicked to retool into a different Farm-family recipe, free and instant - the building, footprint, and any assigned worker stay put, only the recipe changes (buffered goods under the old recipe are cleared, not converted). Brickmaker is not part of this group - it's a dedicated single-recipe building.
+Any placed Farm-family building can be clicked to retool into a different Farm-family recipe, free and instant - the building, footprint, and any assigned worker stay put, only the recipe changes (buffered goods under the old recipe are cleared, not converted). Brickmaker is not part of this group - it's a dedicated single-recipe building. Only Cabbage Farm is placeable from the Build menu - Grain Farm/Hops Farm/Fruit Orchard/Potato Farm exist purely as retool targets now (per an explicit request to combine the five separate crop buildings into one buildable building), never placed directly.
 
 ## Construction
 
 Confirming a placement starts a construction site, not a finished building, in two phases:
 
 1. **Materials** - any idle/hauling citizen delivers the option's full cost, the same as any other haul job. Nothing is spent from the stockpile until it actually arrives; the site sits half-supplied indefinitely if materials run out. Its label shows what's still needed.
-2. **Labor** - once materials are complete, the site becomes a normal job post training Construction, staffed automatically like any other job (preferring the highest Construction skill). Labor required scales with the building's total material cost (see stats.md). Label shows percent complete.
+2. **Labor** - once materials are complete, the site becomes a normal job post training Construction, staffed automatically like any other job (preferring the highest Construction skill), and can take up to several builders at once - each additional one adds to build speed, but at reduced effectiveness per worker rather than linearly (see stats.md). Labor required scales with the building's total material cost (see stats.md). Label shows percent complete.
 
 Completing labor replaces the site with the real building on the spot, granting its capacity/water/storage bonus then, not at placement time. Progress (materials delivered + labor completed) survives save/load.
 

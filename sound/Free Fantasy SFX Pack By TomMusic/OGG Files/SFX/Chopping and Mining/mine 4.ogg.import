@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://cs22esj6ypfsa"
+path="res://.godot/imported/mine 4.ogg-690cce29204bb0a4a8ff33b7aa620617.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 4.ogg"
+dest_files=["res://.godot/imported/mine 4.ogg-690cce29204bb0a4a8ff33b7aa620617.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://bix8tn7lf7i0c"
+path="res://.godot/imported/Spell Impact 3.wav-2ce2d1789c258f29924d1d1744273cea.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/SFX/Spells/Spell Impact 3.wav"
+dest_files=["res://.godot/imported/Spell Impact 3.wav-2ce2d1789c258f29924d1d1744273cea.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

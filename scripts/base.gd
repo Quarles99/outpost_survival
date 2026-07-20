@@ -13,10 +13,25 @@ const INVALID_TINT := Color(1.0, 0.4, 0.4, 0.6)
 const BUILDING_PROPERTIES := [
 	"display_name", "resource_type", "output_per_tick", "work_interval",
 	"sprite_tint", "input_resource", "input_per_tick", "skill_id",
+	"chosen_unit_type", "description",
 ]
 
-const INITIAL_TREE_COUNT := 12
+## Planted as several small groves (see _scatter_initial_trees) rather than
+## one dense ring around the Outpost Hall - the old single-center approach
+## read as an unnaturally dense tree wall right on top of the starting
+## building, per an explicit request to spread trees out more evenly
+## across the map. Total count raised alongside the spread so each grove
+## is still a real, harvestable cluster rather than a handful of isolated
+## trees.
+const INITIAL_TREE_COUNT := 40
 const INITIAL_TREE_RADIUS := 5.0
+const TREE_GROVE_COUNT := 5
+
+const ROCK_SCENE := preload("res://scenes/nature/RockDecoration.tscn")
+const INITIAL_ROCK_COUNT := 14
+
+const GRASS_CLUMP_SCENE := preload("res://scenes/nature/GrassClump.tscn")
+const INITIAL_GRASS_COUNT := 30
 
 ## --- Fast-forward -----------------------------------------------------
 ## Companion to slowing base movement/work speed down by a factor of 2 (see
@@ -32,6 +47,26 @@ const INITIAL_TREE_RADIUS := 5.0
 const SPEED_MULTIPLIERS := [1.0, 2.0, 4.0]
 var speed_index := 0
 
+## --- X-ray reveal -----------------------------------------------------------
+## Holding Shift fades whatever's occluding a citizen (trees, buildings) in a
+## circular zone around the cursor - see shaders/xray_reveal.gdshader for the
+## actual fade. Purely visual/input-driven, nothing here is save-persisted.
+## Uses *global* shader uniforms (RenderingServer.global_shader_parameter_*)
+## rather than per-node script wiring, so every occluder's Sprite2D (each
+## wearing the same shared xray_reveal_material.tres, assigned in its own
+## class's _ready() - see Workstation/WorldTree/House/OutpostHall/Well/
+## StorageFacility) reacts automatically from these three values alone,
+## updated once per frame right here rather than needing every occluder to
+## poll Input/mouse position itself.
+const XRAY_ACTIVE_PARAM := "xray_active"
+const XRAY_CENTER_PARAM := "xray_center"
+const XRAY_RADIUS_PARAM := "xray_radius"
+## Roughly one ground tile's width - big enough to matter, small enough to
+## still feel like a "peek," not a whole-screen toggle. Not tracked in
+## Balance.md - this is UI/feel tuning, the same category that doc's own
+## header excludes (AI-behavior epsilons, etc.).
+const XRAY_RADIUS := 150.0
+
 ## --- Battle deployment -----------------------------------------------------
 ## See _on_attack_pressed/BattleState.gd for the full handoff. CombatTest.tscn
 ## is the same standalone sandbox scene the main menu's "Battle Test" button
@@ -39,20 +74,12 @@ var speed_index := 0
 ## apart from a real deployment, see CombatTestManager's own doc comment.
 const COMBAT_TEST_SCENE := "res://scenes/combat/CombatTest.tscn"
 
-## Round-robin distribution for citizens trained in "melee_combat" - that one
-## skill can't disambiguate which of CombatUnit's four melee archetypes
-## (Shieldbearer/Marauder/Outrider/Trapper) a citizen becomes, since nothing
-## on CharacterData tracks a sub-specialization (see Outpost_Survival/Ideas/
-## Combat Units.md's deferred-integration note - no existing design answer
-## to honor here). Cycling through all four by squad-roster order is a
-## deliberately simple first pass - keeps a defending squad from being an
-## all-Shieldbearer wall (a weak, easily-baited composition per the point-
-## cost table in Ideas/Combat Units.md) without inventing a new stat/UI just
-## for this. Revisit once there's a real archetype-selection mechanic.
-const MELEE_ARCHETYPES := [
-	CombatUnit.UnitType.SHIELDBEARER, CombatUnit.UnitType.MARAUDER,
-	CombatUnit.UnitType.OUTRIDER, CombatUnit.UnitType.TRAPPER,
-]
+## MELEE_ARCHETYPES (the old global round-robin across squad-roster order,
+## used here because nothing let a citizen's concrete melee unit type be
+## chosen) removed per an explicit request ("Choosing what units to use at a
+## barracks") - every TrainingGround now carries its own chosen_unit_type
+## (see that class's own doc comment), so _on_attack_pressed below just
+## reads it directly instead of guessing by position.
 
 ## --- Day/night visual tint ------------------------------------------------
 ## Multiplies onto every world CanvasItem (ground, buildings, characters,
@@ -82,10 +109,14 @@ const CONSTRUCTION_SITE_SCENE := preload("res://scenes/workstation/ConstructionS
 ## separate hand-authored number per catalog entry - LABOR_PER_MATERIAL_UNIT
 ## multiplies the sum of every resource unit in the option's cost dict, with
 ## MIN_LABOR_REQUIRED as a floor so even a very cheap building still takes a
-## meaningful amount of labor rather than finishing in a single tick. Both
-## first-pass numbers, not tuned via playtesting.
-const LABOR_PER_MATERIAL_UNIT := 2.0
-const MIN_LABOR_REQUIRED := 10.0
+## meaningful amount of labor rather than finishing in a single tick. Lowered
+## 2.0 -> 1.5 -> 1.3 -> 0.6 -> 0.5 (MIN_LABOR_REQUIRED separately lowered
+## 10.0 -> 5.0 -> 2.0) via Outpost_Survival/Game Systems/Balance.md's edit-
+## and-hand-back workflow - the latest drop offsets the same pass's much
+## higher building costs (see the Building Costs & Output table) so
+## construction time doesn't scale up right alongside them.
+const LABOR_PER_MATERIAL_UNIT := 0.5
+const MIN_LABOR_REQUIRED := 2.0
 
 ## --- Happiness ---------------------------------------------------------
 ## Every tick, each citizen's happiness eases toward a target recomputed
@@ -138,6 +169,8 @@ const CHARACTER_SCENE := preload("res://scenes/character/Character.tscn")
 @onready var recruit_panel: RecruitPanel = $RecruitPanel
 @onready var crop_panel: CropPanel = $CropPanel
 @onready var training_ground_panel: TrainingGroundPanel = $TrainingGroundPanel
+@onready var citizens_panel: CitizensPanel = $CitizensPanel
+@onready var building_info_panel: BuildingInfoPanel = $BuildingInfoPanel
 @onready var system_menu: SystemMenu = $SystemMenu
 @onready var slot_panel: SlotPanel = $SlotPanel
 @onready var hud: HUD = $HUD
@@ -205,6 +238,7 @@ var _ghost_valid := false
 
 func _ready() -> void:
 	get_viewport().physics_object_picking = true
+	_register_xray_globals()
 
 	## GameState is an autoload - unlike Base itself, it's never destroyed
 	## when MainMenu switches scenes into Base.tscn, so a second (or third)
@@ -236,6 +270,8 @@ func _ready() -> void:
 	_reserve_existing_footprint($OutpostHall, BuildingCatalog.get_option("outpost_hall")["grid_size"])
 
 	_scatter_initial_trees()
+	_scatter_initial_rocks()
+	_scatter_initial_grass()
 
 	## Baked once here (after every starting cell reservation above) and
 	## re-baked on every subsequent WorldGrid.occupancy_changed (a building
@@ -272,9 +308,14 @@ func _ready() -> void:
 	hud.attack_pressed.connect(_on_attack_pressed)
 	hud.speed_pressed.connect(_on_speed_button_pressed)
 	hud.menu_pressed.connect(_open_system_menu)
+	hud.citizens_pressed.connect(_on_citizens_pressed)
 
 	recruit_panel.candidate_selected.connect(_on_candidate_selected)
 	training_ground_panel.option_chosen.connect(_on_training_ground_option_chosen)
+	training_ground_panel.employee_selected.connect(_on_citizen_selected_from_panel)
+	citizens_panel.citizen_selected.connect(_on_citizen_selected_from_panel)
+	building_info_panel.employee_selected.connect(_on_citizen_selected_from_panel)
+	crop_panel.employee_selected.connect(_on_citizen_selected_from_panel)
 	$OutpostHall.clicked.connect(_on_outpost_hall_clicked)
 
 	crop_panel.option_selected.connect(_on_crop_selected)
@@ -283,7 +324,9 @@ func _ready() -> void:
 
 	system_menu.save_pressed.connect(func() -> void: _open_slot_panel("save"))
 	system_menu.load_pressed.connect(func() -> void: _open_slot_panel("load"))
-	system_menu.main_menu_pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/menu/MainMenu.tscn"))
+	system_menu.main_menu_pressed.connect(func() -> void:
+		_stop_all_character_work()
+		get_tree().change_scene_to_file("res://scenes/menu/MainMenu.tscn"))
 	system_menu.quit_pressed.connect(func() -> void: get_tree().quit())
 	slot_panel.slot_chosen.connect(_on_slot_panel_chosen)
 
@@ -347,6 +390,57 @@ func _ready() -> void:
 ## loads next. Mirrors CombatTestManager._exit_tree() exactly, same reason.
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
+	## Same reasoning as the time_scale reset above - xray_active is a
+	## RenderingServer-global value, not scoped to this scene, so it has to
+	## be explicitly turned back off on the way out or it'd keep fading
+	## whatever loads next (menu, battle) for as long as Shift happened to be
+	## held at the moment this scene was removed.
+	RenderingServer.global_shader_parameter_set(XRAY_ACTIVE_PARAM, 0.0)
+
+
+## Registers the three xray_reveal globals (see this file's own "X-ray
+## reveal" doc comment) - safe to call every time this scene loads (a second
+## playthrough in the same process run, same reasoning as GameState.
+## reset_to_defaults() above): global_shader_parameter_add() just (re)defines
+## the parameter, it doesn't error or duplicate on a name that already
+## exists.
+func _register_xray_globals() -> void:
+	RenderingServer.global_shader_parameter_add(XRAY_ACTIVE_PARAM, RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
+	RenderingServer.global_shader_parameter_add(XRAY_CENTER_PARAM, RenderingServer.GLOBAL_VAR_TYPE_VEC2, Vector2.ZERO)
+	RenderingServer.global_shader_parameter_add(XRAY_RADIUS_PARAM, RenderingServer.GLOBAL_VAR_TYPE_FLOAT, XRAY_RADIUS)
+
+
+func _process(_delta: float) -> void:
+	RenderingServer.global_shader_parameter_set(XRAY_ACTIVE_PARAM, 1.0 if Input.is_key_pressed(KEY_SHIFT) else 0.0)
+	RenderingServer.global_shader_parameter_set(XRAY_CENTER_PARAM, get_global_mouse_position())
+
+
+## Runs before Area2D physics-picking dispatch (see RtsCamera's own _input()
+## doc comment for the same "_input always runs before _unhandled_input,
+## regardless of tree order" mechanism, which this relies on identically) -
+## while x-ray is active, a left-click should hit whatever citizen the fade
+## just revealed rather than the building/tree that would otherwise still
+## physically overlap the same point and claim the click first. Only
+## intercepts when a Character is actually found at the cursor; otherwise
+## does nothing and today's normal per-node click handling proceeds
+## untouched.
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if not Input.is_key_pressed(KEY_SHIFT):
+		return
+
+	var query := PhysicsPointQueryParameters2D.new()
+	query.position = get_global_mouse_position()
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var results: Array = get_world_2d().direct_space_state.intersect_point(query)
+	for result in results:
+		var collider: Object = result["collider"]
+		if collider is Character:
+			get_viewport().set_input_as_handled()
+			collider.handle_click()
+			return
 
 
 func _apply_speed() -> void:
@@ -455,15 +549,54 @@ func _tween_day_night_tint(target: Color) -> void:
 	tween.tween_property(day_night_tint, "color", target, DAY_NIGHT_TRANSITION_SECONDS)
 
 
+## TREE_GROVE_COUNT grove centers, each picked uniformly at random anywhere
+## on the map (WorldGrid.find_random_cell_anywhere - same whole-map spread
+## _scatter_decoration below uses for rocks/grass), with INITIAL_TREE_COUNT
+## trees split evenly between them and planted within INITIAL_TREE_RADIUS
+## of each grove's own center - several small forests dotted around the
+## map rather than one dense ring around the Outpost Hall (there isn't a
+## fixed starting Lumber Camp anymore, so there's no reason trees need to
+## start conveniently close to the Hall specifically).
 func _scatter_initial_trees() -> void:
-	## Scattered around the Outpost Hall rather than a starting Lumber
-	## Camp - there isn't a fixed one anymore, the player builds their own.
-	var scatter_center := WorldGrid.local_to_grid($OutpostHall.position)
-	for i in INITIAL_TREE_COUNT:
-		var cell = WorldGrid.find_plantable_cell(scatter_center, INITIAL_TREE_RADIUS)
+	var trees_per_grove := INITIAL_TREE_COUNT / TREE_GROVE_COUNT
+	for g in TREE_GROVE_COUNT:
+		var grove_center = WorldGrid.find_random_cell_anywhere()
+		if grove_center == null:
+			continue
+		for i in trees_per_grove:
+			var cell = WorldGrid.find_plantable_cell(Vector2(grove_center.x, grove_center.y), INITIAL_TREE_RADIUS)
+			if cell == null:
+				break
+			WorldGrid.plant_tree(cell, true)
+
+
+func _scatter_initial_rocks() -> void:
+	_scatter_decoration(ROCK_SCENE, INITIAL_ROCK_COUNT)
+
+
+func _scatter_initial_grass() -> void:
+	_scatter_decoration(GRASS_CLUMP_SCENE, INITIAL_GRASS_COUNT)
+
+
+## Purely decorative ground clutter (rocks, grass clumps) - deliberately
+## doesn't reserve a WorldGrid cell the way a tree does, so a building can
+## still be placed over one later without any special-casing. Scattered
+## sparsely across the *whole* map (find_random_cell_anywhere), not
+## clustered near the Outpost Hall like the starting trees - rocks/grass
+## are ambient terrain dressing, not a resource the player needs
+## conveniently close by. Re-run (and re-randomized) on every _ready(),
+## same as it isn't part of save data. Added as a direct child of Base (not
+## IsoGround) so it still participates in Base's y-sort - see IsoGround's
+## own doc comment for why baking non-flat art into the ground layer
+## itself (z_index=-1, unsorted) isn't safe.
+func _scatter_decoration(scene: PackedScene, count: int) -> void:
+	for i in count:
+		var cell = WorldGrid.find_random_cell_anywhere()
 		if cell == null:
 			break
-		WorldGrid.plant_tree(cell, true)
+		var decoration: Sprite2D = scene.instantiate()
+		decoration.position = WorldGrid.grid_to_local(Vector2(cell.x, cell.y))
+		add_child(decoration)
 
 
 ## Recomputes a target happiness from current settlement conditions and
@@ -589,6 +722,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if training_ground_panel.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
 		training_ground_panel.close()
 		return
+	if citizens_panel.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
+		citizens_panel.close()
+		return
+	if building_info_panel.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
+		building_info_panel.close()
+		return
 	if _selected_character == null:
 		## Esc only reaches here once nothing else above had anything to
 		## back out of - deselecting a citizen (below) takes priority over
@@ -629,6 +768,47 @@ func _deselect() -> void:
 	skill_panel.close()
 
 
+## Builds CitizensPanel's row data here rather than in the panel itself
+## (same "Base decides, panel just renders" split RecruitPanel's own
+## candidates already follow) - "job"/"location"/"happiness_text" are
+## formatted strings so the panel stays generic. "location" is the
+## citizen's assigned post's display name, or "Hauling" for an unassigned
+## citizen (assign_to(null) always starts the hauler loop - see
+## Character.assign_to's own doc comment - so "Hauling" is accurate for
+## every unassigned citizen, not just one caught mid-haul-trip).
+func _on_citizens_pressed() -> void:
+	_cancel_placement()
+	build_menu.close()
+	recruit_panel.close()
+	crop_panel.close()
+	training_ground_panel.close()
+	building_info_panel.close()
+	var rows: Array[Dictionary] = []
+	for character in characters:
+		var job: String = SkillTitles.get_title(character.data, character._current_skill_id())
+		var location: String = character.assigned_post.display_name if character.assigned_post else "Hauling"
+		var band: Dictionary = _happiness_band(character.data.happiness)
+		rows.append({
+			"character": character,
+			"name": character.data.character_name,
+			"job": job,
+			"location": location,
+			"happiness_text": "%d%% (%s)" % [roundi(character.data.happiness), band["name"]],
+		})
+	citizens_panel.open_for(rows)
+
+
+## CitizensPanel reports which row was pressed - reuses the exact same
+## selection path a normal in-world click already goes through (opens the
+## skill panel, same as _on_character_selected's own doc comment), then
+## additionally snaps the camera - the one part of this idea a normal
+## in-world click can't do, since you'd already have to be looking at the
+## citizen to click them.
+func _on_citizen_selected_from_panel(character: Character) -> void:
+	_on_character_selected(character)
+	camera.focus_on(character.position)
+
+
 func _on_build_pressed() -> void:
 	_cancel_placement()
 	if _selected_character:
@@ -636,6 +816,8 @@ func _on_build_pressed() -> void:
 	recruit_panel.close()
 	crop_panel.close()
 	training_ground_panel.close()
+	citizens_panel.close()
+	building_info_panel.close()
 	build_menu.open_for(BuildingCatalog.placeable_options())
 
 
@@ -651,6 +833,8 @@ func _open_system_menu() -> void:
 	recruit_panel.close()
 	crop_panel.close()
 	training_ground_panel.close()
+	citizens_panel.close()
+	building_info_panel.close()
 	system_menu.open()
 
 
@@ -667,6 +851,8 @@ func _on_outpost_hall_clicked() -> void:
 	build_menu.close()
 	crop_panel.close()
 	training_ground_panel.close()
+	citizens_panel.close()
+	building_info_panel.close()
 	_recruit_source = null
 	recruit_panel.open_for(RecruitCatalog.generate_candidates())
 
@@ -686,6 +872,8 @@ func _on_training_ground_clicked(building: TrainingGround) -> void:
 	build_menu.close()
 	crop_panel.close()
 	recruit_panel.close()
+	citizens_panel.close()
+	building_info_panel.close()
 	_training_ground_target = building
 
 	var options: Array[Dictionary] = []
@@ -702,7 +890,22 @@ func _on_training_ground_clicked(building: TrainingGround) -> void:
 		"id": "upgrade",
 		"label": "Upgrade (%s)\nUnit cap %d -> %d" % [_format_cost(TrainingGround.UPGRADE_COST), building.get_unit_cap(), building.get_unit_cap() + TrainingGround.UNIT_CAP_PER_UPGRADE],
 	})
-	training_ground_panel.open_for(building.display_name, options)
+	## One "Train: <Unit>" option per entry in this building's own
+	## get_allowed_unit_types() (see TrainingGround.UNIT_CHOICES_BY_SKILL) -
+	## skipped entirely for a skill_id with only one possible unit (Mage
+	## Tower/"spellcasting" today), since a one-option "choice" isn't one.
+	## The currently-chosen type's own option is prefixed so the panel shows
+	## current state without a separate visual affordance.
+	var allowed_types: Array = building.get_allowed_unit_types()
+	if allowed_types.size() > 1:
+		for unit_type in allowed_types:
+			var is_current: bool = unit_type == building.chosen_unit_type
+			var prefix := "[Current] " if is_current else ""
+			options.append({
+				"id": "unit_%d" % unit_type,
+				"label": "%sTrain: %s" % [prefix, CombatUnit.TYPE_NAMES[unit_type]],
+			})
+	training_ground_panel.open_for(building.display_name, options, _employees_of(building), building.description)
 
 
 ## training_ground_panel's own signal handler - branches into the same
@@ -713,6 +916,17 @@ func _on_training_ground_option_chosen(option_id: String) -> void:
 	if not is_instance_valid(_training_ground_target):
 		return
 	var building := _training_ground_target
+	## "unit_%d"-prefixed ids (see _on_training_ground_clicked) aren't a
+	## `match`-able fixed set the way "recruit"/"upgrade" are - handled here
+	## instead, before the match below, and returns rather than falling
+	## through. Free and instant: only changes which unit type the *next*
+	## deployment reads for this building (Base._on_attack_pressed), not
+	## anything about in-progress training.
+	if option_id.begins_with("unit_"):
+		var chosen: CombatUnit.UnitType = int(option_id.trim_prefix("unit_")) as CombatUnit.UnitType
+		building.chosen_unit_type = chosen
+		hud.flash_message("%s will now train %s" % [building.display_name, CombatUnit.TYPE_NAMES[chosen]])
+		return
 	match option_id:
 		"recruit":
 			if not building.can_recruit():
@@ -767,20 +981,56 @@ func _wire_training_ground_clicks(building: Node) -> void:
 		building.clicked.connect(_on_training_ground_clicked.bind(building))
 
 
-## A House's `clicked` signal always means "try to upgrade" - unlike a
-## Farm, a House isn't assignable, so there's no citizen-selection branch
-## to check first (compare _on_farm_clicked).
+## Connects the generic building-info panel (name + who's employed here) to
+## every Workstation subclass's info_clicked signal, EXCEPT Farm/
+## TrainingGround - those two already show this same info inside their own
+## panel (see CropPanel/TrainingGroundPanel's employee-list section), so
+## opening a second, competing panel on the same left-click would be wrong.
+## info_clicked still fires for a Farm/TrainingGround instance too (see
+## Workstation.info_clicked's own doc comment) - just never connected to
+## anything for those two, so it's a harmless no-op emit.
+func _wire_building_info_clicks(building: Node) -> void:
+	if building is Workstation and not (building is Farm) and not (building is TrainingGround):
+		building.info_clicked.connect(_on_building_info_clicked.bind(building))
+
+
+## A House's `clicked` signal opens the building-info panel showing its
+## description and, if not already upgraded, an Upgrade button previewing
+## House.UPGRADE_COST before anything is spent - matching
+## TrainingGroundPanel's already-established preview-then-confirm pattern
+## for its own upgrade, rather than the instant blind spend-on-click this
+## used to be (which only reported failure after the fact, via a flash
+## message that had actually gone stale - it said "Not enough stone" long
+## after UPGRADE_COST switched to brick+wood). `show_employees: false`
+## throughout - unlike every BuildingInfoPanel caller, House is never a job
+## post, so "No one currently employed here" would be actively wrong here,
+## not just unused.
 func _on_house_clicked(house: House) -> void:
+	_cancel_placement()
+	build_menu.close()
+	recruit_panel.close()
+	crop_panel.close()
+	training_ground_panel.close()
+	citizens_panel.close()
 	if house.upgraded:
-		hud.flash_message("%s is already upgraded" % house.display_name)
+		building_info_panel.open_for(house.display_name, [], house.description, "", false)
 		return
+	var label := "Upgrade (%s)\n+%d capacity" % [_format_cost(House.UPGRADE_COST), House.UPGRADE_CAPACITY_BONUS]
+	building_info_panel.open_for(house.display_name, [], house.description, "", false, label, func() -> void: _confirm_house_upgrade(house))
+
+
+## The actual spend/grant, deferred until the Upgrade button in
+## BuildingInfoPanel is pressed (see _on_house_clicked) rather than running
+## the instant the building is clicked.
+func _confirm_house_upgrade(house: House) -> void:
 	if not GameState.can_afford(House.UPGRADE_COST):
-		hud.flash_message("Not enough stone")
+		hud.flash_message("Not enough %s" % _format_cost(House.UPGRADE_COST))
 		return
 	GameState.spend(House.UPGRADE_COST)
 	house.mark_upgraded()
 	GameState.add_population_capacity(House.UPGRADE_CAPACITY_BONUS)
 	hud.flash_message("%s upgraded (+%d capacity)" % [house.display_name, House.UPGRADE_CAPACITY_BONUS])
+	building_info_panel.close()
 
 
 func _on_farm_clicked(farm: Farm) -> void:
@@ -788,8 +1038,78 @@ func _on_farm_clicked(farm: Farm) -> void:
 	build_menu.close()
 	recruit_panel.close()
 	training_ground_panel.close()
+	citizens_panel.close()
+	building_info_panel.close()
 	_crop_target = farm
-	crop_panel.open_for(BuildingCatalog.farm_family_options(), farm.display_name)
+	crop_panel.open_for(BuildingCatalog.farm_family_options(), farm.display_name, _employees_of(farm), farm.description)
+
+
+## Every Character whose assigned_post is exactly this building - "who
+## works here" for the building-info panel (and CropPanel/
+## TrainingGroundPanel's own employee-list section). A plain equality
+## check against the post instance, same pattern _on_post_disabled_changed
+## already uses to find whoever's currently working an evicted post.
+func _employees_of(post: Node) -> Array[Character]:
+	var employees: Array[Character] = []
+	for character in characters:
+		if character.assigned_post == post:
+			employees.append(character)
+	return employees
+
+
+## Opens the generic building-info panel for a plain job post (see
+## _wire_building_info_clicks for exactly which building types reach this -
+## Farm/TrainingGround never do, they show the same info in their own
+## panel instead).
+func _on_building_info_clicked(building: Workstation) -> void:
+	_cancel_placement()
+	build_menu.close()
+	recruit_panel.close()
+	crop_panel.close()
+	training_ground_panel.close()
+	citizens_panel.close()
+	building_info_panel.open_for(building.display_name, _employees_of(building), building.description, _recipe_text(building))
+
+
+## "0.6 Stone / cycle", "1 Stone -> 0.5 Brick / cycle", "2 Wood / chop" -
+## shown under a building's description in BuildingInfoPanel. ConstructionSite
+## is excluded outright rather than falling through to the generic branch -
+## it still carries Workstation's resource_type/output_per_tick exports at
+## their unused defaults (never set via BuildingCatalog properties, since a
+## site isn't placed from the catalog the normal way), which would render a
+## nonsense "1 Cabbage / cycle" line for something mid-construction. LumberCamp
+## gets its own branch since it produces via wood_per_chop/chop_interval, not
+## the buffered input/output_per_tick loop every other Workstation subclass
+## shares (see Character._run_farm_loop vs _run_lumberjack_loop).
+func _recipe_text(building: Workstation) -> String:
+	if building is ConstructionSite:
+		return ""
+	if building is LumberCamp:
+		return "%s Wood / chop" % _format_number(building.wood_per_chop)
+	var output := "%s %s" % [_format_number(building.output_per_tick), building.resource_type.capitalize()]
+	if building.input_resource.is_empty():
+		return "%s / cycle" % output
+	return "%s %s -> %s / cycle" % [_format_number(building.input_per_tick), building.input_resource.capitalize(), output]
+
+
+## "0.6"/"2" instead of "0.6000"/"2.0" - GDScript's implicit float->String
+## always shows decimals; every recipe number here is meant to read like the
+## Building Costs & Output table in Balance.md, which drops trailing zeros.
+## Formats to 2 decimals then strips trailing zeros (and a bare trailing
+## "." if every decimal was stripped) - String.num(value)'s default
+## decimals=-1 looked like it should already do this but doesn't actually
+## trim anything (2.0 -> "2.0", verified directly), and decimals=0 rounds
+## away real fractional values (0.6 -> "1"), so neither alone works. "%g" %
+## value (the original attempt) was worse still - not actually a supported
+## specifier for GDScript's `%` string-format operator (only
+## s/c/d/i/o/x/X/f/% are), so it silently returned the literal, unprocessed
+## "%g" instead of formatting anything at all, only caught once seen in a
+## building's info panel rather than at compile time.
+func _format_number(value: float) -> String:
+	var text := String.num(value, 2)
+	if text.contains("."):
+		text = text.rstrip("0").rstrip(".")
+	return text
 
 
 ## Right-click toggles any job post (Farm/LumberCamp/StoneMine/Brickmaker/
@@ -1066,6 +1386,20 @@ func _on_build_option_selected(option: Dictionary) -> void:
 	_placing_option = option
 	_ghost = option["scene"].instantiate()
 	_apply_option_properties(_ghost, option)
+	## Workstation subclasses (Farm-family, Workshop, TrainingGround) bake
+	## their own sprite_tint into Sprite2D.modulate via refresh_visual() -
+	## which then multiplies with _update_ghost()'s VALID_TINT/INVALID_TINT
+	## on the root, since CanvasItem.modulate compounds down the tree. Left
+	## alone, a tinted building's ghost showed a muddied, inconsistent
+	## shade instead of the same clean green/red every untinted building
+	## (LumberCamp, Well, House...) already got. Reset to white here, before
+	## add_child() triggers _ready()/refresh_visual(), so every ghost's
+	## sprite starts neutral and the root's validity tint is the only color
+	## applied - the real sprite_tint is untouched on the eventual placed
+	## building, which is a separate instance built fresh by
+	## _materialize_building().
+	if _ghost.has_method("refresh_visual"):
+		_ghost.set("sprite_tint", Color.WHITE)
 	if _ghost.has_node("Label"):
 		_ghost.get_node("Label").visible = false
 	## Farm's (and any future clickable post's) input_event handler would
@@ -1173,6 +1507,7 @@ func _spawn_construction_site(option: Dictionary, origin: Vector2i, save_id: Str
 	site.set_meta("origin", origin)
 	add_child(site)
 	_wire_workstation_disable(site)
+	_wire_building_info_clicks(site)
 	site.materials_ready.connect(_on_construction_materials_ready.bind(site))
 	site.construction_complete.connect(_on_construction_complete.bind(site))
 	site.refresh_label()
@@ -1248,6 +1583,7 @@ func _materialize_building(option: Dictionary, origin: Vector2i, save_id: String
 	_wire_house_clicks(building)
 	_wire_training_ground_clicks(building)
 	_wire_workstation_disable(building)
+	_wire_building_info_clicks(building)
 
 	if option.has("population_capacity"):
 		GameState.add_population_capacity(option["population_capacity"])
@@ -1349,19 +1685,38 @@ func _on_slot_panel_chosen(slot: int) -> void:
 		_load_game()
 
 
+## Halts every citizen's active work coroutine (whatever loop _start_work/
+## _start_hauling currently has running) without touching assigned_post or
+## any other citizen state - the same Character._stop_work() leave() already
+## calls before a departing citizen is queue_free()'d. Needed anywhere this
+## scene is about to be torn down out from under every Character child at
+## once (a battle deployment, returning to the main menu) rather than one
+## citizen at a time: without bumping _work_session first, a loop coroutine
+## resumed after its node has already left the tree finds _wait_for_tick()
+## returning instantly (is_inside_tree() guard) without ever awaiting, so
+## the loop's own `session == _work_session` check never sees a change and
+## spins with no yield at all - a real reproduced hang/crash (verified via
+## the flooded godot.log from _on_attack_pressed, matching this exactly).
+func _stop_all_character_work() -> void:
+	for character in characters:
+		character._stop_work()
+
+
 ## HUD's "Simulate Attack" button - the current stand-in for the roadmap's
 ## eventual raid/siege trigger (Docs/roadmap.md's Long-Term Design Vision),
 ## since there's no wandering-raider AI yet. Every citizen currently
 ## assigned to a TrainingGround (Barracks/Archery Range/Mage Tower) deploys
 ## as their own squad against a generated enemy roster in CombatTest.tscn -
 ## see BattleState's doc comment for the full handoff shape, and
-## MELEE_ARCHETYPES for why a "melee_combat"-trained citizen's concrete unit
-## type is a round-robin guess rather than a real stat lookup. A citizen NOT
-## currently assigned to a TrainingGround never deploys, same as any other
-## job - "soldier" is just whatever a citizen's current post happens to be,
-## consistent with how every other job skill already works (see Combat
-## Units.md's "whether they keep their town job meanwhile" question - they
-## do, this reads assignment directly rather than unassigning first).
+## TrainingGround.chosen_unit_type for a "melee_combat"/"archery"-trained
+## citizen's concrete unit type (a real per-building choice now, not a
+## round-robin guess - see that field's own doc comment for what this
+## replaced). A citizen NOT currently assigned to a TrainingGround never
+## deploys, same as any other job - "soldier" is just whatever a citizen's
+## current post happens to be, consistent with how every other job skill
+## already works (see Combat Units.md's "whether they keep their town job
+## meanwhile" question - they do, this reads assignment directly rather than
+## unassigning first).
 func _on_attack_pressed() -> void:
 	var squad := characters.filter(func(c: Character) -> bool: return c.assigned_post is TrainingGround)
 	if squad.is_empty():
@@ -1369,20 +1724,12 @@ func _on_attack_pressed() -> void:
 		return
 
 	var pending: Array = []
-	var melee_index := 0
 	for citizen in squad:
 		var post: TrainingGround = citizen.assigned_post
-		var unit_type: CombatUnit.UnitType
-		if post.skill_id == "archery":
-			unit_type = CombatUnit.UnitType.ARCHER
-		elif post.skill_id == "spellcasting":
-			unit_type = CombatUnit.UnitType.MAGE
-		else:
-			unit_type = MELEE_ARCHETYPES[melee_index % MELEE_ARCHETYPES.size()]
-			melee_index += 1
 		pending.append({
 			"citizen_id": citizen.data.id,
-			"unit_type": unit_type,
+			"citizen_name": citizen.data.character_name,
+			"unit_type": post.chosen_unit_type,
 			"skill_level": citizen.data.get_skill_level(post.skill_id),
 		})
 
@@ -1391,6 +1738,11 @@ func _on_attack_pressed() -> void:
 	## deliberately doesn't go through SaveManager/a disk slot.
 	BattleState.town_blob = _serialize_state()
 	BattleState.active = true
+	## Must happen after _serialize_state() (which reads current_task/
+	## assigned_post, untouched by this) but before the scene change below -
+	## see _stop_all_character_work's own doc comment for why calling it too
+	## late (or not at all) is what actually crashes here.
+	_stop_all_character_work()
 	get_tree().change_scene_to_file(COMBAT_TEST_SCENE)
 
 
@@ -1568,6 +1920,14 @@ func _serialize_placed_buildings() -> Array:
 			out_entry["last_recruit_day"] = entry["node"].last_recruit_day
 		if entry["node"] is TrainingGround and entry["node"].upgrade_level > 0:
 			out_entry["upgrade_level"] = entry["node"].upgrade_level
+		## Only written when it's actually been changed away from this
+		## building type's own catalog default (Barracks -> Shieldbearer,
+		## Archery Range -> Archer, Mage Tower -> Mage) - same conditional-
+		## field shape as upgraded/upgrade_level/disabled above, so an old
+		## save predating this field just falls back to each building's
+		## default on restore below.
+		if entry["node"] is TrainingGround and entry["node"].chosen_unit_type != BuildingCatalog.get_option(entry["option_id"]).get("chosen_unit_type"):
+			out_entry["chosen_unit_type"] = entry["node"].chosen_unit_type
 		if entry["node"] is Workstation and entry["node"].disabled:
 			out_entry["disabled"] = true
 		out.append(out_entry)
@@ -1611,12 +1971,15 @@ func _restore_placed_buildings(entries: Array) -> void:
 		_wire_house_clicks(building)
 		_wire_training_ground_clicks(building)
 		_wire_workstation_disable(building)
+		_wire_building_info_clicks(building)
 		if building is House and entry.get("upgraded", false):
 			building.mark_upgraded()
 		if building is TrainingGround and entry.has("last_recruit_day"):
 			building.last_recruit_day = int(entry["last_recruit_day"])
 		if building is TrainingGround and entry.has("upgrade_level"):
 			building.restore_upgrade_level(int(entry["upgrade_level"]))
+		if building is TrainingGround and entry.has("chosen_unit_type"):
+			building.chosen_unit_type = int(entry["chosen_unit_type"]) as CombatUnit.UnitType
 		if building is Workstation and entry.get("disabled", false):
 			building.disabled = true
 		if building.has_method("add_worker"):
@@ -1722,6 +2085,13 @@ func _serialize_characters() -> Array:
 			"unhappy_streak": character.data.unhappy_streak,
 			"assigned_save_id": save_id,
 			"position": [character.position.x, character.position.y],
+			## Time left until this worker's current production tick - see
+			## Character._wait_for_tick's doc comment. Without this, every
+			## restored worker's loop would start its first tick fresh at
+			## the full interval, resyncing an entire town of farmers/
+			## lumberjacks/etc. onto the same tick purely because they all
+			## happened to load at the same moment.
+			"tick_remaining": character._tick_remaining,
 		})
 	return out
 
@@ -1762,6 +2132,12 @@ func _restore_characters(entries: Array) -> void:
 		character.data.skill_xp = (entry.get("skill_xp", {}) as Dictionary).duplicate()
 		character.data.happiness = float(entry.get("happiness", character.data.happiness))
 		character.data.unhappy_streak = int(entry.get("unhappy_streak", 0))
+		## Set before assign_to() below, not after - assign_to() synchronously
+		## starts this character's work loop (Character._start_work), which
+		## for several loop shapes reaches their first _wait_for_tick() call
+		## before ever yielding back here, so setting this any later would
+		## be too late for that first tick to see it.
+		character._tick_remaining = float(entry.get("tick_remaining", 0.0))
 		## grant_move_xp=false: this call's own _move_to (toward the
 		## post/home position) is about to be overridden by
 		## snap_to_position() below (or just left as-is for an older save

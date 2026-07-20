@@ -30,14 +30,13 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 |---|---|
 | Location | Bottom-right corner, HUD |
 | Fill | Aggregate food total (`GameState.get_total_food()`) against `storage_capacity` |
-| Overlay preview window | 30s (`HUD.FOOD_BAR_PREVIEW_SECONDS`) |
-| Overlay color | Red (shrinking) inside the top of the current fill / green (growing) just above it |
+| Overlay | Red, inside the top of the fill - always shows the exact cost of the next meal (`FOOD_PER_CITIZEN_PER_MEAL * population_count`), not a rate projection |
 
 ## Resource Consumption
 
 | | Value |
 |---|---|
-| Food (or food-equivalent) eaten per citizen per meal | 18.0 |
+| Food (or food-equivalent) eaten per citizen per meal | 12.0 |
 | Meal timing | Twice per day/night cycle - at dawn (`DayNightCycle.day_started`) and dusk (`night_started`), same amount both times |
 | Applies to | every citizen, regardless of work assignment |
 | Floor | resources can't go below 0 |
@@ -47,35 +46,35 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 | Building | Footprint | Cost | Grants | Notes |
 |---|---|---|---|---|
 | Outpost Hall | 2×2 | Not placeable (fixed starting building) | — | A stockpile drop-off/pickup point - haulers use whichever registered stockpile (any Outpost Hall or Storage Facility) is nearest. |
-| Cabbage Farm | 2×2 | 10 wood | — | Converts wood → cabbage. See production table below. |
+| Cabbage Farm | 2×2 | 10 wood | — | The only Farm-family building placeable from the Build menu - converts wood → cabbage by default, then retool (see below) into any other Farm-family recipe. See production table below. |
 | Lumber Camp | 1×1 | 10 wood | — | Produces wood by chopping trees. See production table below. |
-| House | 2×2 | 20 wood | +2 population capacity | Passive — no worker slot. Clickable once placed for a one-time upgrade: 10 brick + 20 wood for +2 more population capacity (denied if already upgraded or unaffordable). Deliberately no raw stone in the upgrade cost - an upgraded ("stone") house is built from worked brick, not the raw ore. |
+| House | 2×2 | 50 wood | +2 population capacity | Passive — no worker slot. Click once placed to open a panel with a description and, if not yet upgraded, an Upgrade button previewing its cost (50 brick + 100 wood, for +2 more population capacity) before spending - denied if already upgraded or unaffordable. Deliberately no raw stone in the upgrade cost - an upgraded ("stone") house is built from worked brick, not the raw ore. |
 | Stone Mine | 1×1 | 10 wood | — | Produces stone, no input needed. See production table below. |
 | Well | 1×1 | 10 stone + 5 wood | +1 to water-well count (unlocks water access) | Passive — no worker slot. |
 | Storage Facility | 2×4 | 25 wood + 25 stone | +60 storage capacity (all resources) | Also a stockpile drop-off/pickup point, same as the Outpost Hall, and assignable as a hauler post (see Assigning Citizens). Not upgradeable in place yet; build another for more capacity. |
 | Brickmaker | 1×1 | 10 wood + 10 stone | — | Converts stone → brick. Not part of the Farm-family retool group (see below) - a dedicated, single-recipe building. See production table below. |
-| Grain Farm | 2×2 | 10 wood | — | Converts wood → grain. Crop-chain building; see table below. |
+| Grain Farm | 2×2 | Not placeable directly (retool a Farm-family building into this recipe, free and instant) | — | Converts wood → grain. Crop-chain building; see table below. |
 | Mill | 2×2 | 10 wood + 10 brick | — | Converts grain → flour. |
 | Bakery | 2×2 | 10 wood + 5 stone | — | Converts flour → bread (edible). |
-| Hops Farm | 2×2 | 10 wood | — | Converts wood → hops. |
+| Hops Farm | 2×2 | Not placeable directly (retool a Farm-family building into this recipe, free and instant) | — | Converts wood → hops. |
 | Brewery | 2×2 | 10 wood + 5 stone + 5 brick | — | Converts hops → beer (luxury good, not edible). |
-| Fruit Orchard | 2×2 | 20 wood | — | Produces fruit (edible), no input needed — slower but reliable. |
-| Potato Farm | 2×2 | 10 wood | — | Produces potato (edible), no input needed. |
+| Fruit Orchard | 2×2 | Not placeable directly (retool a Farm-family building into this recipe, free and instant) | — | Converts wood → fruit (edible) - slower but reliable. |
+| Potato Farm | 2×2 | Not placeable directly (retool a Farm-family building into this recipe, free and instant) | — | Converts wood → potato (edible). |
 | Barracks | 2×2 | 20 wood + 10 stone | — | Trains `melee_combat`. No input/output - pure time-worked xp (see Skills & Leveling). Max 1 built at once - see Combat-Building Recruit below. |
 | Archery Range | 2×2 | 10 wood + 5 stone | — | Trains `archery`. Same no-input/output shape as Barracks. Max 1 built at once. |
 | Mage Tower | 2×2 | 10 wood + 10 stone + 5 brick | — | Trains `spellcasting`. Same no-input/output shape as Barracks. Max 1 built at once. |
 
-All 8 of the above (Farm through Potato Farm) can be clicked once placed to retool into any other one of the 8, for free, at any time - see [mechanics.md](mechanics.md#building--placement). Brickmaker and the three combat-training buildings (Barracks/Archery Range/Mage Tower, sharing `TrainingGround.tscn`) are deliberately excluded from this group.
+All 5 raw-crop Farm-family recipes (Cabbage/Grain/Hops/Fruit/Potato) share one retool group: click any placed one to switch it into any other, for free, at any time - see [mechanics.md](mechanics.md#building--placement). Only Cabbage Farm is placeable from the Build menu, per an explicit request to combine the five into one buildable building rather than five separate ones - Grain/Hops/Fruit/Potato are reached exclusively by retooling an existing Farm-family building afterward, never placed fresh. Mill/Bakery/Brewery are a separate, still-independently-placeable trio (Workshop-class, not Farm-class - see below), and Brickmaker and the three combat-training buildings (Barracks/Archery Range/Mage Tower, sharing `TrainingGround.tscn`) are deliberately excluded from the retool group entirely.
 
 ## Workstation Production
 
 | | Farm | Lumber Camp | Stone Mine | Brickmaker |
 |---|---|---|---|---|
 | Output resource | cabbage | wood | stone | brick |
-| Output per work cycle | 1.0 × skill multiplier | 1.0 × skill multiplier (per chop) | 0.5 × skill multiplier | 0.5 × skill multiplier |
+| Output per work cycle | 1.0 × skill multiplier | 2.0 × skill multiplier (per chop) | 0.5 × skill multiplier | 0.5 × skill multiplier |
 | Input resource | wood | — | — | stone |
 | Input cost per work cycle | 0.5 wood flat (not scaled by skill) | — | — | 1.0 stone flat (not scaled by skill) |
-| Work cycle interval | 3.0 s | 2.4 s (per chop) | 3.0 s | 3.0 s (default) |
+| Work cycle interval | 6.0 s | 3.0 s (per chop) | 6.0 s | 6.0 s (default) |
 | Carry limit (output buffer cap / haul size) | 8.0 | 8.0 | 8.0 | 8.0 |
 | Search radius (tree-finding, Lumber Camp only) | — | 4.5 tiles | — | — |
 | Target forest size maintained (Lumber Camp only) | — | 16 trees within search radius | — | — |
@@ -107,15 +106,15 @@ The **Farm** class is a generic single-input/single-output converter (exported `
 
 | Building | Input → Output | Input/tick | Output/tick | Work interval | Skill trained |
 |---|---|---|---|---|---|
-| Grain Farm | wood → grain | 0.5 | 1.0 | 3.0 s (default) | `farming` |
-| Mill | grain → flour | 1.0 | 1.0 | 3.0 s (default) | `milling` |
-| Bakery | flour → bread | 1.0 | 1.0 | 3.0 s (default) | `baking` |
-| Hops Farm | wood → hops | 0.5 | 1.0 | 3.0 s (default) | `farming` |
-| Brewery | hops → beer | 1.0 | 1.0 | 3.0 s (default) | `brewing` |
-| Fruit Orchard | none → fruit | 0 | 2.0 | 6.0 s (slower) | `farming` |
-| Potato Farm | none → potato | 0 | 1.0 | 3.0 s (default) | `farming` |
+| Grain Farm | wood → grain | 0.5 | 1.0 | 6.0 s (default) | `farming` |
+| Mill | grain → flour | 1.0 | 1.0 | 6.0 s (default) | `milling` |
+| Bakery | flour → bread | 1.0 | 1.0 | 6.0 s (default) | `baking` |
+| Hops Farm | wood → hops | 0.5 | 1.0 | 6.0 s (default) | `farming` |
+| Brewery | hops → beer | 1.0 | 1.0 | 6.0 s (default) | `brewing` |
+| Fruit Orchard | wood → fruit | 1.0 | 2.0 | 12.0 s (slower) | `farming` |
+| Potato Farm | wood → potato | 0.5 | 1.0 | 6.0 s (default) | `farming` |
 
-Output/tick scales by the worker's skill multiplier the same way the base Farm's does; input/tick does not - a higher-level worker gets more output from the same input, not just more of both at a fixed ratio. Fruit Orchard and Potato Farm never haul input (no delivery trip is ever triggered) — matching the design intent of a "consistent" crop that isn't gated on deliveries.
+Output/tick scales by the worker's skill multiplier the same way the base Farm's does; input/tick does not - a higher-level worker gets more output from the same input, not just more of both at a fixed ratio. Every Farm-family recipe now requires a wood input (Fruit Orchard and Potato Farm used to be input-free "consistent" crops - no longer, per an explicit request that all farms require wood).
 
 A Farm-class post's haul trip triggers when its input buffer can't cover the next work cycle's input cost, or its output buffer is full (whichever comes first). A Lumber Camp or Stone Mine's haul trip triggers when its output buffer hits the carry limit.
 
@@ -160,10 +159,10 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 |---|---|
 | Skill trained | `construction` |
 | Materials delivery | Any idle/hauling citizen, same mechanism as output pickup/input delivery - see Gathering & Hauling |
-| Labor required | `max(total units in the option's cost * 2.0, 10.0)` (`Base.LABOR_PER_MATERIAL_UNIT`/`MIN_LABOR_REQUIRED`) - e.g. a 10-wood Lumber Camp needs 20 labor, a 50-wood+stone Storage Facility needs 100 |
-| Labor added per work cycle | 1.2 (`Character.CONSTRUCTION_LABOR_PER_TICK`, raised from 1.0 for a ~20% build-speed increase) × the worker's construction skill multiplier × the settlement's happiness output multiplier |
-| Work cycle interval | 3.0 s (`Workstation.work_interval` default, unchanged for a construction site) |
-| Max workers per site | 1 |
+| Labor required | `max(total units in the option's cost * 0.5, 2.0)` (`Base.LABOR_PER_MATERIAL_UNIT`/`MIN_LABOR_REQUIRED`) - e.g. a 25-wood Lumber Camp needs 12.5 labor, a 500-wood+100-stone Storage Facility needs 300 |
+| Labor added per work cycle | 2.0 (`Character.CONSTRUCTION_LABOR_PER_TICK`) × the worker's construction skill multiplier × the settlement's happiness output multiplier × a multi-builder effectiveness factor (see below) |
+| Work cycle interval | 6.0 s (`Workstation.work_interval` default, unchanged for a construction site) |
+| Max workers per site | 3 (`ConstructionSite.MAX_BUILDERS`) - each worker's own labor-per-cycle is scaled by `1 / active_workers^0.5` (`Character.CONSTRUCTION_MULTI_BUILDER_EXPONENT`), so more builders finish a site faster but with diminishing returns rather than linearly (2 workers ≈1.41x a single worker's speed, 3 ≈1.73x, not 2x/3x) |
 | What happens on completion | Site is freed; the real building is instantiated in its place and granted its capacity/water/storage bonus then, not at placement time; a fresh job-assignment pass runs immediately |
 | What's spent, and when | The option's full cost, deducted resource-by-resource as each haul trip actually delivers it - nothing is spent at placement-confirm time |
 
@@ -281,6 +280,18 @@ Barracks/Archery Range/Mage Tower each override `Workstation`'s normal 1-worker 
 | Upgrade cost | 10 brick, flat per upgrade (not yet scaled by level) |
 | Max upgrade level | None - repeatable indefinitely |
 | Effect | Raises that specific building's `max_workers`, so up to that many citizens can train there / deploy from it at once |
+
+## Choosing a Unit Type (`TrainingGround`, `Base`)
+
+Each Barracks/Archery Range is locked to producing one specific combat unit type at a time, chosen from that building's panel (a "Train: \<Unit\>" option alongside Recruit/Upgrade) - free and instant to change, any time, as many times as you like. It only decides which concrete unit a citizen trained there becomes on deployment (see Combat sandbox docs) - not their trained skill, XP, or anything else about them.
+
+| Building | Choices | Default |
+|---|---|---|
+| Barracks (melee_combat) | Shieldbearer, Marauder, Pikeman | Shieldbearer |
+| Archery Range (archery) | Archer, Skirmisher | Archer |
+| Mage Tower (spellcasting) | Mage only - no choice offered | Mage |
+
+Pikeman and Skirmisher are new unit types - see the combat sandbox's own balance reference for their stats. Outrider and Trapper (the previous two melee options) aren't currently producible by any building - they're being held for a future Stable building, not removed from the game.
 
 ## Day & Night (`DayNightCycle`)
 

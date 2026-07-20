@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://dp2ybdb7afgg"
+path="res://.godot/imported/Sword Attack 1.wav-8b072199c21ab2d9f0ca0027174cf21f.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 1.wav"
+dest_files=["res://.godot/imported/Sword Attack 1.wav-8b072199c21ab2d9f0ca0027174cf21f.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://rqx5uf2uxyc5"
+path="res://.godot/imported/Ice Freeze 1.ogg-39cd447066ed3b86fb6e657cfc02d069.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Ice Freeze 1.ogg"
+dest_files=["res://.godot/imported/Ice Freeze 1.ogg-39cd447066ed3b86fb6e657cfc02d069.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

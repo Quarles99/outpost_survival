@@ -17,8 +17,9 @@ extends Node
 ## Esc-to-main-menu).
 var active := false
 
-## One entry per deploying citizen: {"citizen_id": String, "unit_type":
-## CombatUnit.UnitType, "skill_level": int}. Built by Base from every
+## One entry per deploying citizen: {"citizen_id": String, "citizen_name":
+## String, "unit_type": CombatUnit.UnitType, "skill_level": int}. Built by
+## Base from every
 ## citizen whose assigned_post is a TrainingGround right before deployment -
 ## see Base._on_attack_pressed. Positionally unordered (CombatTestManager
 ## reads the whole array, not by index).

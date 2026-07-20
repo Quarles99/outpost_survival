@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://dognv100oy2kd"
+path="res://.godot/imported/Sea Storm.wav-52837e3b79162c182107f9f6602bd7ee.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/BGS Loops/Sea/Sea Storm.wav"
+dest_files=["res://.godot/imported/Sea Storm.wav-52837e3b79162c182107f9f6602bd7ee.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

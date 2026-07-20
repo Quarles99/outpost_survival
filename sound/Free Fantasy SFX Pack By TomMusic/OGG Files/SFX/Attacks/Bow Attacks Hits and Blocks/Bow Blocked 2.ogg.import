@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://chkctjnlkxdsd"
+path="res://.godot/imported/Bow Blocked 2.ogg-d0c3fb7be19f78a2f30a1d4022ef76e5.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Blocked 2.ogg"
+dest_files=["res://.godot/imported/Bow Blocked 2.ogg-d0c3fb7be19f78a2f30a1d4022ef76e5.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

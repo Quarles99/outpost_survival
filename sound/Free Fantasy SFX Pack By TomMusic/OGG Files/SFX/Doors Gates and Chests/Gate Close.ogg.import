@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://d0nw3ed2qbp7m"
+path="res://.godot/imported/Gate Close.ogg-932257f0b74116f2d5ebe7bdb8b1e37e.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Doors Gates and Chests/Gate Close.ogg"
+dest_files=["res://.godot/imported/Gate Close.ogg-932257f0b74116f2d5ebe7bdb8b1e37e.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

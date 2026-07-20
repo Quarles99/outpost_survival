@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://d2xbnwlkr5yt3"
+path="res://.godot/imported/Sword Attack 2.ogg-68419353c809836b998188cedeb4afad.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 2.ogg"
+dest_files=["res://.godot/imported/Sword Attack 2.ogg-68419353c809836b998188cedeb4afad.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

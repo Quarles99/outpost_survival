@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://bol1thiumbpen"
+path="res://.godot/imported/Sea.ogg-6d66afa634c7d00563da60a392ad043f.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/BGS Loops/Sea/Sea.ogg"
+dest_files=["res://.godot/imported/Sea.ogg-6d66afa634c7d00563da60a392ad043f.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

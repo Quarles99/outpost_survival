@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://b017x0t1veqv1"
+path="res://.godot/imported/Beach.ogg-7bddacc6dcdd5df8266824b885cf3309.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/BGS Loops/Beach/Beach.ogg"
+dest_files=["res://.godot/imported/Beach.ogg-7bddacc6dcdd5df8266824b885cf3309.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

@@ -25,6 +25,38 @@ signal clicked
 
 @export var skill_id: String = "melee_combat"
 
+## Which concrete CombatUnit.UnitType a citizen trained at *this specific*
+## building becomes on deployment (see Base._on_attack_pressed) - added per
+## an explicit request ("Choosing what units to use at a barracks", see
+## Outpost_Survival/Actionable Ideas/Completed/ once filed) to replace the
+## old global round-robin (Base's now-deleted MELEE_ARCHETYPES), which
+## picked a citizen's concrete unit type by squad-roster position rather
+## than letting the player choose. Defaulted per catalog entry via
+## BuildingCatalog's "chosen_unit_type" field (Barracks -> Shieldbearer,
+## Archery Range -> Archer, Mage Tower -> Mage - see BuildingCatalog.
+## BUILDING_PROPERTIES), changeable any time afterward through
+## TrainingGroundPanel's option list (see Base._on_training_ground_clicked/
+## _on_training_ground_option_chosen) - free and instant, since it only
+## affects which unit type the *next* deployment reads, not any in-progress
+## training (a worker's actual trained skill_id never changes).
+@export var chosen_unit_type: CombatUnit.UnitType = CombatUnit.UnitType.SHIELDBEARER
+
+## Which CombatUnit.UnitTypes a building training this skill_id can be set
+## to produce - Base._on_training_ground_clicked reads this to build the
+## panel's option list, one per entry, skipped entirely for a skill_id whose
+## list has only one choice (Mage Tower/"spellcasting" - nothing to pick
+## between). Outrider/Trapper deliberately excluded from "melee_combat"'s
+## list, not deleted from the game - see CombatUnit.UnitType's own doc
+## comment for why (Stable/mounted units are a deferred follow-up; both stay
+## fully functional and testable in the free-play sandbox meanwhile, just
+## not producible by a real settlement until that building exists).
+const UNIT_CHOICES_BY_SKILL := {
+	"melee_combat": [CombatUnit.UnitType.SHIELDBEARER, CombatUnit.UnitType.MARAUDER, CombatUnit.UnitType.PIKEMAN],
+	"archery": [CombatUnit.UnitType.ARCHER, CombatUnit.UnitType.SKIRMISHER],
+	"spellcasting": [CombatUnit.UnitType.MAGE],
+}
+
+
 ## Per-building once-per-day recruit cooldown, independent of DayNightCycle's
 ## own last_recruit_day (the Outpost Hall's cooldown) - per an explicit
 ## request that a built combat building grant an *additional* recruit per
@@ -51,10 +83,11 @@ var last_recruit_day: int = 0
 ## stone bricks") at a flat cost per upgrade - not scaled to get pricier at
 ## higher levels, since only the first upgrade's cost was specified; a
 ## natural next tuning knob if the flat rate turns out too cheap late-game
-## (see Outpost_Survival/Balance.md).
+## (see Outpost_Survival/Game Systems/Balance.md). Raised 10.0 -> 25.0 via
+## that doc's edit-and-hand-back workflow.
 const BASE_UNIT_CAP := 3
 const UNIT_CAP_PER_UPGRADE := 3
-const UPGRADE_COST := {"brick": 10.0}
+const UPGRADE_COST := {"brick": 25.0}
 
 ## How many times this specific building has been upgraded - unlike House's
 ## one-shot `upgraded` bool, this counts up indefinitely. Persisted the same
@@ -67,6 +100,14 @@ var upgrade_level: int = 0
 
 func get_skill_id() -> String:
 	return skill_id
+
+
+## A single-entry list for a skill_id with nothing to actually choose
+## between (just "spellcasting" today) - Base._on_training_ground_clicked
+## skips adding any unit-choice options at all when size() <= 1, rather than
+## showing a pointless one-option "choice."
+func get_allowed_unit_types() -> Array:
+	return UNIT_CHOICES_BY_SKILL.get(skill_id, [])
 
 
 func can_recruit() -> bool:

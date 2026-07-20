@@ -1,0 +1,18 @@
+- Replace all current sounds with relevant sounds from sound pack
+
+## Completion write-up (2026-07-20)
+
+**Pack:** `sound/Free Fantasy SFX Pack By TomMusic/` (already present in the project, unimported until this pass - `flatpak run org.godotengine.Godot --headless --import` was run once to generate `.import` files for all 204 `.ogg` assets; verified afterward via `git diff`/mtime that this didn't touch any scene file, including ones I'd just edited for the Building click UI item).
+
+**What changed:** the game previously had exactly one work-tick sound (`gather_sound`, wired to a placeholder `resource_gain.wav`) shared identically across every gather/labor/training action - chopping, mining, farming, milling, construction labor, combat drilling, all the same chime. `Character._play_gather_sound(pool: Array[AudioStream])` (new helper) now picks a random variant from a pack-backed pool and plays it through the same `GatherSound` player node (swapping `.stream` per call rather than adding new player nodes), applied per the building actually doing the work:
+- **Lumber Camp** (`_run_lumberjack_loop`) → `CHOP_SOUNDS` (chop 1-4.ogg)
+- **Stone Mine** (`_run_generic_work_loop` - the only remaining plain-`Workstation` subclass, per `_start_work`'s dispatch) → `MINE_SOUNDS` (mine 1-5.ogg)
+- **Brickmaker** (shares `_run_farm_loop` with Farm/Workshop, but works stone) → also `MINE_SOUNDS`, via a branch on `post is Brickmaker` at that one shared call site
+- **Barracks/Archery Range/Mage Tower** (`_run_training_loop`) → branches on `post.get_skill_id()`: `SWORD_DRILL_SOUNDS` (melee_combat), `BOW_DRILL_SOUNDS` (archery), `SPELL_DRILL_SOUNDS` (spellcasting, using the pack's "Spell Impact" variants as a generic drill sound rather than a specific element)
+- Every pool has multiple numbered variants specifically so repeated ticks don't replay the identical sample back to back - picked at random per call, not round-robin or fixed.
+
+**Deliberately left unchanged (no relevant pack analog):**
+- **Farm-family crops and Mill/Bakery/Brewery** (`_run_farm_loop`'s default branch) and **Construction labor** (`_run_construction_loop`) still use `DEFAULT_GATHER_SOUNDS` (a one-item pool wrapping the original `resource_gain.wav`) - this pack is combat/environment-themed (attacks, footsteps, doors, chopping/mining, spells, torches, water ambience), with nothing resembling farming, milling, baking, brewing, or hammering-a-building-together. Force-fitting one of the pack's actual sounds here would have been a worse "relevant" match than the neutral original, not a better one.
+- **`select_chime.wav`** (character selection) and **`assign_task.wav`** (job assignment) - both pure UI feedback, not diegetic in-world actions, and this pack has no UI/chime category at all (it's entirely world SFX). Left as their original placeholder files rather than guessing a metaphorical fit (e.g. a door/chest sound for "assignment") - flagging this explicitly rather than silently deciding, since it's a genuinely subjective call the user may want to weigh in on if full pack coverage matters more than avoiding a forced fit.
+
+**Verification:** `flatpak run org.godotengine.Godot --headless --path . --quit` (full project load) completed with zero compile errors after the `character.gd` changes, confirming every `preload()` path resolves correctly against the newly-imported assets. Not verified by ear - the user had their own Godot session open and playtesting at the time (see the note on every other completion write-up above this session). Worth a live check next session: work a Lumber Camp/Stone Mine/Brickmaker and listen for chop/mine sounds, and open each combat-training building to hear its matching drill sound.

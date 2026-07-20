@@ -14,11 +14,12 @@ anchor_top = 1.0
 anchor_right = 0.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -280.0
+offset_top = -460.0
 offset_right = 360.0
 offset_bottom = -16.0
 
 [node name="Panel" type="Panel" parent="Control"]
+theme_type_variation = &"DialogPanel"
 anchor_right = 1.0
 anchor_bottom = 1.0
 
@@ -33,7 +34,21 @@ offset_bottom = -10.0
 [node name="TitleLabel" type="Label" parent="Control/Panel/VBoxContainer"]
 text = "Training Ground"
 
+[node name="DescriptionLabel" type="Label" parent="Control/Panel/VBoxContainer"]
+modulate = Color(1, 1, 1, 0.8)
+autowrap_mode = 3
+
 [node name="ButtonContainer" type="VBoxContainer" parent="Control/Panel/VBoxContainer"]
+
+[node name="EmployeesLabel" type="Label" parent="Control/Panel/VBoxContainer"]
+text = "Employed here:"
+
+[node name="EmployeeScroll" type="ScrollContainer" parent="Control/Panel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 80)
+size_flags_vertical = 3
+
+[node name="EmployeeContainer" type="VBoxContainer" parent="Control/Panel/VBoxContainer/EmployeeScroll"]
+anchor_right = 1.0
 
 [node name="EscLabel" type="Label" parent="Control/Panel/VBoxContainer"]
 modulate = Color(1, 1, 1, 0.6)

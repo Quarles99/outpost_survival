@@ -1,6 +1,21 @@
 extends Workstation
 class_name ConstructionSite
 
+## Overrides Workstation.max_workers' exported default of 1 - same pattern
+## TrainingGround.get_unit_cap()/_ready() already uses to override it for
+## itself. Lets several citizens haul labor into the same site at once
+## instead of it sitting idle while every construction-trained citizen but
+## one is stuck hauling - see Character._run_construction_loop's
+## per-worker EFFECTIVENESS_EXPONENT for the "reduced effectiveness"
+## tradeoff that keeps this from just linearly multiplying build speed.
+## First-pass number, not tuned via playtesting.
+const MAX_BUILDERS := 3
+
+
+func _ready() -> void:
+	max_workers = MAX_BUILDERS
+	super._ready()
+
 ## Emitted once every entry in materials_needed has been fully delivered -
 ## Base listens (Base._on_construction_materials_ready) to add this site to
 ## `posts` for the first time, making it eligible for automatic job
@@ -71,13 +86,15 @@ func refresh_label() -> void:
 	_update_label()
 
 
-## "<name>\nNeeds: 4 Wood, 2 Stone\n0/1" during the materials phase, or
-## "<name>\nBuilding 42%\n1/1" once labor has started - overrides
-## Workstation's own "<name>(Disabled)\n<active>/<max>" so the in-world
-## label actually communicates which of the two phases this site is in,
-## rather than always reading like a finished, idle job post.
+## "Needs: 4 Wood, 2 Stone\n0/1" during the materials phase, or
+## "Building 42%\n1/1" once labor has started - overrides Workstation's own
+## "<active>/<max>" so the in-world label actually communicates which of
+## the two phases this site is in, rather than always reading like a
+## finished, idle job post. No name line (dropped per an explicit request,
+## see Workstation._update_label's own doc comment) - just the two status
+## lines.
 func _update_label() -> void:
-	var lines := [display_name]
+	var lines: Array[String] = []
 	if not materials_are_ready():
 		var parts: Array[String] = []
 		for resource_name in materials_needed:

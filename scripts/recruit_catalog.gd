@@ -17,9 +17,9 @@ const FOOD_TIERS := ["cabbage", "potato", "fruit", "bread", "beer"]
 ## particular food tier as well as an equal amount of all food from lower
 ## tiers", so a Grandmaster-tier recruit still keeps cabbage/potato/fruit
 ## relevant instead of obsoleting them the moment Bread/Ale come online.
-## Raised 15.0 -> 20.0 via Outpost_Survival/Balance.md's edit-and-hand-back
-## workflow.
-const RECRUIT_UNIT_COST := 20.0
+## Raised 15.0 -> 20.0 -> 50.0 via Outpost_Survival/Game Systems/Balance.md's
+## edit-and-hand-back workflow.
+const RECRUIT_UNIT_COST := 50.0
 
 const NAMES := [
 	"Brom", "Ysolde", "Garrick", "Merida", "Torvald", "Elowen",

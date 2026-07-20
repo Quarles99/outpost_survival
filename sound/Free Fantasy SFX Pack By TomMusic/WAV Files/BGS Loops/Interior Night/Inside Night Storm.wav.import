@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://bhh4x337un4gt"
+path="res://.godot/imported/Inside Night Storm.wav-a071646ba505cba634193523055c09a0.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/BGS Loops/Interior Night/Inside Night Storm.wav"
+dest_files=["res://.godot/imported/Inside Night Storm.wav-a071646ba505cba634193523055c09a0.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

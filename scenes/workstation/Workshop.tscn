@@ -1,7 +1,11 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/workshop.gd" id="1"]
-[ext_resource type="Texture2D" path="res://art/iso_workstation_workshop.svg" id="2"]
+[ext_resource type="Texture2D" path="res://art/Pixel Isometric 16x16/Structures2.png" id="2"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1"]
+atlas = ExtResource("2")
+region = Rect2(4, 6, 88, 89)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(240, 120)
@@ -14,17 +18,19 @@ position = Vector2(0, -40)
 shape = SubResource("RectangleShape2D_1")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
-texture = ExtResource("2")
+texture_filter = 1
+scale = Vector2(4, 4)
+texture = SubResource("AtlasTexture_1")
 centered = false
-offset = Vector2(-132, -153)
+offset = Vector2(-44, -89)
 
 [node name="WorkSpot" type="Marker2D" parent="."]
 position = Vector2(0, 30)
 
 [node name="Label" type="Label" parent="."]
 offset_left = -70.0
-offset_top = -130.0
+offset_top = -376.0
 offset_right = 70.0
-offset_bottom = -106.0
+offset_bottom = -356.0
 horizontal_alignment = 1
 text = "Workstation"

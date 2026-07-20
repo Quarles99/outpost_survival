@@ -3,12 +3,26 @@ class_name StorageFacility
 
 @export var display_name: String = "Storage Facility"
 
+## See Workstation.XRAY_MATERIAL's doc comment - same shared material, same
+## reasoning.
+const XRAY_MATERIAL := preload("res://shaders/xray_reveal_material.tres")
+
 @onready var label: Label = $Label
 @onready var worker_spot: Marker2D = $WorkerSpot
 
 
 func _ready() -> void:
-	label.text = display_name
+	## No number to show and the name is dropped per an explicit request
+	## (see Workstation._update_label's own doc comment) - nothing left to
+	## float above a Storage Facility.
+	label.text = ""
+	## Unlike every other occluder class, this one has several Sprite2D
+	## children (the scattered goods piles, Pile1-Pile4 - see
+	## StorageFacility.tscn) rather than one $Sprite2D, so material
+	## assignment has to walk children instead of a single onready ref.
+	for child in get_children():
+		if child is Sprite2D:
+			child.material = XRAY_MATERIAL
 
 
 ## A placed Storage Facility is a real drop-off/pickup point for haulers,

@@ -72,8 +72,77 @@ const HAUL_MIN_THRESHOLD := 1.0
 ## constant: see GameState.DEFAULT_RESOURCES's wood comment - starting wood
 ## only covers the Lumber Camp now, so both the Farm and the House have to
 ## be earned via real wood gathering (naturally paced by production, not
-## an artificial labor-speed knob) before either can be built.
-const CONSTRUCTION_LABOR_PER_TICK := 1.0
+## an artificial labor-speed knob) before either can be built. Raised
+## 1.0 -> 2.0 via Outpost_Survival/Game Systems/Balance.md's edit-and-
+## hand-back workflow.
+const CONSTRUCTION_LABOR_PER_TICK := 2.0
+## "Reduced effectiveness" for a construction site worked by several
+## builders at once (see ConstructionSite.MAX_BUILDERS) - each builder's own
+## per-tick gain is scaled by 1/sqrt(site.active_workers) rather than left
+## at 1.0 flat, so total site throughput still improves with more workers
+## but with diminishing returns (2 workers ~1.41x a single worker's speed,
+## 3 workers ~1.73x, not a flat 2x/3x) rather than either no benefit at all
+## or several workers trivially multiplying speed with zero tradeoff for
+## crowding onto one site. Read at the moment each tick resolves (not
+## captured once per worker session), so it responds immediately as
+## workers join/leave mid-build rather than staying stale from whenever a
+## given worker's loop started. First-pass curve, not tuned via
+## playtesting - a flatter or steeper falloff is a one-line change here if
+## multi-builder sites end up feeling too strong/weak once played.
+const CONSTRUCTION_MULTI_BUILDER_EXPONENT := 0.5
+
+## Work-tick sound pools, from the Free Fantasy SFX Pack (sound/Free Fantasy
+## SFX Pack By TomMusic/) - one gather_sound.play() call used a single
+## generic resource_gain.wav for every gather/labor/training tick regardless
+## of what kind of work it was; these replace it with the pack's own
+## purpose-made sound where a genuinely relevant one exists (see
+## _play_gather_sound/the five call sites in _run_generic_work_loop/
+## _run_farm_loop/_run_lumberjack_loop/_run_training_loop). Each pool has
+## several numbered variants specifically so repeated ticks don't play the
+## identical sample back to back - _play_gather_sound picks one at random
+## per call. DEFAULT_GATHER_SOUNDS (a "pool" of the original single file)
+## covers every gather-tick call site with no relevant pack analog (Farm-
+## family crops, Mill/Bakery/Brewery, Construction labor - this pack is
+## combat/environment-themed, not farming/crafting-themed) rather than
+## force-fitting an unrelated sound just to "replace everything" - see the
+## "Implement Sounds from new sound pack" completion write-up for the full
+## per-building mapping and why select_chime.wav/assign_task.wav (pure UI
+## feedback, not diegetic action sounds) were left untouched too.
+const DEFAULT_GATHER_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/resource_gain.wav"),
+]
+const CHOP_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/chop 1.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/chop 2.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/chop 3.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/chop 4.ogg"),
+]
+## Also used for Brickmaker (shares _run_farm_loop with Farm/Workshop, but
+## its input is stone, unlike the others - see the branch in that loop) -
+## the pack has no dedicated "crafting"/"forge" sound, and a striking-rock
+## sound is a closer fit for turning stone into brick than the generic
+## default.
+const MINE_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 1.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 2.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 3.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 4.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 5.ogg"),
+]
+const SWORD_DRILL_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 1.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 2.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 3.ogg"),
+]
+const BOW_DRILL_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Attack 1.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Attack 2.ogg"),
+]
+const SPELL_DRILL_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 1.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 2.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 3.ogg"),
+]
 ## Flavor "drill" amount shown in a TrainingGround worker's gather feedback
 ## (see _run_training_loop) - purely cosmetic, nothing accumulates it
 ## toward a target the way ConstructionSite.labor_completed does, since
@@ -97,8 +166,18 @@ const SPEED_XP_PER_SECOND := 2.5
 var assigned_post: Node = null
 var is_selected := false
 
+## Human-readable summary of what this citizen is doing right now - shown
+## on their skill panel (see SkillPanel.open_for) as a point-in-time
+## snapshot at the moment they're clicked, not live-updated while the panel
+## stays open (matches the panel's existing "view-only" design - re-click
+## for a fresh read, same as every other field there). Set at each
+## meaningfully distinct phase of whichever work/haul loop is currently
+## running - see _run_hauler_loop/_execute_haul_job and each _run_*_loop
+## for exactly where.
+var current_task := "Idle"
+
 @onready var label: Label = $Label
-@onready var sprite: Sprite2D = $Sprite2D
+@onready var sprite: AnimatedSprite2D = $Sprite2D
 @onready var selection_outline: Sprite2D = $SelectionOutline
 @onready var select_sound: AudioStreamPlayer2D = $SelectSound
 @onready var assign_sound: AudioStreamPlayer2D = $AssignSound
@@ -119,6 +198,23 @@ var _work_active := false
 var _work_session := 0
 var _claimed_tree: WorldTree = null
 
+## Time left until this worker's current production tick fires - see
+## _wait_for_tick's own doc comment for why this exists (saving/restoring
+## it is what stops every worker from resyncing onto the same tick after a
+## load).
+var _tick_remaining: float = 0.0
+
+
+## Row 3 of the Tiny Pixel Art Entities sheet (the plain, unhelmeted
+## swordsman) - see combat_unit.gd's UNIT_SPRITE_ROW doc comment for why
+## this is built fresh in code rather than loaded from a saved
+## SpriteFrames.tres (a hand-authored one silently lost its atlas
+## reference the first time the editor re-saved it - only villager.tres
+## survived that, because Character.tscn keeps it "alive" through normal
+## editor use, and even that's not worth relying on).
+const ENTITIES_SHEET := preload("res://art/Tiny Pixel Art/IsometricTRPGAssetPack_Entities.png")
+const VILLAGER_ROW := 3
+
 
 func _ready() -> void:
 	input_event.connect(_on_input_event)
@@ -127,6 +223,8 @@ func _ready() -> void:
 	_base_position = position
 	_home_position = position
 	selection_outline.modulate.a = 0.0
+	sprite.sprite_frames = _build_sprite_frames(VILLAGER_ROW)
+	sprite.play("walk")
 	label.modulate.a = 0.0
 	_update_label()
 	if not assigned_post:
@@ -141,8 +239,17 @@ func _process(delta: float) -> void:
 func _on_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		get_viewport().set_input_as_handled()
-		select_sound.play()
-		clicked.emit(self)
+		handle_click()
+
+
+## The actual "this character was clicked" effect, split out of
+## _on_input_event so Base's x-ray click-priority override (see its _input()
+## doc comment) can trigger the exact same selection behavior when it
+## manually picks this character out from underneath an occluding building,
+## instead of duplicating these two lines at both call sites.
+func handle_click() -> void:
+	select_sound.play()
+	clicked.emit(self)
 
 
 func _on_mouse_entered() -> void:
@@ -278,10 +385,26 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 		var next_pos: Vector2 = nav_agent.get_next_path_position()
 		var direction := _base_position.direction_to(next_pos)
 		_base_position += direction * move_speed * delta
+		if absf(direction.x) > 0.01:
+			sprite.flip_h = direction.x < 0.0
 		elapsed += delta
+		## This character can be leave()'d + queue_free()'d (departure) while
+		## this coroutine is suspended on the await below - queue_free() is
+		## deferred, so the node is still fully valid and callable right up
+		## until the moment it actually exits the tree, at which point
+		## get_tree() starts throwing "Parameter data.tree is null." instead
+		## of returning a SceneTree. Bailing here rather than letting that
+		## happen is what actually stops this loop; the caller's own
+		## `session != _work_session` checks (bumped by leave()'s _stop_work)
+		## can't run until this coroutine resumes and reaches them, which is
+		## exactly what this guard preempts.
+		if not is_inside_tree():
+			return
 		await get_tree().process_frame
 	while elapsed < MIN_MOVE_DURATION:
 		elapsed += get_process_delta_time()
+		if not is_inside_tree():
+			return
 		await get_tree().process_frame
 	if grant_xp:
 		_gain_skill_xp("speed", SPEED_XP_PER_SECOND * minf(elapsed, MAX_MOVE_DURATION))
@@ -344,6 +467,16 @@ func _show_gather_feedback(resource_type: String, amount: float, xp: float) -> v
 	GatherFeedback.spawn(get_parent(), position, resource_type, amount, xp)
 
 
+## Picks a random variant from `pool` (see the *_SOUNDS constants above) and
+## plays it through the shared GatherSound player, rather than always
+## replaying the same sample - reuses the one player node for every
+## gather/labor/training tick instead of adding a dedicated
+## AudioStreamPlayer2D per sound category.
+func _play_gather_sound(pool: Array[AudioStream]) -> void:
+	gather_sound.stream = pool[randi() % pool.size()]
+	gather_sound.play()
+
+
 ## How much of a post's resource_type/input_resource this specific character
 ## can move in one trip - post.carry_limit (the building's own stat) scaled
 ## by this character's strength. Used everywhere a haul function decides how
@@ -382,6 +515,41 @@ func _start_hauling() -> void:
 	_run_hauler_loop(_work_session)
 
 
+## Shared by every work loop's production-tick wait (_run_generic_work_loop/
+## _run_construction_loop/_run_training_loop/_run_farm_loop/
+## _run_lumberjack_loop) in place of a bare `await get_tree().create_
+## timer(interval).timeout` - functionally the same wait, but also keeps
+## _tick_remaining in sync so a save mid-cycle captures the real countdown
+## instead of losing it. Without this, every restored worker's loop would
+## start its very first wait fresh at the *full* interval, so an entire
+## town of farmers/lumberjacks/etc. would end up perfectly resynced (all
+## producing on the same tick from that moment on) purely as an artifact of
+## when the save happened to load - something that never occurs during
+## continuous play, since each worker's loop naturally starts at whatever
+## moment they were individually assigned.
+##
+## If _tick_remaining is already > 0 when called, that's the one-time
+## resume case (Base._restore_characters sets it right before assign_to()
+## restarts this loop) - waits that long instead of the full interval, then
+## the loop is back to normal cadence for every tick after. Decrements via
+## a manual per-frame loop (get_process_delta_time(), same pattern _move_to
+## already uses) rather than a parallel _process() callback specifically so
+## the countdown only ever ticks down while actually inside this wait, not
+## during whatever haul/move detour a loop takes before reaching it.
+## Guards is_inside_tree() as every other awaited tree signal in this file
+## does (see _move_to's own doc comment for the departure-mid-await race
+## this prevents).
+func _wait_for_tick(interval: float) -> void:
+	var wait_time: float = _tick_remaining if _tick_remaining > 0.0 else interval
+	_tick_remaining = wait_time
+	while _tick_remaining > 0.0:
+		if not is_inside_tree():
+			return
+		await get_tree().process_frame
+		_tick_remaining -= get_process_delta_time()
+	_tick_remaining = 0.0
+
+
 ## An idle character isn't wasted - it either carries a workstation's
 ## output_buffer to the stockpile, or carries a needed input from the
 ## stockpile out to a workstation that's running short (e.g. wood to a
@@ -394,6 +562,9 @@ func _run_hauler_loop(session: int) -> void:
 	while _work_active and session == _work_session:
 		var job := _find_haul_job()
 		if job.is_empty():
+			current_task = "Idle"
+			if not is_inside_tree():
+				return
 			await get_tree().create_timer(IDLE_RETRY_DELAY).timeout
 			continue
 		if not await _execute_haul_job(job, session):
@@ -407,11 +578,13 @@ func _run_hauler_loop(session: int) -> void:
 ## reassignment interrupted the trip.
 func _execute_haul_job(job: Dictionary, session: int) -> bool:
 	if job["type"] == "construction":
+		current_task = "Delivering %s" % String(job["resource"]).capitalize()
 		return await _deliver_construction_material(job["post"], session, job["resource"])
 
 	var post: Workstation = job["post"]
 
 	if job["type"] == "output":
+		current_task = "Hauling %s" % post.resource_type.capitalize()
 		await _move_to(post.get_worker_spot())
 		if session != _work_session:
 			return false
@@ -419,6 +592,7 @@ func _execute_haul_job(job: Dictionary, session: int) -> bool:
 			return true
 		return await _haul_to_stockpile(post, session, post.resource_type, "")
 	else:
+		current_task = "Delivering %s" % String(job["resource"]).capitalize()
 		return await _deliver_to_post(post, session, job["resource"])
 
 
@@ -433,6 +607,9 @@ func _execute_haul_job(job: Dictionary, session: int) -> bool:
 func _assist_haul_or_wait(session: int) -> bool:
 	var job := _find_haul_job()
 	if job.is_empty():
+		current_task = "Idle"
+		if not is_inside_tree():
+			return false
 		await get_tree().create_timer(IDLE_RETRY_DELAY).timeout
 		return session == _work_session
 	return await _execute_haul_job(job, session)
@@ -578,6 +755,8 @@ func _haul_to_stockpile(post: Workstation, session: int, drop_resource: String, 
 	if carried:
 		_gain_skill_xp("strength", XP_PER_GATHER)
 
+	if not is_inside_tree():
+		return false
 	await get_tree().create_timer(STOCKPILE_PAUSE).timeout
 	return session == _work_session
 
@@ -602,6 +781,9 @@ func _deliver_to_post(post: Workstation, session: int, resource: String) -> bool
 		return true
 	GameState.spend({resource: take})
 
+	if not is_inside_tree():
+		GameState.add_resource(resource, take)
+		return false
 	await get_tree().create_timer(STOCKPILE_PAUSE).timeout
 	if session != _work_session:
 		# Carrying `take` and about to be reassigned - hand it back rather
@@ -656,6 +838,9 @@ func _deliver_construction_material(site: ConstructionSite, session: int, resour
 		return true
 	GameState.spend({resource: take})
 
+	if not is_inside_tree():
+		GameState.add_resource(resource, take)
+		return false
 	await get_tree().create_timer(STOCKPILE_PAUSE).timeout
 	if session != _work_session:
 		GameState.add_resource(resource, take)
@@ -694,6 +879,7 @@ func _deliver_construction_material(site: ConstructionSite, session: int, resour
 func _run_generic_work_loop(post: Workstation, session: int) -> void:
 	while _work_active and session == _work_session:
 		if post.output_buffer >= _carry_capacity(post):
+			current_task = "Hauling %s" % post.resource_type.capitalize()
 			if not await _haul_to_stockpile(post, session, post.resource_type, ""):
 				return
 			## _haul_to_stockpile leaves the character standing at the
@@ -708,14 +894,20 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 				return
 			continue
 
-		await get_tree().create_timer(post.work_interval).timeout
+		current_task = "Gathering %s" % post.resource_type.capitalize()
+		await _wait_for_tick(post.work_interval)
 		if session != _work_session:
 			return
 
 		var multiplier: float = data.get_skill_multiplier(post.get_skill_id())
 		var amount: float = post.output_per_tick * multiplier * GameState.happiness_output_multiplier
 		post.output_buffer += amount
-		gather_sound.play()
+		## _run_generic_work_loop is StoneMine's loop - every other
+		## Workstation subclass dispatches to its own dedicated loop (see
+		## _start_work) - so MINE_SOUNDS is always the right pool here,
+		## with no branching needed the way _run_farm_loop's shared call
+		## site (Farm/Brickmaker/Workshop) needs.
+		_play_gather_sound(MINE_SOUNDS)
 		var xp: float = amount * XP_PER_RESOURCE_UNIT
 		_gain_skill_xp(post.get_skill_id(), xp)
 		_show_gather_feedback(post.resource_type, amount, xp)
@@ -727,7 +919,9 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 ## haul cycle at all (nothing here is a resource that needs carrying to the
 ## stockpile, "labor" just represents time spent). Every work_interval,
 ## adds CONSTRUCTION_LABOR_PER_TICK * this worker's construction skill
-## multiplier * the settlement's happiness multiplier to labor_completed -
+## multiplier * the settlement's happiness multiplier * a multi-builder
+## effectiveness factor (see CONSTRUCTION_MULTI_BUILDER_EXPONENT - 1.0
+## whenever this worker is the only one on the site) to labor_completed -
 ## same "skill/happiness scale output, not a separate input" pattern every
 ## other work loop already follows, just with no input side to begin with.
 ## Once labor_completed reaches labor_required, tells the site it's done
@@ -735,16 +929,18 @@ func _run_generic_work_loop(post: Workstation, session: int) -> void:
 ## (including reassigning this character via the next job-assignment pass).
 func _run_construction_loop(site: ConstructionSite, session: int) -> void:
 	while _work_active and session == _work_session:
-		await get_tree().create_timer(site.work_interval).timeout
+		current_task = "Building"
+		await _wait_for_tick(site.work_interval)
 		if session != _work_session:
 			return
 		if not is_instance_valid(site):
 			return
 
 		var multiplier: float = data.get_skill_multiplier(site.get_skill_id())
-		var gain: float = CONSTRUCTION_LABOR_PER_TICK * multiplier * GameState.happiness_output_multiplier
+		var effectiveness: float = 1.0 / pow(maxf(site.active_workers, 1), CONSTRUCTION_MULTI_BUILDER_EXPONENT)
+		var gain: float = CONSTRUCTION_LABOR_PER_TICK * multiplier * GameState.happiness_output_multiplier * effectiveness
 		site.labor_completed += gain
-		gather_sound.play()
+		_play_gather_sound(DEFAULT_GATHER_SOUNDS)
 		_gain_skill_xp(site.get_skill_id(), XP_PER_GATHER)
 		_show_gather_feedback("labor", gain, XP_PER_GATHER)
 		site.refresh_label()
@@ -768,13 +964,26 @@ func _run_construction_loop(site: ConstructionSite, session: int) -> void:
 ## accrues here.
 func _run_training_loop(post: Workstation, session: int) -> void:
 	while _work_active and session == _work_session:
-		await get_tree().create_timer(post.work_interval).timeout
+		current_task = "Training"
+		await _wait_for_tick(post.work_interval)
 		if session != _work_session:
 			return
 
 		var multiplier: float = data.get_skill_multiplier(post.get_skill_id())
 		var drill: float = TRAINING_DRILL_PER_TICK * multiplier * GameState.happiness_output_multiplier
-		gather_sound.play()
+		## Barracks/Archery Range/Mage Tower train melee_combat/archery/
+		## spellcasting respectively (BuildingCatalog's skill_id per entry) -
+		## picks the matching drill sound rather than one generic tick, same
+		## reasoning as _run_farm_loop's Brickmaker branch below.
+		match post.get_skill_id():
+			"melee_combat":
+				_play_gather_sound(SWORD_DRILL_SOUNDS)
+			"archery":
+				_play_gather_sound(BOW_DRILL_SOUNDS)
+			"spellcasting":
+				_play_gather_sound(SPELL_DRILL_SOUNDS)
+			_:
+				_play_gather_sound(DEFAULT_GATHER_SOUNDS)
 		_gain_skill_xp(post.get_skill_id(), XP_PER_GATHER)
 		_show_gather_feedback("training", drill, XP_PER_GATHER)
 
@@ -806,6 +1015,7 @@ func _run_farm_loop(post: Workstation, session: int) -> void:
 		var input_needed: float = post.input_per_tick
 
 		if post.input_buffer < input_needed or post.output_buffer >= _carry_capacity(post):
+			current_task = "Hauling %s" % post.resource_type.capitalize()
 			if not await _haul_to_stockpile(post, session, post.resource_type, post.get_input_resource()):
 				return
 			await _move_to(post.get_worker_spot())
@@ -819,7 +1029,8 @@ func _run_farm_loop(post: Workstation, session: int) -> void:
 					return
 				continue
 
-		await get_tree().create_timer(post.work_interval).timeout
+		current_task = "Producing %s" % post.resource_type.capitalize()
+		await _wait_for_tick(post.work_interval)
 		if session != _work_session:
 			return
 
@@ -845,7 +1056,10 @@ func _run_farm_loop(post: Workstation, session: int) -> void:
 		post.input_buffer -= input_needed
 		var amount: float = post.output_per_tick * multiplier * GameState.happiness_output_multiplier * water_bonus
 		post.output_buffer += amount
-		gather_sound.play()
+		## Brickmaker shares this loop (see the class's own doc comment
+		## above) but works stone, not a crop - MINE_SOUNDS fits it, not
+		## the crop-family default.
+		_play_gather_sound(MINE_SOUNDS if post is Brickmaker else DEFAULT_GATHER_SOUNDS)
 		var xp: float = amount * XP_PER_RESOURCE_UNIT
 		_gain_skill_xp(post.get_skill_id(), xp)
 		_show_gather_feedback(post.resource_type, amount, xp)
@@ -865,6 +1079,7 @@ func _run_farm_loop(post: Workstation, session: int) -> void:
 func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 	while _work_active and session == _work_session:
 		if camp.output_buffer >= _carry_capacity(camp):
+			current_task = "Hauling wood"
 			if not await _haul_to_stockpile(camp, session, "wood", ""):
 				return
 			continue
@@ -874,6 +1089,7 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 		if WorldGrid.count_trees_near(camp_cell, camp.search_radius) < camp.optimal_tree_count:
 			var plant_cell = WorldGrid.find_plantable_cell(camp_cell, camp.search_radius)
 			if plant_cell != null:
+				current_task = "Planting tree"
 				var target := WorldGrid.grid_to_local(Vector2(plant_cell.x, plant_cell.y))
 				await _move_to(target)
 				if session != _work_session:
@@ -893,12 +1109,14 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 
 		tree.claimed = true
 		_claimed_tree = tree
+		current_task = "Walking to tree"
 		await _move_to(tree.global_position)
 		if session != _work_session:
 			return
 
 		while _work_active and session == _work_session and is_instance_valid(tree) and tree.wood_remaining > 0.0 and camp.output_buffer < _carry_capacity(camp):
-			await get_tree().create_timer(camp.chop_interval).timeout
+			current_task = "Chopping tree"
+			await _wait_for_tick(camp.chop_interval)
 			if session != _work_session:
 				return
 			if not is_instance_valid(tree):
@@ -907,7 +1125,7 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 			if gained > 0.0 and data:
 				var amount: float = gained * data.get_skill_multiplier(camp.get_skill_id()) * GameState.happiness_output_multiplier
 				camp.output_buffer += amount
-				gather_sound.play()
+				_play_gather_sound(CHOP_SOUNDS)
 				var xp: float = amount * XP_PER_RESOURCE_UNIT
 				_gain_skill_xp(camp.get_skill_id(), xp)
 				_show_gather_feedback("wood", amount, xp)
@@ -915,3 +1133,33 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 		if is_instance_valid(tree) and tree.wood_remaining > 0.0:
 			tree.claimed = false
 		_claimed_tree = null
+
+
+## CELL_W/CELL_H are the sheet's per-frame grid stride (used to locate a
+## frame's column/row), not its content size - every frame in this sheet
+## only draws into a small part of its 16x17 cell (measured: content never
+## exceeds local x=[3,15], y=[2,13] across every row this game uses, villager
+## included). FRAME_INSET/FRAME_SIZE crop to that shared tight bounding box
+## instead of the full padded cell, so `scale` maps onto actual drawn pixels
+## - matching combat_unit.gd's identical crop (kept in lockstep since both
+## draw from the same sheet's same grid). This alone doesn't change how big
+## anything renders (scale times content-pixel-count is unaffected by how
+## much transparent padding surrounded it) - it only makes the crop/anchor
+## math well-defined for whatever scale gets chosen, here or later.
+static func _build_sprite_frames(row_1indexed: int) -> SpriteFrames:
+	const CELL_W := 16
+	const CELL_H := 17
+	const FRAME_INSET := Vector2(3, 2)
+	const FRAME_SIZE := Vector2(12, 11)
+	var frames := SpriteFrames.new()
+	frames.remove_animation(&"default")
+	frames.add_animation(&"walk")
+	frames.set_animation_loop(&"walk", true)
+	frames.set_animation_speed(&"walk", 6.0)
+	var y := (row_1indexed - 1) * CELL_H
+	for col in 4:
+		var atlas := AtlasTexture.new()
+		atlas.atlas = ENTITIES_SHEET
+		atlas.region = Rect2(col * CELL_W + FRAME_INSET.x, y + FRAME_INSET.y, FRAME_SIZE.x, FRAME_SIZE.y)
+		frames.add_frame(&"walk", atlas)
+	return frames

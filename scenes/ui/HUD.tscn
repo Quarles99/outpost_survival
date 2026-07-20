@@ -28,21 +28,34 @@ offset_top = 8.0
 offset_right = -12.0
 offset_bottom = -8.0
 
-[node name="FoodButton" type="Button" parent="Control/Rows"]
-flat = true
-text = "> Food: 0"
+[node name="FoodHeader" type="Label" parent="Control/Rows"]
+text = "Food"
+horizontal_alignment = 2
+
+[node name="FoodBreakdown" type="GridContainer" parent="Control/Rows"]
+columns = 3
+
+[node name="WoodRow" type="HBoxContainer" parent="Control/Rows"]
 alignment = 2
 
-[node name="FoodBreakdown" type="VBoxContainer" parent="Control/Rows"]
-visible = false
+[node name="Icon" type="TextureRect" parent="Control/Rows/WoodRow"]
+custom_minimum_size = Vector2(28, 28)
+texture_filter = 1
+stretch_mode = 5
 
-[node name="WoodLabel" type="Label" parent="Control/Rows"]
-text = "Wood: 0"
-horizontal_alignment = 2
+[node name="WoodLabel" type="Label" parent="Control/Rows/WoodRow"]
+text = "0"
 
-[node name="StoneLabel" type="Label" parent="Control/Rows"]
-text = "Stone: 0"
-horizontal_alignment = 2
+[node name="StoneRow" type="HBoxContainer" parent="Control/Rows"]
+alignment = 2
+
+[node name="Icon" type="TextureRect" parent="Control/Rows/StoneRow"]
+custom_minimum_size = Vector2(28, 28)
+texture_filter = 1
+stretch_mode = 5
+
+[node name="StoneLabel" type="Label" parent="Control/Rows/StoneRow"]
+text = "0"
 
 [node name="WaterLabel" type="Label" parent="Control/Rows"]
 text = "Water: None"
@@ -66,6 +79,9 @@ custom_minimum_size = Vector2(0, 8)
 [node name="BuildButton" type="Button" parent="Control/Rows"]
 text = "Build"
 
+[node name="CitizensButton" type="Button" parent="Control/Rows"]
+text = "Citizens"
+
 [node name="AttackButton" type="Button" parent="Control/Rows"]
 text = "Simulate Attack"
 
@@ -82,7 +98,7 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -76.0
-offset_top = -232.0
+offset_top = -160.0
 offset_right = -16.0
 offset_bottom = -16.0
 grow_horizontal = 0
@@ -94,7 +110,7 @@ text = "Food"
 horizontal_alignment = 1
 
 [node name="FoodBarFrame" type="Control" parent="FoodBarPanel"]
-custom_minimum_size = Vector2(36, 160)
+custom_minimum_size = Vector2(36, 100)
 
 [node name="Background" type="Panel" parent="FoodBarPanel/FoodBarFrame"]
 anchor_right = 1.0
@@ -104,9 +120,6 @@ anchor_bottom = 1.0
 color = Color(0.55, 0.6, 0.25, 1)
 
 [node name="MealWarning" type="ColorRect" parent="FoodBarPanel/FoodBarFrame"]
-visible = false
-
-[node name="Overlay" type="ColorRect" parent="FoodBarPanel/FoodBarFrame"]
 visible = false
 
 [node name="FoodBarValue" type="Label" parent="FoodBarPanel"]

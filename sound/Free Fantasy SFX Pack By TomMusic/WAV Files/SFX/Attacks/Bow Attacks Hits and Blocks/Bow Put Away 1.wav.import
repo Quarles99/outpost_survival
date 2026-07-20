@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://hrep4iyefh3t"
+path="res://.godot/imported/Bow Put Away 1.wav-26a1a04b8a77b28603337fe88e1f0616.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Put Away 1.wav"
+dest_files=["res://.godot/imported/Bow Put Away 1.wav-26a1a04b8a77b28603337fe88e1f0616.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

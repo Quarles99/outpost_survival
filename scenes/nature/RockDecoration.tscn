@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://art/Tiny Pixel Art/Isometric_MedievalFantasy_Tiles.png" id="1"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1"]
+atlas = ExtResource("1")
+region = Rect2(146, 0, 12, 17)
+
+[node name="RockDecoration" type="Sprite2D"]
+texture_filter = 1
+scale = Vector2(3.5, 3.5)
+texture = SubResource("AtlasTexture_1")
+centered = false
+offset = Vector2(-6, -14)

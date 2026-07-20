@@ -1,0 +1,1 @@
+- Mousing over any resource or building for more than 2 seconds (balance sheet reference needed here) open a tooltip window that describes the function of the thing and any relevant numbers and/or mechanics

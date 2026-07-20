@@ -232,6 +232,12 @@ var team_a: Array = []
 var team_b: Array = []
 var formation_a: Formation
 var formation_b: Formation
+
+## The one unit currently showing its name/level label - see
+## CombatUnit.set_selected. Mirrors Base._selected_character's pattern:
+## clicking a unit selects it (deselecting whichever was selected before),
+## clicking the same unit again or clicking empty ground deselects it.
+var _selected_unit: CombatUnit = null
 var strategist_a: StrategistAI
 var strategist_b: StrategistAI
 var matchup_index := 0
@@ -262,6 +268,7 @@ var _squad_casualty_ids: Array[String] = []
 
 
 func _ready() -> void:
+	get_viewport().physics_object_picking = true
 	camera.position = Vector2.ZERO
 	terrain = BattlefieldTerrain.new()
 	terrain.z_index = -1
@@ -432,6 +439,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 		return
 
+	## A unit's own _on_input_event consumes clicks that land on it (see
+	## CombatUnit._on_input_event's set_input_as_handled call), so any click
+	## reaching here landed on empty ground - deselect, same as Base does
+	## for citizens.
+	if event is InputEventMouseButton and event.pressed and _selected_unit:
+		_deselect_unit()
+		return
+
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_R:
 			_restart()
@@ -461,20 +476,23 @@ func _spawn_battle() -> void:
 	var roster_b: Array = []
 	var skill_levels_a: Array = []
 	var citizen_ids_a: Array = []
+	var citizen_names_a: Array = []
 
 	if BattleState.active:
 		## Real deployment - see Base._on_attack_pressed for how
 		## pending_squad was built (one entry per citizen currently assigned
-		## to a TrainingGround). The enemy roster is a same-composition
-		## mirror of the defending squad (mock skill levels, same as the
-		## free-play sandbox's own teams) - a deliberate first-pass stand-in
-		## for a real raider-generation system (see Docs/roadmap.md's
+		## to a TrainingGround). The enemy roster is a same-composition,
+		## same-levels mirror of the defending squad (skill_levels_a is
+		## reused for team B below, not left empty/mock like the free-play
+		## sandbox's own teams are) - a deliberate first-pass stand-in for a
+		## real raider-generation system (see Docs/roadmap.md's
 		## "raids/sieges" long-term item), not a balanced-encounter design.
 		matchup_label.text = "Defending the settlement"
 		for entry in BattleState.pending_squad:
 			roster_a.append(entry["unit_type"])
 			skill_levels_a.append(entry["skill_level"])
 			citizen_ids_a.append(entry["citizen_id"])
+			citizen_names_a.append(entry.get("citizen_name", ""))
 		roster_b = roster_a.duplicate()
 	else:
 		var matchup: Dictionary = MATCHUPS[matchup_index]
@@ -496,8 +514,14 @@ func _spawn_battle() -> void:
 	add_child(formation_b)
 	formation_b.setup(starting_preset, 1.0, bounds)
 
-	team_a = _spawn_team(CombatUnit.Team.A, formation_a, roster_a, skill_levels_a, citizen_ids_a)
-	team_b = _spawn_team(CombatUnit.Team.B, formation_b, roster_b)
+	team_a = _spawn_team(CombatUnit.Team.A, formation_a, roster_a, skill_levels_a, citizen_ids_a, citizen_names_a)
+	## skill_levels_a reused here (not a fresh mock roll) so a deployed
+	## enemy raider party scales with the defending squad's actual trained
+	## levels - see this function's own doc comment above. In the free-play
+	## sandbox skill_levels_a stays empty (only populated in the
+	## BattleState.active branch), so team B still falls back to
+	## _spawn_team's existing mock-level behavior there, unchanged.
+	team_b = _spawn_team(CombatUnit.Team.B, formation_b, roster_b, skill_levels_a)
 	# Only after _spawn_team returns a finished roster - it returns a new
 	# Array rather than mutating one in place, so assigning living_units any
 	# earlier would leave each formation watching a stale, permanently-empty
@@ -529,14 +553,16 @@ const MOCK_SKILL_LEVEL_MIN := 1
 const MOCK_SKILL_LEVEL_MAX := 70
 
 
-## `skill_levels`/`citizen_ids`, when non-empty, are positionally parallel to
-## `roster` - the real-deployment case (see _spawn_battle), where each
-## citizen's actual trained level (not a mock roll) and CharacterData.id
-## (for casualty tracking, see _on_unit_died) need to land on the matching
-## unit. Left empty for the free-play sandbox's own two teams and for the
-## generated enemy roster in deployment mode - both fall back to the
-## existing mock-level behavior exactly as before, and citizen_id stays "".
-func _spawn_team(team: CombatUnit.Team, formation: Formation, roster: Array, skill_levels: Array = [], citizen_ids: Array = []) -> Array:
+## `skill_levels`/`citizen_ids`/`citizen_names`, when non-empty, are
+## positionally parallel to `roster` - the real-deployment case (see
+## _spawn_battle), where each citizen's actual trained level (not a mock
+## roll), CharacterData.id (for casualty tracking, see _on_unit_died), and
+## display name (shown on selection, see CombatUnit.set_selected) need to
+## land on the matching unit. Left empty for the free-play sandbox's own two
+## teams and for the generated enemy roster in deployment mode - both fall
+## back to the existing mock-level behavior exactly as before, and
+## citizen_id/citizen_name stay "".
+func _spawn_team(team: CombatUnit.Team, formation: Formation, roster: Array, skill_levels: Array = [], citizen_ids: Array = [], citizen_names: Array = []) -> Array:
 	var units: Array = []
 	var offsets := formation.assign_slots(roster)
 	for i in roster.size():
@@ -544,11 +570,37 @@ func _spawn_team(team: CombatUnit.Team, formation: Formation, roster: Array, ski
 		add_child(unit)
 		unit.global_position = formation.global_position + offsets[i]
 		var skill_level: int = skill_levels[i] if i < skill_levels.size() else randi_range(MOCK_SKILL_LEVEL_MIN, MOCK_SKILL_LEVEL_MAX)
-		unit.setup(roster[i], team, [], formation.play_bounds, formation, offsets[i], skill_level, terrain)
 		if i < citizen_ids.size():
 			unit.citizen_id = citizen_ids[i]
+		if i < citizen_names.size():
+			unit.citizen_name = citizen_names[i]
+		## citizen_id/citizen_name must be set before setup() - setup() builds
+		## name_label's text from them once, up front, rather than the label
+		## re-reading them live later.
+		unit.setup(roster[i], team, [], formation.play_bounds, formation, offsets[i], skill_level, terrain)
+		unit.clicked.connect(_on_unit_selected)
 		units.append(unit)
 	return units
+
+
+## Clicking a unit shows its name/level label (and the citizen's own name,
+## for a real deployment's defenders); clicking the same already-selected
+## unit again just deselects it, same as clicking empty ground (see
+## _unhandled_input).
+func _on_unit_selected(unit: CombatUnit) -> void:
+	if _selected_unit == unit:
+		_deselect_unit()
+		return
+	if is_instance_valid(_selected_unit):
+		_selected_unit.set_selected(false)
+	_selected_unit = unit
+	_selected_unit.set_selected(true)
+
+
+func _deselect_unit() -> void:
+	if is_instance_valid(_selected_unit):
+		_selected_unit.set_selected(false)
+	_selected_unit = null
 
 
 ## An escaped unit (see CombatUnit.escaped/_escape()) is removed from its
@@ -562,12 +614,16 @@ func _spawn_team(team: CombatUnit.Team, formation: Formation, roster: Array, ski
 func _on_unit_died(unit: CombatUnit) -> void:
 	if unit.citizen_id != "":
 		_squad_casualty_ids.append(unit.citizen_id)
+	if _selected_unit == unit:
+		_selected_unit = null
 	team_a.erase(unit)
 	team_b.erase(unit)
 	_check_empty_teams()
 
 
 func _on_unit_escaped(unit: CombatUnit) -> void:
+	if _selected_unit == unit:
+		_selected_unit = null
 	team_a.erase(unit)
 	team_b.erase(unit)
 	_check_empty_teams()
@@ -615,6 +671,7 @@ func _return_to_base() -> void:
 
 
 func _restart() -> void:
+	_selected_unit = null
 	for unit in team_a + team_b:
 		if is_instance_valid(unit):
 			unit.queue_free()

@@ -11,15 +11,23 @@ class_name TrainingGroundPanel
 ## comments) - a third instance of the same "numbered option picker"
 ## convention rather than a new one.
 signal option_chosen(option_id: String)
+## Reported back to Base the same way CitizensPanel.citizen_selected/
+## BuildingInfoPanel.employee_selected are - a click on one of the
+## "employed here" rows below the Recruit/Upgrade/Train options, letting
+## the player select that unit (opens their SkillPanel).
+signal employee_selected(character: Character)
 
 const SLIDE_OFFSET := Vector2(0, 20)
 const ANIM_DURATION := 0.18
 
 @onready var panel_control: Control = $Control
 @onready var title_label: Label = $Control/Panel/VBoxContainer/TitleLabel
+@onready var description_label: Label = $Control/Panel/VBoxContainer/DescriptionLabel
 @onready var button_container: VBoxContainer = $Control/Panel/VBoxContainer/ButtonContainer
+@onready var employee_container: VBoxContainer = $Control/Panel/VBoxContainer/EmployeeScroll/EmployeeContainer
 
 var _buttons: Array[Button] = []
+var _employee_rows: Array[Control] = []
 var _option_callables: Array[Callable] = []
 var _base_position: Vector2
 var _anim_tween: Tween
@@ -36,10 +44,18 @@ func _ready() -> void:
 ## the shortcut can trigger it - reads as "not right now" rather than
 ## vanishing outright, same reasoning CropPanel/RecruitPanel don't need
 ## since every option they list is always choosable.
-func open_for(building_name: String, options: Array[Dictionary]) -> void:
+## `employees` - who currently works this specific Barracks/Archery Range/
+## Mage Tower (see Base._employees_of) - unlike Farm/plain workstations,
+## this can be several units (Workstation.max_workers is overridden to
+## TrainingGround.get_unit_cap(), 3+ per upgrade), hence the scrollable
+## EmployeeScroll wrapper rather than a single unbounded-height row list.
+func open_for(building_name: String, options: Array[Dictionary], employees: Array[Character] = [], description: String = "") -> void:
 	title_label.text = building_name
+	description_label.visible = not description.is_empty()
+	description_label.text = description
 	_clear_buttons()
 	_option_callables.clear()
+	_rebuild_employees(employees)
 
 	for i in options.size():
 		var option: Dictionary = options[i]
@@ -74,6 +90,34 @@ func close() -> void:
 func _choose(option_id: String) -> void:
 	option_chosen.emit(option_id)
 	close()
+
+
+func _choose_employee(character: Character) -> void:
+	employee_selected.emit(character)
+	close()
+
+
+## One clickable row per employed unit, or a single "Vacant" row if none.
+func _rebuild_employees(employees: Array[Character]) -> void:
+	for row in _employee_rows:
+		row.queue_free()
+	_employee_rows.clear()
+
+	if employees.is_empty():
+		var label := Label.new()
+		label.text = "Vacant"
+		label.modulate.a = 0.6
+		employee_container.add_child(label)
+		_employee_rows.append(label)
+		return
+
+	for character in employees:
+		var name_text: String = character.data.character_name if character.data else "Unknown"
+		var button := Button.new()
+		button.text = name_text
+		button.pressed.connect(func() -> void: _choose_employee(character))
+		employee_container.add_child(button)
+		_employee_rows.append(button)
 
 
 func _input(event: InputEvent) -> void:

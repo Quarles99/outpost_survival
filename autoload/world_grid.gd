@@ -179,3 +179,19 @@ func find_plantable_cell(from_cell: Vector2, radius_tiles: float):
 	if candidates.is_empty():
 		return null
 	return candidates.pick_random()
+
+
+## A free, in-bounds cell picked uniformly at random anywhere on the map -
+## unlike find_plantable_cell, not limited to a radius around one center
+## point. Used for scattering decoration (rocks, grass clumps) sparsely
+## across the whole map rather than clustered near a single point. Retries
+## a bounded number of times rather than enumerating every cell up front -
+## the map is mostly free space when this runs, so a handful of retries is
+## enough; giving up (returning null) just means one fewer decoration
+## spawns, same as find_plantable_cell running out of candidates.
+func find_random_cell_anywhere():
+	for i in 40:
+		var cell := Vector2i(randi_range(bounds_min.x, bounds_max.x), randi_range(bounds_min.y, bounds_max.y))
+		if is_free(cell):
+			return cell
+	return null

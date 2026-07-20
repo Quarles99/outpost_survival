@@ -72,6 +72,13 @@ func _choose(option: Dictionary) -> void:
 	close()
 
 
+## Cost used to be spelled out as plain text ("10 Wood, 5 Stone") in the
+## tooltip - replaced by _add_cost_row's icon+number chips directly on the
+## button per the icon-based resource UI (Outpost_Survival/Actionable
+## Ideas/New Icons.md: "any references to resources in the UI should use
+## the icon of that resource, not the name"). Godot tooltips are plain
+## strings with no room for a TextureRect, so the chips live on the button
+## face instead of in the tooltip.
 func _format_cost(cost: Dictionary) -> String:
 	if cost.is_empty():
 		return ""
@@ -144,6 +151,8 @@ func _add_button(option: Dictionary, keybind: String, on_pressed: Callable) -> v
 	name_label.offset_right -= 2
 	button.add_child(name_label)
 
+	_add_cost_row(button, option.get("cost", {}))
+
 	if not keybind.is_empty():
 		var keybind_label := Label.new()
 		keybind_label.text = keybind
@@ -157,6 +166,49 @@ func _add_button(option: Dictionary, keybind: String, on_pressed: Callable) -> v
 
 	button_container.add_child(button)
 	_buttons.append(button)
+
+
+## A row of icon+number chips along the button's bottom edge - the visible
+## cost readout now that the icon is what identifies the resource (see
+## _format_cost's doc comment above). Sits below name_label's full-rect
+## Label, which is fine since that Label's own text never reaches the
+## bottom edge at LABEL_FONT_SIZE=13 inside a 64px button.
+func _add_cost_row(button: Button, cost: Dictionary) -> void:
+	if cost.is_empty():
+		return
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 3)
+	row.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	row.offset_top = -14
+	row.offset_bottom = -2
+
+	for resource_name in cost:
+		var chip := HBoxContainer.new()
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_theme_constant_override("separation", 1)
+
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(10, 10)
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture = ResourceIcons.get_icon(resource_name)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(icon)
+
+		var amount_label := Label.new()
+		amount_label.text = str(int(cost[resource_name]))
+		amount_label.add_theme_font_size_override("font_size", 10)
+		amount_label.add_theme_color_override("font_color", Color.WHITE)
+		amount_label.add_theme_constant_override("outline_size", 2)
+		amount_label.add_theme_color_override("font_outline_color", Color.BLACK)
+		amount_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(amount_label)
+
+		row.add_child(chip)
+
+	button.add_child(row)
 
 
 func _clear_buttons() -> void:

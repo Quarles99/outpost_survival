@@ -92,6 +92,16 @@ func _clamp_position() -> void:
 	position.y = clampf(position.y, limit_top, limit_bottom)
 
 
+## Instant, not tweened - CitizensPanel's own idea note asks for a "snap",
+## and every other camera move here (drag, edge-scroll) is already a direct
+## position set too; a smooth pan would be the odd one out. Still routed
+## through _clamp_position() same as those, so snapping to a citizen right
+## at the map edge doesn't push the view past the configured limits.
+func focus_on(target: Vector2) -> void:
+	position = target
+	_clamp_position()
+
+
 func _zoom_by(amount: float) -> void:
 	_zoom_level = clampf(_zoom_level + amount, zoom_min, zoom_max)
 	if _zoom_tween:

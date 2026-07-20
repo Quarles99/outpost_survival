@@ -7,23 +7,43 @@ class_name Workstation
 ## job assignment either direction.
 signal disabled_changed(is_disabled: bool)
 
+## Fired on left-click - lets Base show a generic building-info panel
+## (name + who's currently employed here, see Base._on_building_info_
+## clicked/BuildingInfoPanel) for whichever Workstation subclass doesn't
+## already have its own left-click meaning. Farm (crop-retool panel) and
+## TrainingGround (recruit/upgrade panel) both extend this class too and
+## so also emit this signal on left-click alongside their own separate
+## `clicked` signal - harmless, since Base's wiring (_wire_building_info_
+## clicks) deliberately only connects it for the plain subclasses
+## (LumberCamp/StoneMine/Brickmaker/Workshop/ConstructionSite) and leaves
+## it unconnected (a no-op emit) for Farm/TrainingGround, whose own panels
+## show this same name+employees info instead - see CropPanel/
+## TrainingGroundPanel's own employee-list section.
+signal info_clicked
+
 ## Multiplied onto sprite_tint (not a replacement) so a disabled post still
 ## reads as "the same building, dimmed" rather than losing its crop/
 ## resource-specific color entirely.
 const DISABLED_TINT := Color(0.55, 0.55, 0.55)
 
-const RESOURCE_VISUALS := {
-	"cabbage": {
-		"texture": preload("res://art/iso_workstation_farm.svg"),
-		"centered": false,
-		"offset": Vector2(-138, -106),
-	},
-	"wood": {
-		"texture": preload("res://art/iso_workstation_woodpile.svg"),
-		"centered": false,
-		"offset": Vector2(-72, -102),
-	},
-}
+## Shared across every occluder class (WorldTree, House, OutpostHall, Well,
+## StorageFacility too) - see Base's "X-ray reveal" doc comment. One shared
+## ShaderMaterial instance is safe here since every parameter it reads is a
+## global uniform, not a per-instance one.
+const XRAY_MATERIAL := preload("res://shaders/xray_reveal_material.tres")
+
+## Emptied out - "cabbage" and "wood" used to force an override here
+## regardless of which scene a post actually was, which silently meant
+## LumberCamp (always resource_type "wood") rendered from this dict instead
+## of its own scene's baked-in Sprite2D, and a Farm-family post retooled
+## back to Cabbage would revert to whatever art lived here even if the
+## scene's own default had since moved on. Now that every Farm-family crop
+## and LumberCamp each carry their own correct baked-in sprite directly
+## (see _default_texture below), there's no resource_type left that needs
+## a cross-scene override - kept as an empty dict (not deleted) since
+## refresh_visual() still consults it and a future genuinely-shared-across-
+## scenes resource type could still want one.
+const RESOURCE_VISUALS := {}
 
 @export var display_name: String = "Workstation"
 @export var resource_type: String = "cabbage"
@@ -41,16 +61,21 @@ const RESOURCE_VISUALS := {
 @export var input_resource: String = ""
 ## Max units of resource_type a worker will accumulate here before hauling
 ## the lot to the stockpile - also how much a single haul trip carries.
-## Raised 6.0 -> 8.0 via Outpost_Survival/Balance.md's edit-and-hand-back
-## workflow.
-@export var carry_limit: float = 8.0
+## Raised 6.0 -> 8.0 -> 10.0 via Outpost_Survival/Game Systems/Balance.md's
+## edit-and-hand-back workflow.
+@export var carry_limit: float = 10.0
 ## Seconds between production ticks. Used directly by Character's generic
 ## work loop (e.g. StoneMine); Farm reads it too even though it has its own
 ## specialized loop, and LumberCamp ignores it in favor of chop_interval.
-## Doubled from 1.5 per an explicit request to slow work pace by a factor of
-## 2 (see Character.MOVE_SPEED's doc comment for the matching movement
-## slowdown, and Base's fast-forward system for the companion speed-up).
-@export var work_interval: float = 3.0
+## Doubled from 1.5 to 3.0 per an explicit request to slow work pace by a
+## factor of 2 (see Character.MOVE_SPEED's doc comment for the matching
+## movement slowdown, and Base's fast-forward system for the companion
+## speed-up), then doubled again 3.0 -> 6.0 via Outpost_Survival/Balance.md's
+## edit-and-hand-back workflow. Not itself save-persisted (see
+## Base.BUILDING_PROPERTIES/_apply_option_properties) - it's re-applied from
+## BuildingCatalog at placement/restore time, so this default change is
+## automatically backward-compatible with existing saves.
+@export var work_interval: float = 6.0
 ## How many citizens can be assigned here at once - most Workstations only
 ## have room for one at a time now (a first-pass default, not tuned via
 ## playtesting - a handful of catalog entries may still want to override it
@@ -64,6 +89,13 @@ const RESOURCE_VISUALS := {
 ## visually distinct - applied over whatever RESOURCE_VISUALS or the scene's
 ## own sprite picked. Identity tint (WHITE) leaves it untouched.
 @export var sprite_tint: Color = Color.WHITE
+## Short player-facing blurb shown in whichever info panel this post's
+## click opens (BuildingInfoPanel/CropPanel/TrainingGroundPanel - see
+## Base.BUILDING_PROPERTIES, which copies this from the catalog entry the
+## same way it does display_name/sprite_tint). Empty by default so a
+## catalog entry that hasn't been given one yet just shows nothing rather
+## than a placeholder string.
+@export var description: String = ""
 ## Right-click toggles this (see _on_input_event) - lets the player
 ## temporarily pull a post out of automatic job assignment (see
 ## Base._run_job_assignment) to send its worker elsewhere, without having
@@ -83,7 +115,6 @@ var output_buffer: float = 0.0
 ## Meaningless (stays 0, never read) for a post whose get_input_resource()
 ## is "" - LumberCamp and generic Workstation don't use it.
 var input_buffer: float = 0.0
-var _pulse_tween: Tween
 
 ## The scene's own baked-in sprite, captured before any RESOURCE_VISUALS
 ## override is applied - refresh_visual() falls back to this for a
@@ -101,34 +132,43 @@ func _ready() -> void:
 	_default_texture = sprite.texture
 	_default_centered = sprite.centered
 	_default_offset = sprite.offset
+	sprite.material = XRAY_MATERIAL
 	refresh_visual()
 	input_event.connect(_on_workstation_input_event)
 
 
-## "Farm\n1/1" - shows how full this post's worker slots are, not just its
-## name, refreshed on every add_worker()/remove_worker() so it stays live.
-## A disabled post appends " (Disabled)" to the name line (compare House's
-## " (Upgraded)" suffix).
+## "1/1" - just how full this post's worker slots are, refreshed on every
+## add_worker()/remove_worker() so it stays live. Used to also show the
+## building's own name above this, dropped per an explicit request ("remove
+## the floating name from above buildings but keep the number") - a
+## disabled post is still visually distinguishable via DISABLED_TINT on the
+## sprite itself (see refresh_visual()), so dropping the old " (Disabled)"
+## text suffix here doesn't lose that information.
 func _update_label() -> void:
-	var suffix := " (Disabled)" if disabled else ""
-	label.text = "%s%s\n%d/%d" % [display_name, suffix, active_workers, max_workers]
+	label.text = "%d/%d" % [active_workers, max_workers]
 
 
-## Right-click toggles `disabled` - left-click is already spoken for on a
-## Farm-family post (opens the crop panel, see Farm._on_input_event), so
-## this uses the other button rather than competing with it. Godot calls
-## every connected input_event listener for a given event regardless of
-## button, so Farm's own left-click handler and this one coexist fine on
-## the same Area2D. Deliberately a different method name than Farm's own
-## _on_input_event override - connecting a same-named method from this
-## base class's _ready() would resolve virtually to Farm's override
-## instead (GDScript has no way to bind "this class's implementation,
-## even from a subclass"), silently skipping this handler entirely and
-## double-connecting Farm's.
+## Right-click toggles `disabled`; left-click emits info_clicked (see its
+## own doc comment for why this is safe to also fire on Farm/TrainingGround,
+## which have their own separate left-click meaning via their own
+## _on_input_event override). Godot calls every connected input_event
+## listener for a given event regardless of button, so Farm's own
+## left-click handler and this one coexist fine on the same Area2D.
+## Deliberately a different method name than Farm's own _on_input_event
+## override - connecting a same-named method from this base class's
+## _ready() would resolve virtually to Farm's override instead (GDScript
+## has no way to bind "this class's implementation, even from a
+## subclass"), silently skipping this handler entirely and double-
+## connecting Farm's.
 func _on_workstation_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+	if not (event is InputEventMouseButton and event.pressed):
+		return
+	if event.button_index == MOUSE_BUTTON_RIGHT:
 		get_viewport().set_input_as_handled()
 		set_disabled(not disabled)
+	elif event.button_index == MOUSE_BUTTON_LEFT:
+		get_viewport().set_input_as_handled()
+		info_clicked.emit()
 
 
 func set_disabled(value: bool) -> void:
@@ -179,32 +219,18 @@ func get_input_resource() -> String:
 	return input_resource
 
 
+## No longer pulses the sprite while active (see _update_label's sibling
+## history) - removed per an explicit request ("remove the working
+## animation from all buildings, the villagers will be the ones animated
+## when working"). The sprite-scale pulse was also what farm.gd's
+## _start_pulse override existed to suppress (a big ground-diamond sprite
+## pulsing ±8% swept over the worker standing on it) - that override is gone
+## too now that there's nothing left to override.
 func add_worker() -> void:
 	active_workers += 1
 	_update_label()
-	if active_workers == 1:
-		_start_pulse()
 
 
 func remove_worker() -> void:
 	active_workers = max(0, active_workers - 1)
 	_update_label()
-	if active_workers == 0:
-		_stop_pulse()
-
-
-func _start_pulse() -> void:
-	if _pulse_tween:
-		_pulse_tween.kill()
-	_pulse_tween = create_tween()
-	_pulse_tween.set_loops()
-	_pulse_tween.tween_property(sprite, "scale", Vector2(1.08, 1.08), 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_pulse_tween.tween_property(sprite, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-
-func _stop_pulse() -> void:
-	if _pulse_tween:
-		_pulse_tween.kill()
-		_pulse_tween = null
-	var reset_tween := create_tween()
-	reset_tween.tween_property(sprite, "scale", Vector2.ONE, 0.15)

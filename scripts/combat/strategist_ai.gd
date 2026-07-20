@@ -18,7 +18,7 @@ class_name StrategistAI
 ## switching once it decides to, so a composition estimate flickering near
 ## a decision boundary can't cause rapid back-and-forth thrashing.
 const RE_EVAL_INTERVAL := 4.0
-const SWITCH_COOLDOWN := 6.0
+const SWITCH_COOLDOWN := 4.0
 
 ## Dominant-enemy-type -> the FormationCatalog preset that counters it - see
 ## that file's own comments for the DAMAGE_MULTIPLIERS-derived reasoning.

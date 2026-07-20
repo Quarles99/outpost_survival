@@ -12,11 +12,11 @@ signal storage_capacity_changed(capacity: float)
 ## of day being twice as long as night - simplicity was an explicit
 ## request, not an oversight. Originally derived to reproduce the old
 ## continuous-drain model's exact total (18.0/meal, 36.0/citizen/cycle),
-## then lowered to 10.0 (20.0/citizen/cycle) via Outpost_Survival/
-## Balance.md's edit-and-hand-back workflow - a deliberate easing back off
-## that derived value, not a re-derivation; see GameState.DEFAULT_RESOURCES'
-## "cabbage" comment for the resulting first-meal-affordability math.
-const FOOD_PER_CITIZEN_PER_MEAL := 10.0
+## lowered to 10.0, then raised to 12.0 (24.0/citizen/cycle) via
+## Outpost_Survival/Balance.md's edit-and-hand-back workflow - see
+## GameState.DEFAULT_RESOURCES' "cabbage" comment for the resulting
+## first-meal-affordability math.
+const FOOD_PER_CITIZEN_PER_MEAL := 12.0
 
 ## Every resource that satisfies hunger - a citizen doesn't care which kind
 ## it's eating. Consumption (see _consume_food) splits the need *evenly*
@@ -38,31 +38,19 @@ const FOOD_RESOURCES := ["cabbage", "potato", "fruit", "bread", "beer"]
 ## below) so reset_to_defaults() can restore exactly this without a second,
 ## driftable copy of the same starting values.
 const DEFAULT_RESOURCES := {
-	## Set via Outpost_Survival/Balance.md's edit-and-hand-back workflow -
-	## lowered from 50.0 back toward the pre-slowdown-session original
-	## (30.0), a deliberate hardening back off the "make a first recruit
-	## trivially easy" tuning from earlier this session, in keeping with
-	## this session's broader direction (gather-gated early buildings,
-	## periodic lump-sum meal consumption) toward a slower, more careful
-	## early game rather than an easy one. Consequence worth knowing: the
-	## very first meal (see FOOD_PER_CITIZEN_PER_MEAL) costs 10.0/citizen -
-	## 30.0 for the starting population of 3 - which exactly matches this
-	## starting amount, so the very first day/night transition drains
-	## cabbage to precisely 0 (no other FOOD_RESOURCES have any starting
-	## stock either) regardless of how quickly a Farm gets running.
-	"cabbage": 30.0,
-	## Set via Outpost_Survival/Balance.md's edit-and-hand-back workflow -
-	## raised from 5.0 to 10.0 alongside the matching Lumber Camp cost raise
-	## (5.0 -> 10.0, see BuildingCatalog.OPTIONS's "woodpile" entry) - still
-	## exactly enough for a Lumber Camp outright and nothing more, so the
-	## "gather for Farm/House" design from earlier this session (see
-	## Character.CONSTRUCTION_LABOR_PER_TICK's doc comment for the full
-	## history) is unchanged in shape, just scaled up alongside the costs
-	## that now require more wood to match. Previously 5.0, 11.0 (Lumber
-	## Camp + Farm outright), 21.0 (all three outright), and 16.0 (half the
-	## House) before that. See BuildingCatalog.OPTIONS for current costs;
-	## re-derive this if the Lumber Camp's cost ever changes again.
-	"wood": 10.0,
+	## Set via Outpost_Survival/Game Systems/Balance.md's edit-and-hand-back
+	## workflow - raised 30.0 -> 100.0, comfortably covering the very first
+	## meal (see FOOD_PER_CITIZEN_PER_MEAL) again unlike the previous 30.0,
+	## which the 36.0 first-meal cost (3 citizens) exceeded outright.
+	"cabbage": 100.0,
+	## Set via Outpost_Survival/Game Systems/Balance.md's edit-and-hand-back
+	## workflow - raised 10.0 -> 50.0 alongside the matching Lumber Camp cost
+	## raise (10.0 -> 50.0 at the time, see BuildingCatalog.OPTIONS's
+	## "woodpile" entry). The Lumber Camp cost has since come back down to
+	## 25.0 without this following it back down, so this is no longer tuned
+	## to be "exactly enough and nothing more" - it now covers a Lumber Camp
+	## with 25.0 left over. See BuildingCatalog.OPTIONS for current costs.
+	"wood": 50.0,
 	"stone": 0.0,
 	"grain": 0.0,
 	"flour": 0.0,
@@ -85,10 +73,15 @@ var population_capacity := DEFAULT_POPULATION
 ## Baseline exists even with zero Storage Facilities built, both so the
 ## game isn't unplayable from turn one and so it's comfortably above the
 ## starting resources dict - Storage Facilities add on top of it. Doubled
-## from 60.0 to 120.0 per an explicit request to double all storage
-## baseline/bonus across the board - see BuildingCatalog's "storage_facility"
-## entry for the matching Storage Facility bonus doubling.
-const BASE_STORAGE_CAPACITY := 120.0
+## from 60.0 to 120.0, then doubled again to 240.0, per an explicit request
+## to double all storage baseline/bonus across the board - see
+## BuildingCatalog's "storage_facility" entry for the matching Storage
+## Facility bonus doubling. Raised again, to 2000.0, via a direct code edit
+## made outside Balance.md's usual edit-and-hand-back workflow - reconciled
+## into Balance.md/Balance Changelog after the fact rather than the doc
+## driving this one at the time. Since brought back down to 1000.0 via a
+## real Balance.md edit-and-hand-back pass.
+const BASE_STORAGE_CAPACITY := 1000.0
 var storage_capacity := BASE_STORAGE_CAPACITY
 
 ## Water is deliberately not in `resources` - a Well provides unlimited

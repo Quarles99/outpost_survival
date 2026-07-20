@@ -9,13 +9,22 @@ signal clicked
 
 @export var display_name: String = "Outpost Hall"
 
+## See Workstation.XRAY_MATERIAL's doc comment - same shared material, same
+## reasoning.
+const XRAY_MATERIAL := preload("res://shaders/xray_reveal_material.tres")
+
 @onready var label: Label = $Label
 @onready var stockpile_spot: Marker2D = $StockpileSpot
+@onready var sprite: Sprite2D = $Sprite2D
 
 
 func _ready() -> void:
-	label.text = display_name
+	## No number to show and the name is dropped per an explicit request
+	## (see Workstation._update_label's own doc comment) - nothing left to
+	## float above the Outpost Hall.
+	label.text = ""
 	input_event.connect(_on_input_event)
+	sprite.material = XRAY_MATERIAL
 
 
 func get_stockpile_spot() -> Vector2:

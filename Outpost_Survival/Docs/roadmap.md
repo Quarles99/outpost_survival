@@ -9,7 +9,7 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 - **Water resource.** A Well grants unlimited access rather than a depletable stockpile - tracked as available/not. See [mechanics.md](mechanics.md#resources).
 - **Stone resource.** Mined with no input requirement; currently only spent on the Well and Storage Facility.
 - **Storage facility.** Resources are capped per-type; a facility raises the cap. Overflow is lost, not refunded. See [stats.md](stats.md#resource-storage).
-- **Alternative crop types.** Full grain→flour→bread and hops→beer chains, plus fruit/potato as no-input crops - all share one generalized converter class. See [stats.md](stats.md#workstation-production).
+- **Alternative crop types.** Full grain→flour→bread and hops→beer chains, plus fruit/potato/cabbage as wood-input crops - all share one generalized converter class. See [stats.md](stats.md#workstation-production).
 - **Happiness system.** Per-citizen happiness eases toward a target from water/food/variety; sustained low happiness costs a citizen permanently. See [mechanics.md](mechanics.md#happiness).
 - **Citizen recruitment.** Outpost Hall offers 3 candidates with pre-trained specializations, costing food. See [mechanics.md](mechanics.md#citizen-recruitment).
 - **Resource income/minute.** HUD rows show a rolling net rate alongside the current amount.

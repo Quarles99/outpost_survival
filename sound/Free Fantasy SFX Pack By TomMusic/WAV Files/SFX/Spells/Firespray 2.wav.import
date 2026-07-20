@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://w5nhrdq8u0d4"
+path="res://.godot/imported/Firespray 2.wav-a4a6ee2af8de8a2eb20ec2ae42f8ad9e.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/SFX/Spells/Firespray 2.wav"
+dest_files=["res://.godot/imported/Firespray 2.wav-a4a6ee2af8de8a2eb20ec2ae42f8ad9e.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

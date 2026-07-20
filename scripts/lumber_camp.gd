@@ -16,9 +16,12 @@ class_name LumberCamp
 ## Balance.md's edit-and-hand-back workflow.
 @export var wood_per_chop: float = 2.0
 ## Doubled from 1.2 alongside Workstation.work_interval, per an explicit
-## request to halve work pace across the board; nudged 2.4 -> 2.0 via
-## Outpost_Survival/Balance.md's edit-and-hand-back workflow.
-@export var chop_interval: float = 2.0
+## request to halve work pace across the board; nudged 2.4 -> 2.0 -> 3.0 via
+## Outpost_Survival/Balance.md's edit-and-hand-back workflow, then doubled
+## again 3.0 -> 6.0 alongside Workstation.work_interval's own 3.0 -> 6.0
+## default change, per an explicit request to include Lumber Camp in that
+## same global scaling operation.
+@export var chop_interval: float = 6.0
 
 
 func get_skill_id() -> String:

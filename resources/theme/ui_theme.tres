@@ -1,37 +1,51 @@
-[gd_resource type="Theme" format=3 uid="uid://ckrqqp8xe1lv0"]
+[gd_resource type="Theme" load_steps=2 format=3 uid="uid://ckrqqp8xe1lv0"]
 
-[sub_resource type="StyleBoxFlat" id="ButtonHover"]
+[ext_resource type="Texture2D" path="res://art/UIBundleFree/UIBundleFree/freefantasy.png" id="1"]
+
+[sub_resource type="StyleBoxTexture" id="ButtonNormal"]
+texture = ExtResource("1")
 content_margin_left = 12.0
 content_margin_top = 8.0
 content_margin_right = 12.0
 content_margin_bottom = 8.0
-bg_color = Color(0.32, 0.29, 0.24, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+texture_margin_left = 4.0
+texture_margin_top = 4.0
+texture_margin_right = 4.0
+texture_margin_bottom = 4.0
+region_rect = Rect2(96, 5, 32, 23)
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
+modulate_color = Color(0.85, 0.8, 0.75, 1)
 
-[sub_resource type="StyleBoxFlat" id="ButtonNormal"]
+[sub_resource type="StyleBoxTexture" id="ButtonHover"]
+texture = ExtResource("1")
 content_margin_left = 12.0
 content_margin_top = 8.0
 content_margin_right = 12.0
 content_margin_bottom = 8.0
-bg_color = Color(0.22, 0.2, 0.17, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+texture_margin_left = 4.0
+texture_margin_top = 4.0
+texture_margin_right = 4.0
+texture_margin_bottom = 4.0
+region_rect = Rect2(96, 5, 32, 23)
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
+modulate_color = Color(1.05, 1.0, 0.9, 1)
 
-[sub_resource type="StyleBoxFlat" id="ButtonPressed"]
+[sub_resource type="StyleBoxTexture" id="ButtonPressed"]
+texture = ExtResource("1")
 content_margin_left = 12.0
 content_margin_top = 8.0
 content_margin_right = 12.0
 content_margin_bottom = 8.0
-bg_color = Color(0.5, 0.4, 0.2, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+texture_margin_left = 4.0
+texture_margin_top = 4.0
+texture_margin_right = 4.0
+texture_margin_bottom = 4.0
+region_rect = Rect2(96, 5, 32, 23)
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
+modulate_color = Color(0.65, 0.55, 0.45, 1)
 
 [sub_resource type="StyleBoxFlat" id="PanelStyle"]
 bg_color = Color(0.12, 0.11, 0.1, 0.92)
@@ -45,9 +59,21 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
+[sub_resource type="StyleBoxTexture" id="DialogPanelStyle"]
+texture = ExtResource("1")
+texture_margin_left = 19.0
+texture_margin_top = 17.0
+texture_margin_right = 19.0
+texture_margin_bottom = 17.0
+region_rect = Rect2(84, 66, 71, 94)
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
+
 [resource]
 Button/styles/focus = SubResource("ButtonHover")
 Button/styles/hover = SubResource("ButtonHover")
 Button/styles/normal = SubResource("ButtonNormal")
 Button/styles/pressed = SubResource("ButtonPressed")
 Panel/styles/panel = SubResource("PanelStyle")
+DialogPanel/base_type = "Panel"
+DialogPanel/styles/panel = SubResource("DialogPanelStyle")

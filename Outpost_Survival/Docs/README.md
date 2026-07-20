@@ -13,4 +13,4 @@ A single-base isometric (2:1 dimetric) survival/builder. Citizens (3 to start, g
 
 ## Keeping this up to date
 
-This documentation is maintained alongside development: a fresh pass happens whenever an item in the `Ideas/` backlog (see `Home.md`) is implemented, so `mechanics.md` and `stats.md` should always describe the current build, not a stale one.
+This documentation is maintained alongside development: a fresh pass happens whenever an item in the `Actionable Ideas/` backlog (see `Home.md`) is implemented, so `mechanics.md` and `stats.md` should always describe the current build, not a stale one.

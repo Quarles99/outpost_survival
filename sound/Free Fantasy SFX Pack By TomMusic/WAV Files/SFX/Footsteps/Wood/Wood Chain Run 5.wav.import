@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://cr568hfenxxj5"
+path="res://.godot/imported/Wood Chain Run 5.wav-8ead85ecfe78280d3952599a6f59a063.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/SFX/Footsteps/Wood/Wood Chain Run 5.wav"
+dest_files=["res://.godot/imported/Wood Chain Run 5.wav-8ead85ecfe78280d3952599a6f59a063.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

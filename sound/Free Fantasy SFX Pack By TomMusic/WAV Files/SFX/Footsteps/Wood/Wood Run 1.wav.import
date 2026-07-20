@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://2jhvehr0q1ew"
+path="res://.godot/imported/Wood Run 1.wav-e279bae4c6b3d4b60bac018bfbc1ba78.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/SFX/Footsteps/Wood/Wood Run 1.wav"
+dest_files=["res://.godot/imported/Wood Run 1.wav-e279bae4c6b3d4b60bac018bfbc1ba78.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

@@ -33,6 +33,7 @@ const SKILL_LABELS := {
 
 @onready var panel_control: Control = $Control
 @onready var name_label: Label = $Control/Panel/VBoxContainer/NameLabel
+@onready var task_label: Label = $Control/Panel/VBoxContainer/TaskLabel
 @onready var skill_list: VBoxContainer = $Control/Panel/VBoxContainer/SkillList
 
 var _base_position: Vector2
@@ -48,8 +49,12 @@ func _ready() -> void:
 ## Always shows all 13 skills in SKILL_DISPLAY_ORDER, including untrained
 ## ones at level 1 - a fixed layout that doesn't reflow as a citizen picks
 ## up new skills reads more like a stats sheet than a shrinking/growing list.
+## task_label is a point-in-time snapshot of Character.current_task (see its
+## own doc comment) - re-open (re-click the citizen) for a fresh read rather
+## than watching it live-update.
 func open_for(character: Character) -> void:
 	name_label.text = character.data.character_name if character.data else "Unknown"
+	task_label.text = character.current_task
 	_clear_skill_labels()
 
 	for skill_id in SKILL_DISPLAY_ORDER:

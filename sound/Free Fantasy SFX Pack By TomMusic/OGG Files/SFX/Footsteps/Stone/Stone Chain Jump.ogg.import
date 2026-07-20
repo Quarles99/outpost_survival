@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://v01vdtmgwsus"
+path="res://.godot/imported/Stone Chain Jump.ogg-56aa9783998ad066a3eeef52e446bc14.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Footsteps/Stone/Stone Chain Jump.ogg"
+dest_files=["res://.godot/imported/Stone Chain Jump.ogg-56aa9783998ad066a3eeef52e446bc14.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

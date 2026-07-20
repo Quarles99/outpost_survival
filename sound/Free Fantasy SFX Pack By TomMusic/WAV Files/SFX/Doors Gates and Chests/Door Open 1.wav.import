@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://balcn33ovqexw"
+path="res://.godot/imported/Door Open 1.wav-58ec9e9f8c6b4305319bb6b06a88f746.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/SFX/Doors Gates and Chests/Door Open 1.wav"
+dest_files=["res://.godot/imported/Door Open 1.wav-58ec9e9f8c6b4305319bb6b06a88f746.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

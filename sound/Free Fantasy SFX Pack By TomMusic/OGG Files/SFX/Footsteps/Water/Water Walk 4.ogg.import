@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://c0p528s1h1u7m"
+path="res://.godot/imported/Water Walk 4.ogg-922bb44952965d23ddb013e969507789.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Footsteps/Water/Water Walk 4.ogg"
+dest_files=["res://.godot/imported/Water Walk 4.ogg-922bb44952965d23ddb013e969507789.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

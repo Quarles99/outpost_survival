@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://djck1mpfge2b6"
+path="res://.godot/imported/Chest Open 1.wav-d3018a46904f25d73b25a976b775bc3b.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/SFX/Doors Gates and Chests/Chest Open 1.wav"
+dest_files=["res://.godot/imported/Chest Open 1.wav-d3018a46904f25d73b25a976b775bc3b.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

@@ -1,4 +1,4 @@
-extends Node2D
+extends Area2D
 class_name CombatUnit
 
 ## Standalone combat-sandbox actor (see scenes/combat/CombatTest.tscn) - not
@@ -8,6 +8,10 @@ class_name CombatUnit
 ## prototype targeting/damage/kiting feel in isolation before that
 ## integration happens, so its stats/logic are expected to migrate into a
 ## Character work loop later rather than stay a separate class forever.
+##
+## Area2D (not Node2D) specifically so it can be clicked - same pattern as
+## Character (see character.gd) - to select it and reveal its name_label,
+## which is otherwise hidden (see set_selected).
 
 signal died(unit: CombatUnit)
 ## Fired when a routing unit successfully flees the battle - see _escape().
@@ -16,8 +20,20 @@ signal died(unit: CombatUnit)
 ## fight. CombatTestManager removes it from its team array exactly like a
 ## death, since either way the unit is no longer available to fight.
 signal escaped(unit: CombatUnit)
+## Fired on left-click - CombatTestManager owns the actual single-selection
+## bookkeeping (_on_unit_selected/_selected_unit), same division of
+## responsibility as Character.clicked/Base._on_character_selected.
+signal clicked(unit: CombatUnit)
 
-enum UnitType { SHIELDBEARER, MARAUDER, ARCHER, MAGE, OUTRIDER, TRAPPER }
+## PIKEMAN/SKIRMISHER added per an explicit request ("Choosing what units to
+## use at a barracks" - see Outpost_Survival/Actionable Ideas/Completed/ once
+## filed) - Barracks can now be built as a Shieldbearer/Marauder/Pikeman
+## producer, Archery Range as Archer/Skirmisher. Outrider/Trapper are
+## deliberately left fully intact rather than removed - see TrainingGround.
+## UNIT_CHOICES_BY_SKILL's doc comment for why (Stable/mounted units are a
+## deferred follow-up, and this keeps both fully testable in the free-play
+## sandbox meanwhile).
+enum UnitType { SHIELDBEARER, MARAUDER, ARCHER, MAGE, OUTRIDER, TRAPPER, PIKEMAN, SKIRMISHER }
 enum Team { A, B }
 
 const TYPE_NAMES := {
@@ -27,15 +43,83 @@ const TYPE_NAMES := {
 	UnitType.MAGE: "Mage",
 	UnitType.OUTRIDER: "Outrider",
 	UnitType.TRAPPER: "Trapper",
+	UnitType.PIKEMAN: "Pikeman",
+	UnitType.SKIRMISHER: "Skirmisher",
 }
+
+## Tiny Pixel Art roster (art/Tiny Pixel Art/IsometricTRPGAssetPack_Entities.png)
+## - one 4-frame "walk" animation per type, picked for visual distinctiveness
+## on the battlefield rather than a literal thematic match (the pack has no
+## mounted unit for "Outrider", no trap-setter for "Trapper", etc.) - see
+## Outpost_Survival/Actionable Ideas/Implement New Art.md's completion
+## write-up for the full row mapping. Pikeman (row 9, a green-cloaked figure
+## with a visibly longer polearm-like weapon) and Skirmisher (row 24, a
+## purple-hooded crossbow-wielder) picked the same way - browsed every unused
+## row in the sheet for whichever looked distinct from every row already
+## claimed, not a thematic "pikeman"/"skirmisher" sprite (the pack has
+## neither). Skirmisher's row is a back-facing companion to Trapper's own
+## row 23 (same crossbow character, different pose) - the only other bow-
+## wielding rows in the whole sheet besides Archer's own row 5, which is
+## already spoken for. Close enough in palette to Trapper to be worth a
+## second look in actual play (both purple-hooded), but distinct enough in
+## pose/silhouette to tell apart at battle scale - revisit if it reads as
+## too similar once both are on screen together.
+##
+## Built in code (_sprite_frames_for) rather than as standalone .tres
+## resources - a hand-authored SpriteFrames.tres that's only ever reached
+## via preload() in a script (never opened directly in the editor, unlike
+## Character.tscn's villager.tres) turned out not to survive the editor's
+## own resave path: opening the CombatUnit scene silently dropped every
+## AtlasTexture's `atlas` reference, leaving every unit invisible (health
+## bar/name label still drew fine, since those aren't part of the sprite).
+## Building it fresh from GDScript every time sidesteps that entirely - same
+## reasoning as why the ground tiles are AtlasTextures built in code, not a
+## saved resource.
+const ENTITIES_SHEET := preload("res://art/Tiny Pixel Art/IsometricTRPGAssetPack_Entities.png")
+const UNIT_SPRITE_ROW := {
+	UnitType.SHIELDBEARER: 7,
+	UnitType.MARAUDER: 17,
+	UnitType.ARCHER: 5,
+	UnitType.MAGE: 19,
+	UnitType.OUTRIDER: 13,
+	UnitType.TRAPPER: 23,
+	UnitType.PIKEMAN: 9,
+	UnitType.SKIRMISHER: 24,
+}
+
+
+## See Character._build_sprite_frames's identical doc comment - FRAME_INSET/
+## FRAME_SIZE crop to the tight content bbox shared by every row this sheet
+## is used for (villager included), kept in lockstep with that function
+## since both draw from the same sheet's same grid.
+static func _sprite_frames_for(row_1indexed: int) -> SpriteFrames:
+	const CELL_W := 16
+	const CELL_H := 17
+	const FRAME_INSET := Vector2(3, 2)
+	const FRAME_SIZE := Vector2(12, 11)
+	var frames := SpriteFrames.new()
+	frames.remove_animation(&"default")
+	frames.add_animation(&"walk")
+	frames.set_animation_loop(&"walk", true)
+	frames.set_animation_speed(&"walk", 6.0)
+	var y := (row_1indexed - 1) * CELL_H
+	for col in 4:
+		var atlas := AtlasTexture.new()
+		atlas.atlas = ENTITIES_SHEET
+		atlas.region = Rect2(col * CELL_W + FRAME_INSET.x, y + FRAME_INSET.y, FRAME_SIZE.x, FRAME_SIZE.y)
+		frames.add_frame(&"walk", atlas)
+	return frames
 
 ## Which types count as a "melee threat" ranged units evade - see
 ## _nearest_melee_threat(). Both Shieldbearer and Marauder qualify (the
 ## Swordsman split, see Ideas/Combat Units.md); Outrider/Trapper are also
 ## melee-range but deliberately excluded (see their own STATS comments -
 ## both are built around aggressively closing distance, not evading, so
-## they'd have nothing to fear from either even if they weren't).
-const MELEE_THREAT_TYPES := [UnitType.SHIELDBEARER, UnitType.MARAUDER]
+## they'd have nothing to fear from either even if they weren't). Pikeman
+## added alongside them - a real frontline holder like Shieldbearer/Marauder
+## (unlike Outrider/Trapper's aggressive-diver design), so a kiting Archer/
+## Mage/Skirmisher should want to avoid getting caught by one too.
+const MELEE_THREAT_TYPES := [UnitType.SHIELDBEARER, UnitType.MARAUDER, UnitType.PIKEMAN]
 
 ## Which combat skill each type trains - shared by role family rather than
 ## one skill per type (an explicit choice: mirrors the precedent where
@@ -54,7 +138,9 @@ const SKILL_ID := {
 	UnitType.MARAUDER: "melee_combat",
 	UnitType.OUTRIDER: "melee_combat",
 	UnitType.TRAPPER: "melee_combat",
+	UnitType.PIKEMAN: "melee_combat",
 	UnitType.ARCHER: "archery",
+	UnitType.SKIRMISHER: "archery",
 	UnitType.MAGE: "spellcasting",
 }
 
@@ -149,6 +235,34 @@ const STATS := {
 		"attack_interval": 1.1, "move_speed": 130.0, "ranged": false,
 		"avoids_melee": false, "melee_avoid_radius": 0.0,
 	},
+	## Trapper's replacement as the counter-specialist role at Barracks (see
+	## TrainingGround.UNIT_CHOICES_BY_SKILL) - longer reach than any other
+	## melee type (a spear, not a sword) and its hard counter is a straight
+	## damage bonus (see DAMAGE_MULTIPLIERS' OUTRIDER row) rather than
+	## Trapper's slow-debuff, since it's meant to read as "wins the matchup
+	## outright" the way a braced pike historically beats a charge, not
+	## "wins by kiting/crippling" the way Trapper does. No bonus damage or
+	## resistances against anything else, same "no defensive edge, wins
+	## through the one specific thing it's built for" shape Outrider/Trapper
+	## already established.
+	UnitType.PIKEMAN: {
+		"health": 100.0 * HEALTH_MULTIPLIER, "damage": 11.0, "attack_range": 65.0,
+		"attack_interval": 1.1, "move_speed": 125.0, "ranged": false,
+		"avoids_melee": false, "melee_avoid_radius": 0.0,
+	},
+	## Archer's alternative at Archery Range (see TrainingGround.
+	## UNIT_CHOICES_BY_SKILL) - a real trade-off, not a strict upgrade: less
+	## range/damage than Archer, but faster attacks, faster movement, and a
+	## hard counter specifically against Archer (see DAMAGE_MULTIPLIERS'
+	## ARCHER row) - wins an archer-vs-archer exchange, loses a bit of raw
+	## power everywhere else. Same "weak to melee, resists magic" defensive
+	## shape as Archer (see its own DAMAGE_MULTIPLIERS row) - the
+	## differentiation is entirely offensive, not defensive.
+	UnitType.SKIRMISHER: {
+		"health": 65.0 * HEALTH_MULTIPLIER, "damage": 13.0, "attack_range": 220.0,
+		"attack_interval": 1.0, "move_speed": 180.0, "ranged": true,
+		"avoids_melee": true, "melee_avoid_radius": 150.0,
+	},
 }
 
 ## Role behavior: target selection is a weighted score, not a strict ordered
@@ -180,19 +294,39 @@ const TYPE_PREFERENCE := {
 	UnitType.MARAUDER: {},
 	UnitType.ARCHER: {
 		UnitType.MAGE: 100.0, UnitType.OUTRIDER: 80.0, UnitType.ARCHER: 60.0,
-		UnitType.TRAPPER: 50.0, UnitType.MARAUDER: 35.0, UnitType.SHIELDBEARER: 15.0,
+		UnitType.SKIRMISHER: 55.0, UnitType.TRAPPER: 50.0, UnitType.PIKEMAN: 45.0,
+		UnitType.MARAUDER: 35.0, UnitType.SHIELDBEARER: 15.0,
 	},
 	UnitType.MAGE: {
 		UnitType.SHIELDBEARER: 100.0, UnitType.OUTRIDER: 50.0, UnitType.ARCHER: 40.0,
-		UnitType.TRAPPER: 40.0, UnitType.MAGE: 20.0, UnitType.MARAUDER: 30.0,
+		UnitType.TRAPPER: 40.0, UnitType.SKIRMISHER: 45.0, UnitType.PIKEMAN: 35.0,
+		UnitType.MAGE: 20.0, UnitType.MARAUDER: 30.0,
 	},
 	UnitType.OUTRIDER: {
-		UnitType.ARCHER: 100.0, UnitType.MAGE: 60.0, UnitType.TRAPPER: 30.0,
-		UnitType.MARAUDER: 10.0, UnitType.SHIELDBEARER: 5.0, UnitType.OUTRIDER: 20.0,
+		UnitType.ARCHER: 100.0, UnitType.SKIRMISHER: 90.0, UnitType.MAGE: 60.0,
+		UnitType.TRAPPER: 30.0, UnitType.MARAUDER: 10.0, UnitType.PIKEMAN: 15.0,
+		UnitType.SHIELDBEARER: 5.0, UnitType.OUTRIDER: 20.0,
 	},
 	UnitType.TRAPPER: {
 		UnitType.OUTRIDER: 90.0, UnitType.ARCHER: 40.0, UnitType.MAGE: 40.0,
-		UnitType.MARAUDER: 25.0, UnitType.SHIELDBEARER: 15.0, UnitType.TRAPPER: 20.0,
+		UnitType.SKIRMISHER: 35.0, UnitType.MARAUDER: 25.0, UnitType.PIKEMAN: 20.0,
+		UnitType.SHIELDBEARER: 15.0, UnitType.TRAPPER: 20.0,
+	},
+	## Takes over Trapper's "hunt the counter target" shape, retargeted at
+	## Outrider - its one hard counter (see STATS/DAMAGE_MULTIPLIERS) - with
+	## the same relative ordering otherwise.
+	UnitType.PIKEMAN: {
+		UnitType.OUTRIDER: 90.0, UnitType.ARCHER: 40.0, UnitType.MAGE: 40.0,
+		UnitType.SKIRMISHER: 35.0, UnitType.MARAUDER: 25.0, UnitType.TRAPPER: 20.0,
+		UnitType.SHIELDBEARER: 15.0, UnitType.PIKEMAN: 20.0,
+	},
+	## Same overall shape as Archer's own table (a fellow ranged unit that
+	## also wants casters dead first), but with Archer itself promoted to
+	## the top slot - its one hard counter (see STATS/DAMAGE_MULTIPLIERS).
+	UnitType.SKIRMISHER: {
+		UnitType.ARCHER: 100.0, UnitType.MAGE: 70.0, UnitType.OUTRIDER: 60.0,
+		UnitType.TRAPPER: 45.0, UnitType.PIKEMAN: 40.0, UnitType.MARAUDER: 30.0,
+		UnitType.SHIELDBEARER: 15.0, UnitType.SKIRMISHER: 20.0,
 	},
 }
 
@@ -518,13 +652,34 @@ const SLOW_DURATION := 4.0
 ## every direction, including against each other - both were explicitly
 ## designed to win through mobility/crowd-control instead of the damage
 ## triangle, not to be a faction in it.
+## Every row extended with PIKEMAN/SKIRMISHER columns (defender's incoming
+## multiplier vs those two as attackers) - direct-indexed both directions
+## (_attack()/_point_cost() etc. all use DAMAGE_MULTIPLIERS[x][y] with no
+## .get() fallback), so every row needs an entry for every UnitType, no
+## exceptions. Shieldbearer/Marauder get the same arrow-resistance treatment
+## against Skirmisher they already have against Archer (0.4/0.6 - armor
+## stops an arrow the same regardless of which archer-type unit fired it,
+## per this table's own existing "Archer/Mage's weakness to melee is a
+## property of their row, not attacker-specific" convention, applied here in
+## the opposite direction). Archer/Mage take the same 1.5x "weak to melee"
+## penalty from Pikeman they already take from Shieldbearer/Marauder, for
+## the same reason. Pikeman's own row is flat 1.0 vs everything (no
+## defensive edge, same shape as Outrider/Trapper) - its hard counter vs
+## Outrider lives entirely in Outrider's row instead (2.0, the actual
+## "incoming damage" this table encodes), same as how Skirmisher's hard
+## counter vs Archer lives in Archer's row (1.8), not Skirmisher's own.
+## Skirmisher's own row otherwise mirrors Archer's defensive shape (weak to
+## melee, resists magic) - its differentiation from Archer is offensive
+## only.
 const DAMAGE_MULTIPLIERS := {
-	UnitType.SHIELDBEARER: {UnitType.SHIELDBEARER: 1.0, UnitType.MARAUDER: 1.0, UnitType.ARCHER: 0.4, UnitType.MAGE: 1.7, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
-	UnitType.MARAUDER: {UnitType.SHIELDBEARER: 1.0, UnitType.MARAUDER: 1.0, UnitType.ARCHER: 0.6, UnitType.MAGE: 1.0, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
-	UnitType.ARCHER: {UnitType.SHIELDBEARER: 1.5, UnitType.MARAUDER: 1.5, UnitType.ARCHER: 1.0, UnitType.MAGE: 0.5, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
-	UnitType.MAGE: {UnitType.SHIELDBEARER: 1.5, UnitType.MARAUDER: 1.5, UnitType.ARCHER: 1.5, UnitType.MAGE: 0.5, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
-	UnitType.OUTRIDER: {UnitType.SHIELDBEARER: 1.0, UnitType.MARAUDER: 1.0, UnitType.ARCHER: 1.0, UnitType.MAGE: 1.0, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
-	UnitType.TRAPPER: {UnitType.SHIELDBEARER: 1.0, UnitType.MARAUDER: 1.0, UnitType.ARCHER: 1.0, UnitType.MAGE: 1.0, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0},
+	UnitType.SHIELDBEARER: {UnitType.SHIELDBEARER: 1.0, UnitType.MARAUDER: 1.0, UnitType.ARCHER: 0.4, UnitType.MAGE: 1.7, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0, UnitType.PIKEMAN: 1.0, UnitType.SKIRMISHER: 0.4},
+	UnitType.MARAUDER: {UnitType.SHIELDBEARER: 1.0, UnitType.MARAUDER: 1.0, UnitType.ARCHER: 0.6, UnitType.MAGE: 1.0, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0, UnitType.PIKEMAN: 1.0, UnitType.SKIRMISHER: 0.6},
+	UnitType.ARCHER: {UnitType.SHIELDBEARER: 1.5, UnitType.MARAUDER: 1.5, UnitType.ARCHER: 1.0, UnitType.MAGE: 0.5, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0, UnitType.PIKEMAN: 1.5, UnitType.SKIRMISHER: 1.8},
+	UnitType.MAGE: {UnitType.SHIELDBEARER: 1.5, UnitType.MARAUDER: 1.5, UnitType.ARCHER: 1.5, UnitType.MAGE: 0.5, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0, UnitType.PIKEMAN: 1.5, UnitType.SKIRMISHER: 1.5},
+	UnitType.OUTRIDER: {UnitType.SHIELDBEARER: 1.0, UnitType.MARAUDER: 1.0, UnitType.ARCHER: 1.0, UnitType.MAGE: 1.0, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0, UnitType.PIKEMAN: 2.0, UnitType.SKIRMISHER: 1.0},
+	UnitType.TRAPPER: {UnitType.SHIELDBEARER: 1.0, UnitType.MARAUDER: 1.0, UnitType.ARCHER: 1.0, UnitType.MAGE: 1.0, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0, UnitType.PIKEMAN: 1.0, UnitType.SKIRMISHER: 1.0},
+	UnitType.PIKEMAN: {UnitType.SHIELDBEARER: 1.0, UnitType.MARAUDER: 1.0, UnitType.ARCHER: 1.0, UnitType.MAGE: 1.0, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0, UnitType.PIKEMAN: 1.0, UnitType.SKIRMISHER: 1.0},
+	UnitType.SKIRMISHER: {UnitType.SHIELDBEARER: 1.5, UnitType.MARAUDER: 1.5, UnitType.ARCHER: 1.0, UnitType.MAGE: 0.5, UnitType.OUTRIDER: 1.0, UnitType.TRAPPER: 1.0, UnitType.PIKEMAN: 1.5, UnitType.SKIRMISHER: 1.0},
 }
 
 ## Flat, subtractive defense - per an explicit request for an armor system
@@ -559,6 +714,8 @@ const ARMOR := {
 	UnitType.MAGE: 0.0,
 	UnitType.OUTRIDER: 0.0,
 	UnitType.TRAPPER: 0.0,
+	UnitType.PIKEMAN: 0.0,
+	UnitType.SKIRMISHER: 0.0,
 }
 
 ## Hard floor every hit deals regardless of armor - mirrors the classic
@@ -887,8 +1044,22 @@ var _skill_multiplier := 1.0
 ## generated enemy roster in a real deployment) - nothing reads this field
 ## for those, it's purely a lookup key for the deployment casualty report.
 var citizen_id := ""
+## Non-empty exactly when citizen_id is (same real-deployment-only
+## condition) - CharacterData.character_name, shown alongside the type/level
+## line in name_label once this unit is selected (see set_selected).
+var citizen_name := ""
 
-@onready var sprite: Sprite2D = $Sprite2D
+## Whether this unit is showing its name_label - see set_selected. Only one
+## unit is ever selected at a time; CombatTestManager owns that bookkeeping.
+var is_selected := false
+
+@onready var sprite: AnimatedSprite2D = $Sprite2D
+## The scene's authored scale (4x, to size the Tiny Pixel Art roster's
+## 16x17 source frames up to this game's scale) - _punch()'s hit-feedback
+## tween used to hardcode Vector2.ONE/Vector2(1.15,1.15) assuming a 1:1
+## baseline, which snapped every unit down to near-invisible size the
+## instant it took its first hit once the sprite's real baseline became 4x.
+var _full_scale: Vector2
 @onready var name_label: Label = $NameLabel
 @onready var health_bar_bg: ColorRect = $HealthBarBg
 @onready var health_bar_fill: ColorRect = $HealthBarFill
@@ -908,8 +1079,19 @@ func setup(p_unit_type: UnitType, p_team: Team, p_enemies: Array, p_play_bounds:
 	var stats: Dictionary = STATS[unit_type]
 	max_health = stats["health"] * _skill_multiplier
 	health = max_health
-	name_label.text = "%s Lv%d" % [TYPE_NAMES[unit_type], skill_level]
+	## citizen_name is "" for every sandbox/enemy unit (see its own doc
+	## comment) - only a real deployment's defenders get the citizen's own
+	## name on its own line above the type/level line.
+	var type_line := "%s Lv%d" % [TYPE_NAMES[unit_type], skill_level]
+	name_label.text = "%s\n%s" % [citizen_name, type_line] if citizen_name != "" else type_line
 	name_label.add_theme_color_override("font_color", TEAM_COLORS[team])
+	name_label.modulate.a = 0.0
+	input_event.connect(_on_input_event)
+	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
+	_full_scale = sprite.scale
+	sprite.sprite_frames = _sprite_frames_for(UNIT_SPRITE_ROW[unit_type])
+	sprite.play("walk")
 	sprite.modulate = TEAM_COLORS[team]
 	_update_health_bar()
 
@@ -1208,14 +1390,6 @@ func _process(delta: float) -> void:
 		_face(to_target)
 		_holding_position = true
 
-	if [0, 1, 5].has(unit_type) and is_instance_valid(formation) and not is_instance_valid(ward):
-		var dbg_leash_range: float = FORMATION_LEASH_RANGE * float(LEASH_MULTIPLIER.get(unit_type, 1.0))
-		var dbg_slot_dist: float = global_position.distance_to(formation.global_position + slot_offset)
-		if dbg_slot_dist / dbg_leash_range > 1.0 and Engine.get_process_frames() % 15 == 0:
-			print("BRANCHDBG id=%d type=%s slot_ratio=%.2f holding=%s fleeing=%s kiting=%s holding_back=%s dist_to_target=%.0f" % [
-				get_instance_id(), TYPE_NAMES[unit_type], dbg_slot_dist / dbg_leash_range,
-				_holding_position, _fleeing, _kiting_blocker, _holding_back, dist
-			])
 	if _holding_position:
 		nav_agent.set_velocity(Vector2.ZERO)
 	else:
@@ -1936,14 +2110,38 @@ func _escape() -> void:
 
 func _punch() -> void:
 	var tween := create_tween()
-	tween.tween_property(sprite, "scale", Vector2(1.15, 1.15), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(sprite, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_property(sprite, "scale", _full_scale * 1.15, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(sprite, "scale", _full_scale, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
 func _update_health_bar() -> void:
 	var frac := clampf(health / max_health, 0.0, 1.0) if max_health > 0.0 else 0.0
 	health_bar_fill.scale.x = frac
 	health_bar_fill.color = Color(0.3, 1.0, 0.3).lerp(Color(1.0, 0.2, 0.2), 1.0 - frac)
+
+
+func _on_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		get_viewport().set_input_as_handled()
+		clicked.emit(self)
+
+
+func _on_mouse_entered() -> void:
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
+
+
+func _on_mouse_exited() -> void:
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+
+
+## The name/level label (and citizen name, if any) only shows while this
+## unit is selected - a battlefield full of ~12+ permanently-labeled units
+## is unreadable clutter; this is the same "reveal on click" choice
+## Character.set_selected already made for town citizens.
+func set_selected(value: bool) -> void:
+	is_selected = value
+	var tween := create_tween()
+	tween.tween_property(name_label, "modulate:a", 1.0 if value else 0.0, 0.15)
 
 
 func _spawn_floating_text(text: String, color: Color) -> void:

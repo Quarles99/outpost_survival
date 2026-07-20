@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://cdnba17asl3mk"
+path="res://.godot/imported/Dirt Land.wav-8d477e8f455b3f0307da40a651a9f168.sample"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/WAV Files/SFX/Footsteps/Dirt/Dirt Land.wav"
+dest_files=["res://.godot/imported/Dirt Land.wav-8d477e8f455b3f0307da40a651a9f168.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

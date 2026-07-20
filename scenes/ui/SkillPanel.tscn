@@ -14,11 +14,12 @@ anchor_top = 1.0
 anchor_right = 0.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -320.0
+offset_top = -344.0
 offset_right = 260.0
 offset_bottom = -16.0
 
 [node name="Panel" type="Panel" parent="Control"]
+theme_type_variation = &"DialogPanel"
 anchor_right = 1.0
 anchor_bottom = 1.0
 
@@ -32,6 +33,10 @@ offset_bottom = -10.0
 
 [node name="NameLabel" type="Label" parent="Control/Panel/VBoxContainer"]
 text = "Character"
+
+[node name="TaskLabel" type="Label" parent="Control/Panel/VBoxContainer"]
+modulate = Color(1, 1, 1, 0.8)
+text = "Idle"
 
 [node name="SkillList" type="VBoxContainer" parent="Control/Panel/VBoxContainer"]
 

@@ -5,15 +5,16 @@ signal build_pressed
 signal menu_pressed
 signal attack_pressed
 signal speed_pressed
+signal citizens_pressed
 
 const COUNT_DURATION := 0.35
 const PUNCH_SCALE := Vector2(1.15, 1.15)
 
-## Order the collapsible Food row's sub-rows are listed in - every
-## GameState.FOOD_RESOURCES entry (edible, counted in the aggregate total)
-## followed by grain/flour (tracked per the design ask, but inedible on
-## their own - see GameState.FOOD_RESOURCES's doc comment - so excluded from
-## the aggregate sum below).
+## Order the Food grid's individual resource icons are listed in - every
+## GameState.FOOD_RESOURCES entry (edible, counted in the Food bar's
+## aggregate total) followed by grain/flour (tracked per the design ask, but
+## inedible on their own - see GameState.FOOD_RESOURCES's doc comment - so
+## excluded from that aggregate).
 const FOOD_BREAKDOWN_ORDER := ["cabbage", "potato", "fruit", "bread", "beer", "grain", "flour"]
 const FOOD_BREAKDOWN_LABELS := {
 	"cabbage": "Cabbage",
@@ -25,15 +26,17 @@ const FOOD_BREAKDOWN_LABELS := {
 	"flour": "Flour",
 }
 
-@onready var food_button: Button = $Control/Rows/FoodButton
-@onready var food_breakdown: VBoxContainer = $Control/Rows/FoodBreakdown
-@onready var wood_label: Label = $Control/Rows/WoodLabel
-@onready var stone_label: Label = $Control/Rows/StoneLabel
+@onready var food_breakdown: GridContainer = $Control/Rows/FoodBreakdown
+@onready var wood_label: Label = $Control/Rows/WoodRow/WoodLabel
+@onready var wood_icon: TextureRect = $Control/Rows/WoodRow/Icon
+@onready var stone_label: Label = $Control/Rows/StoneRow/StoneLabel
+@onready var stone_icon: TextureRect = $Control/Rows/StoneRow/Icon
 @onready var water_label: Label = $Control/Rows/WaterLabel
 @onready var population_label: Label = $Control/Rows/PopulationLabel
 @onready var happiness_label: Label = $Control/Rows/HappinessLabel
 @onready var day_label: Label = $Control/Rows/DayLabel
 @onready var build_button: Button = $Control/Rows/BuildButton
+@onready var citizens_button: Button = $Control/Rows/CitizensButton
 @onready var attack_button: Button = $Control/Rows/AttackButton
 @onready var speed_button: Button = $Control/Rows/SpeedButton
 @onready var menu_button: Button = $Control/Rows/MenuButton
@@ -41,20 +44,10 @@ const FOOD_BREAKDOWN_LABELS := {
 @onready var food_bar_frame: Control = $FoodBarPanel/FoodBarFrame
 @onready var food_bar_fill: ColorRect = $FoodBarPanel/FoodBarFrame/Fill
 @onready var food_bar_meal_warning: ColorRect = $FoodBarPanel/FoodBarFrame/MealWarning
-@onready var food_bar_overlay: ColorRect = $FoodBarPanel/FoodBarFrame/Overlay
 @onready var food_bar_value: Label = $FoodBarPanel/FoodBarValue
 
 const RATE_REFRESH_INTERVAL := 1.0
 
-## How far ahead the Food bar's green growth overlay projects, extrapolated
-## from the current GameState.get_food_income_per_minute() rate - short
-## enough to read as "about to happen" rather than a full-minute projection
-## that would overshoot the bar entirely for anything gaining food quickly.
-## Only used for the growth side now - see food_bar_meal_warning's doc
-## comment on _update_food_bar for why the loss side no longer uses a rate
-## extrapolation at all.
-const FOOD_BAR_PREVIEW_SECONDS := 30.0
-const FOOD_BAR_GAIN_COLOR := Color(0.4, 0.75, 0.35, 0.85)
 const FOOD_BAR_MEAL_WARNING_COLOR := Color(0.85, 0.25, 0.25, 0.85)
 
 ## Only wood/stone go through the single-resource tween/label path now -
@@ -67,17 +60,20 @@ var _count_tweens := {}
 var _save_indicator_tween: Tween
 var _rate_timer: Timer
 var _food_breakdown_labels: Dictionary = {}
-var _food_expanded := false
+var _food_breakdown_icons: Dictionary = {}
 
 
 func _ready() -> void:
 	_resource_labels = {"wood": wood_label, "stone": stone_label}
+	wood_icon.texture = ResourceIcons.get_icon("wood")
+	wood_icon.tooltip_text = "Wood"
+	stone_icon.texture = ResourceIcons.get_icon("stone")
+	stone_icon.tooltip_text = "Stone"
 	wood_label.resized.connect(func() -> void: wood_label.pivot_offset = wood_label.size / 2)
 	stone_label.resized.connect(func() -> void: stone_label.pivot_offset = stone_label.size / 2)
 	water_label.resized.connect(func() -> void: water_label.pivot_offset = water_label.size / 2)
 	population_label.resized.connect(func() -> void: population_label.pivot_offset = population_label.size / 2)
 	happiness_label.resized.connect(func() -> void: happiness_label.pivot_offset = happiness_label.size / 2)
-	food_button.resized.connect(func() -> void: food_button.pivot_offset = food_button.size / 2)
 	## food_bar_frame's actual size isn't reliable until the VBoxContainer it
 	## sits in has completed a layout pass (it stretches the frame to the
 	## container's own width, wider than the frame's own custom_minimum_size)
@@ -87,19 +83,28 @@ func _ready() -> void:
 	## _ready()-time call) keeps the fill/overlay correctly sized regardless
 	## of exactly when layout resolves.
 	food_bar_frame.resized.connect(_update_food_bar)
-	food_button.pressed.connect(_on_food_button_pressed)
 	GameState.resources_changed.connect(_on_resources_changed)
 	GameState.population_changed.connect(_on_population_changed)
 	GameState.water_changed.connect(_on_water_changed)
 	GameState.storage_capacity_changed.connect(_on_storage_capacity_changed)
 	build_button.pressed.connect(func() -> void: build_pressed.emit())
+	citizens_button.pressed.connect(func() -> void: citizens_pressed.emit())
 	attack_button.pressed.connect(func() -> void: attack_pressed.emit())
 	speed_button.pressed.connect(func() -> void: speed_pressed.emit())
 	menu_button.pressed.connect(func() -> void: menu_pressed.emit())
 
 	for food_resource in FOOD_BREAKDOWN_ORDER:
+		var cell := HBoxContainer.new()
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(24, 24)
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture = ResourceIcons.get_icon(food_resource)
+		cell.add_child(icon)
 		var label := Label.new()
-		food_breakdown.add_child(label)
+		cell.add_child(label)
+		food_breakdown.add_child(cell)
+		_food_breakdown_icons[food_resource] = icon
 		_food_breakdown_labels[food_resource] = label
 
 	for resource_name in _resource_labels:
@@ -129,9 +134,8 @@ func flash_message(text: String) -> void:
 
 
 ## Alternative Crop Types added several resource types (grain, flour, hops,
-## beer...) that don't have their own top-level HUD row - showing everything
-## flat would make this compact corner panel unreasonably tall, so anything
-## in FOOD_BREAKDOWN_ORDER folds into the collapsible Food row instead (see
+## beer...) that don't have their own top-level HUD row - anything in
+## FOOD_BREAKDOWN_ORDER goes to the Food grid instead (see
 ## _update_food_display) and everything else that isn't in _resource_labels
 ## (e.g. "hops", which isn't edible and isn't shown anywhere yet) is simply
 ## ignored. This handler is wired to every resource change though, not just
@@ -169,63 +173,61 @@ func _update_label_text(resource_name: String) -> void:
 		return
 	var value: float = _displayed[resource_name]
 	var rate := GameState.get_income_per_minute(resource_name)
-	label.text = "%s: %d/%d (%s%.1f/min)" % [resource_name.capitalize(), value, GameState.storage_capacity, "+" if rate >= 0.0 else "", rate]
+	label.text = "%d/%d (%s%.1f/min)" % [value, GameState.storage_capacity, "+" if rate >= 0.0 else "", rate]
 
 
-## Rebuilds the collapsed/expanded Food row: the aggregate total (sum of
-## GameState.FOOD_RESOURCES) on the clickable header, and every indented
-## sub-row's own amount/cap/rate underneath. Not smoothly tweened like
-## wood/stone's count-up (7 sub-values changing independently would read as
-## more animation than this compact a readout can support) - `punch` still
-## gets the same on-change juice those rows have, just skipped for the
-## purely time-based per-second rate refresh so the row doesn't visibly
-## pulse every second even when nothing actually changed.
+## Rebuilds the Food grid: every individual food resource always shows its
+## own icon + amount (no collapsed/expanded state anymore - removed per an
+## explicit request that each food type stay individually visible rather
+## than folded under a dropdown). Just the amount, not the full
+## amount/cap/rate wood and stone get - capacity is the same shared number
+## for every resource (already visible via wood/stone and the Food bar
+## below) and a full "%d/%d (+%.1f/min)" readout per row doesn't fit a
+## multi-column grid at a legible width, so the rate/capacity detail moves
+## to the icon's tooltip instead. Not smoothly tweened like wood/stone's
+## count-up (7 sub-values changing independently would read as more
+## animation than this compact a readout can support) - `punch` still gets
+## the same on-change juice, just applied to the whole grid at once, and
+## skipped for the purely time-based per-second rate refresh so it doesn't
+## visibly pulse every second even when nothing actually changed.
 func _update_food_display(punch: bool = false) -> void:
-	var total := GameState.get_total_food()
-	var arrow := "v" if _food_expanded else ">"
-	food_button.text = "%s Food: %d" % [arrow, total]
-
 	for resource_name in FOOD_BREAKDOWN_ORDER:
 		var label: Label = _food_breakdown_labels.get(resource_name)
-		if not label:
+		var icon: TextureRect = _food_breakdown_icons.get(resource_name)
+		if not label or not icon:
 			continue
 		var amount: float = GameState.resources.get(resource_name, 0.0)
 		var rate := GameState.get_income_per_minute(resource_name)
-		label.text = "    %s: %d/%d (%s%.1f/min)" % [FOOD_BREAKDOWN_LABELS[resource_name], amount, GameState.storage_capacity, "+" if rate >= 0.0 else "", rate]
+		label.text = "%d" % amount
+		icon.tooltip_text = "%s: %d/%d (%s%.1f/min)" % [FOOD_BREAKDOWN_LABELS[resource_name], amount, GameState.storage_capacity, "+" if rate >= 0.0 else "", rate]
 
 	if punch:
-		_punch_control(food_button)
+		_punch_control(food_breakdown)
 
 
 ## Vertical Food bar in the bottom-right corner (per Ideas/Completed/Resource
-## Consumption UI.md) - a graphical companion to the existing text Food row
-## above (Control/Rows/FoodButton), not a replacement, so a player can gauge
-## stock and trend at a glance without opening the breakdown. food_bar_fill
-## grows from the bottom of food_bar_frame same as any "tank" gauge.
+## Consumption UI.md) - a graphical companion to the individual food-type
+## icons above (Control/Rows/FoodBreakdown), not a replacement, so a player
+## can gauge aggregate stock and trend at a glance without reading every
+## icon. food_bar_fill grows from the bottom of food_bar_frame same as any
+## "tank" gauge.
 ##
-## Two independent overlay bands, not one that switches between them (the
-## original single-overlay version did, before GameState moved consumption
-## off a continuous per-second drain onto two flat meals a day/night cycle -
-## see FOOD_PER_CITIZEN_PER_MEAL): a smoothly-extrapolated rate no longer
-## means anything sensible for the *loss* side specifically, since
-## get_food_income_per_minute()'s rolling 60s window is mostly just
-## production between meals, then briefly reads a huge false spike right
-## after one (the meal itself scrolling through the window) before settling
-## back - extrapolating that spike 30s forward would predict a further drop
-## that isn't actually coming.
-## - food_bar_meal_warning (red, inside the top of the fill): not a
-##   projection at all - the *exact*, always-known cost of the next meal
-##   (FOOD_PER_CITIZEN_PER_MEAL * population_count), clamped to the fill's
-##   own height so it can't show losing more than currently in stock. Shown
-##   any time there's a population to feed, since a meal is coming
-##   regardless of current rate - this is "how big a bite is coming," not
-##   "are you currently trending down."
-## - food_bar_overlay (green, just above the fill): still the old rate-based
-##   growth preview over FOOD_BAR_PREVIEW_SECONDS - production genuinely is
-##   still continuous, so this half of the original design is still valid.
-##   Only shown when the rate is positive; hidden otherwise rather than
-##   trying to also express a negative rate here (that's what the meal
-##   warning band is for now).
+## Just the one overlay band now - a green rate-extrapolated growth preview
+## used to sit above the fill too, but production actually arrives in
+## discrete haul trips at each workstation's own work_interval, a totally
+## separate cadence from the day/night meal timing this bar's other overlay
+## (food_bar_meal_warning) is keyed to - a smoothly-extrapolated "next 30s"
+## band didn't correspond to anything real happening on that schedule, so it
+## was removed rather than kept as a misleading projection. Per an explicit
+## request, not a GameState change - GameState.get_food_income_per_minute()
+## still exists and still drives the text Food row's rate readout, just no
+## longer this bar's own overlay.
+## - food_bar_meal_warning (red, inside the top of the fill): the *exact*,
+##   always-known cost of the next meal (FOOD_PER_CITIZEN_PER_MEAL *
+##   population_count), clamped to the fill's own height so it can't show
+##   losing more than currently in stock. Shown any time there's a
+##   population to feed, since a meal is coming regardless of current rate -
+##   this is "how big a bite is coming," not "are you currently trending down."
 func _update_food_bar() -> void:
 	var capacity := GameState.storage_capacity
 	var total := GameState.get_total_food()
@@ -246,25 +248,7 @@ func _update_food_bar() -> void:
 	else:
 		food_bar_meal_warning.visible = false
 
-	var rate := GameState.get_food_income_per_minute()
-	if rate <= 0.0:
-		food_bar_overlay.visible = false
-	else:
-		var projected_total := clampf(total + rate * (FOOD_BAR_PREVIEW_SECONDS / 60.0), 0.0, capacity)
-		var projected_frac := clampf(projected_total / capacity, 0.0, 1.0) if capacity > 0.0 else 0.0
-		var band_height := (projected_frac - fill_frac) * frame_size.y
-		food_bar_overlay.visible = band_height > 0.0
-		food_bar_overlay.color = FOOD_BAR_GAIN_COLOR
-		food_bar_overlay.position = Vector2(0.0, frame_size.y - fill_height - band_height)
-		food_bar_overlay.size = Vector2(frame_size.x, band_height)
-
 	food_bar_value.text = "%d/%d" % [total, capacity]
-
-
-func _on_food_button_pressed() -> void:
-	_food_expanded = not _food_expanded
-	food_breakdown.visible = _food_expanded
-	_update_food_display()
 
 
 func _refresh_rates() -> void:

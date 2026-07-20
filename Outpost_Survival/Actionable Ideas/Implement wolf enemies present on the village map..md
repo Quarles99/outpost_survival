@@ -1,0 +1,3 @@
+	- Soldiers at military buildings will patrol the village in small groups
+	- Wolves may sometimes choose to attack villagers
+	- The player can select a 'pack' of wolves and select an attack option to have all of the town military units group up before moving out to attack

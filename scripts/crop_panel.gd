@@ -2,6 +2,12 @@ extends CanvasLayer
 class_name CropPanel
 
 signal option_selected(option: Dictionary)
+## Reported back to Base the same way CitizensPanel.citizen_selected/
+## BuildingInfoPanel.employee_selected are - a click on the "who's working
+## here" row below the crop grid, letting the player select that citizen
+## (opens their SkillPanel) without leaving this panel implicitly tied to
+## the click.
+signal employee_selected(character: Character)
 
 const SLIDE_OFFSET := Vector2(0, 20)
 const ANIM_DURATION := 0.18
@@ -12,9 +18,12 @@ const DEFAULT_BACKGROUND := Color(0.22, 0.24, 0.28)
 
 @onready var panel_control: Control = $Control
 @onready var title_label: Label = $Control/Panel/VBoxContainer/TitleLabel
+@onready var description_label: Label = $Control/Panel/VBoxContainer/DescriptionLabel
 @onready var button_container: GridContainer = $Control/Panel/VBoxContainer/ButtonContainer
+@onready var employee_container: VBoxContainer = $Control/Panel/VBoxContainer/EmployeeContainer
 
 var _buttons: Array[Button] = []
+var _employee_rows: Array[Control] = []
 var _option_callables: Array[Callable] = []
 var _base_position: Vector2
 var _anim_tween: Tween
@@ -37,11 +46,18 @@ func _ready() -> void:
 
 ## `target_display_name` names the building being retooled (e.g. "Farm"),
 ## shown in the title so it's clear this reconfigures that specific
-## building rather than placing a new one.
-func open_for(options: Array, target_display_name: String) -> void:
+## building rather than placing a new one. `employees` - who currently
+## works this specific Farm (see Base._employees_of) - Farm-family posts
+## cap at 1 worker (Workstation's own max_workers default), so this is
+## always a single row or the empty state, never a scrollable list the way
+## TrainingGroundPanel's needs to be.
+func open_for(options: Array, target_display_name: String, employees: Array[Character] = [], description: String = "") -> void:
 	title_label.text = "Change Crop: %s" % target_display_name
+	description_label.visible = not description.is_empty()
+	description_label.text = description
 	_clear_buttons()
 	_option_callables.clear()
+	_rebuild_employees(employees)
 
 	for i in options.size():
 		var option: Dictionary = options[i]
@@ -75,6 +91,35 @@ func close() -> void:
 func _choose(option: Dictionary) -> void:
 	option_selected.emit(option)
 	close()
+
+
+func _choose_employee(character: Character) -> void:
+	employee_selected.emit(character)
+	close()
+
+
+## "Worked by: <name>" (clickable, selects them) or "Vacant" - see
+## open_for's own doc comment for why this is always at most one row.
+func _rebuild_employees(employees: Array[Character]) -> void:
+	for row in _employee_rows:
+		row.queue_free()
+	_employee_rows.clear()
+
+	if employees.is_empty():
+		var label := Label.new()
+		label.text = "Vacant"
+		label.modulate.a = 0.6
+		employee_container.add_child(label)
+		_employee_rows.append(label)
+		return
+
+	for character in employees:
+		var name_text: String = character.data.character_name if character.data else "Unknown"
+		var button := Button.new()
+		button.text = "Worked by: %s" % name_text
+		button.pressed.connect(func() -> void: _choose_employee(character))
+		employee_container.add_child(button)
+		_employee_rows.append(button)
 
 
 ## See BuildMenu._short_name - identical derivation, kept as a separate copy

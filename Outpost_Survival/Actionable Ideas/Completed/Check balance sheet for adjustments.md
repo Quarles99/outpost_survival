@@ -1,0 +1,16 @@
+## Completion write-up (2026-07-20)
+
+Ran `tools/check_balance.py` and did a full manual pass over everything it can't parse (the two dict/array knobs and the three table-shaped sections), plus an audit of every `` `file:line` `` citation in the doc against actual current line numbers - not just the ones the checker can verify against a Value cell.
+
+**Real drift found and fixed (doc had moved ahead of code via the normal edit-and-hand-back flow, not yet implemented):**
+- Labor required per material unit: code 0.6 → 0.5 (`scripts/base.gd:118`)
+- Minimum labor required (floor): code 5.0 → 2.0 (`scripts/base.gd:119`)
+- Logged in [[Balance Changelog]].
+
+**Content bug found and fixed:** the Building Costs & Output table's Brewery row described "1 hops + 1 grain -> 1 beer" as if the two-input recipe were live, directly contradicting the doc's own "Not yet implemented" note two paragraphs below stating `Workshop` only supports one input and Brewery's real recipe stays single-input (hops only). Corrected the row to "1.0 hops -> 1.0 beer" to match actual code and stop contradicting itself. Also filled in the missing input side of Grain Farm's and Hops Farm's Output/cycle cells ("0.5 wood -> 1.0 grain"/"hops") for consistency with Cabbage Farm's and Potato Farm's rows, which already showed it.
+
+**Line-number audit:** every `file:line` citation in the doc is a promise ("exact file/line locations," per `Home.md`) that degrades silently as the underlying files grow new comments above a const/entry - `check_balance.py` only verifies the ones it can parse into a Value-cell diff (48 of ~66 total citations), so the rest can drift unnoticed. Wrote a one-off audit script that reads every citation's target line and confirms the named const/id actually appears there; **31 of 66 were stale** (spread across `autoload/game_state.gd`, `scripts/character.gd`, `scripts/base.gd`, `scripts/recruit_catalog.gd`, `scripts/training_ground.gd`, `scripts/combat/combat_unit.gd`, and 17 of 18 rows in the `Building Costs & Output` table via `scripts/building_catalog.gd`), all re-derived from the actual current declaration line and corrected. `lumber_camp.gd:17,24` (wood_per_chop/chop_interval) was the one building-table citation already accurate.
+
+**Verified clean, no drift:** Combat - Unit Stats table (all 8 types' health/damage/armor/range/attack-interval/move-speed checked against `STATS`/`ARMOR` in `combat_unit.gd` - health values in particular required re-deriving `base * HEALTH_MULTIPLIER (4.0x)` per type, since the doc shows the multiplied value) and Combat - Damage Multipliers table (all 64 cells checked against `DAMAGE_MULTIPLIERS`) both match code exactly - only their line-number citations needed fixing, not their values. Starting cabbage/wood (`DEFAULT_RESOURCES`), Speed multipliers (`SPEED_MULTIPLIERS`), Happiness bands (`HAPPINESS_BANDS`), and Upgrade cost (`UPGRADE_COST`) - the checker's UNRESOLVED list - were all manually confirmed to match code too.
+
+**Result:** `tools/check_balance.py` now reports zero mismatches (only the same five inherently-unparseable UNRESOLVED rows, all manually verified above), and a full citation sweep confirms zero stale `file:line` references anywhere in the doc.

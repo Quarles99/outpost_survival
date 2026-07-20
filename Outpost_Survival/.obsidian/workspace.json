@@ -4,63 +4,35 @@
     "type": "split",
     "children": [
       {
-        "id": "557752f9f2a6143f",
+        "id": "dc1517e392705dc5",
         "type": "tabs",
         "children": [
           {
-            "id": "0b1a1b73e6b5a84a",
+            "id": "ce7377c57b6f1340",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Ideas/Ideas.md",
+                "file": "Actionable Ideas/Implement the ability to increase or decrease the desired amount of workers in a building between 0 and the maximum for that building.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Ideas"
+              "title": "Implement the ability to increase or decrease the desired amount of workers in a building between 0 and the maximum for that building"
             }
           },
           {
-            "id": "5e15df50ae4cb4ec",
+            "id": "3225adfc5596e98e",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Balance.md",
+                "file": "Game Systems/Balance.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
               "title": "Balance"
-            }
-          },
-          {
-            "id": "a7ed06d8733493fd",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Ideas/Combat System.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Combat System"
-            }
-          },
-          {
-            "id": "a45c1ce4cf2c0337",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Ideas/Combat Units.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Combat Units"
             }
           }
         ],
@@ -121,7 +93,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 208.5
+    "width": 249.5
   },
   "right": {
     "id": "b450c9c8c919234d",
@@ -199,7 +171,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Balance.md",
+                "file": "Game Systems/Balance.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -226,39 +198,45 @@
       "bases:Create new base": false
     }
   },
-  "active": "5e15df50ae4cb4ec",
+  "active": "3225adfc5596e98e",
   "lastOpenFiles": [
-    "Docs/roadmap.md.tmp.10230.057342563d3c",
-    "Docs/mechanics.md.tmp.10230.3d411677a4c8",
-    "Balance Changelog.md.tmp.10230.6044b960390f",
-    "Balance.md.tmp.10230.161c93b1adca",
-    "Balance Changelog.md.tmp.10230.2895944eeeb0",
-    "Docs/stats.md.tmp.10230.c71b69362b28",
-    "Docs/stats.md.tmp.10230.acbac4584f18",
-    "Docs/stats.md.tmp.10230.1bb74aa3efb4",
-    "Docs/stats.md.tmp.10230.920b210e19d8",
-    "Balance Changelog.md.tmp.10230.28f95cf21a4c",
-    "Docs/stats.md.tmp.10230.e6a03e5667c1",
-    "Balance Changelog.md",
-    "Balance.md",
-    "Ideas/Day-Night Cycle.md",
-    "Ideas/Ideas.md",
-    "Ideas/Combat System.md",
-    "Docs/controls.md",
+    "Actionable Ideas/Completed/Building click UI.md.tmp.192470.b2818b8c57aa",
+    "Actionable Ideas/Completed/Implement Sounds from new sound pack.md",
+    "Actionable Ideas/Implement Sounds from new sound pack.md.tmp.192470.0f33a7ec33a0",
+    "Docs/Balance Changelog.md",
+    "Art/items_sheet.png",
+    "Art/Food.png",
+    "Actionable Ideas/Make the resource display consistent across all resources.md",
+    "Actionable Ideas/Completed/Fix bug with houses saying not enough stone to upgrade when you should have enough.md",
+    "Actionable Ideas/Fix bug with houses saying not enough stone to upgrade when you should have enough.md.tmp.192470.2f99f222722b",
+    "Actionable Ideas/Completed/Allow multiple builders to work on one construction site at reduced effectiveness.md",
+    "Actionable Ideas/Mouseover tooltip system.md",
+    "Actionable Ideas/Fix bug with houses saying not enough stone to upgrade when you should have enough.md",
+    "Actionable Ideas/Allow multiple builders to work on one construction site at reduced effectiveness.md.tmp.192470.dcebadb2b4c4",
+    "Docs/mechanics.md.tmp.192470.703989f76887",
+    "Untitled 1.md",
+    "Docs/stats.md.tmp.192470.11ee82487768",
+    "Actionable Ideas/Implement Sounds from new sound pack.md",
+    "Actionable Ideas/Implement the ability to increase or decrease the desired amount of workers in a building between 0 and the maximum for that building.md",
+    "Actionable Ideas/Completed/Building click UI.md",
+    "Actionable Ideas/Building click UI.md.tmp.192470.b6afd7d97f9f",
+    "Docs/stats.md.tmp.192470.5ea7fd7c2e02",
+    "Docs/controls.md.tmp.192470.a02435685a51",
+    "Docs/controls.md.tmp.192470.b4ef8cc272d6",
+    "Actionable Ideas/Allow multiple builders to work on one construction site at reduced effectiveness.md",
+    "Actionable Ideas/Building click UI.md",
+    "Game Systems/Balance.md",
+    "Actionable Ideas/Replace the construction site sprite with a composite sprite made with current sprite packs.md",
+    "Actionable Ideas/Expand map size 4x.md",
+    "Actionable Ideas/Ideas.md",
+    "Actionable Ideas/Implement New Art.md",
+    "Actionable Ideas/Completed/Check balance sheet for adjustments.md",
+    "Actionable Ideas/Check balance sheet for adjustments.md.tmp.192470.2d6900b6a86c",
+    "Actionable Ideas/Completed/Maintain consistency on red shaded sprites when building location is invalid.md",
+    "Actionable Ideas/Implement wolf enemies present on the village map..md",
+    "Actionable Ideas/Check balance sheet for adjustments.md",
+    "Actionable Ideas/Maintain consistency on red shaded sprites when building location is invalid.md",
     "Docs/mechanics.md",
-    "Docs/README.md",
-    "Docs/roadmap.md",
-    "Ideas/Completed/Resource Consumption UI.md",
-    "Journal/2026-07-15.md",
-    "Planning/Planning.md",
-    "Ideas/Resource Consumption UI.md",
-    "Ideas/Formation Strategy AI.md",
-    "Home.md",
-    "Docs/stats.md",
-    "Ideas/Combat Units.md",
-    "Planning/Strategist AI (Combat Sandbox).md",
-    "Planning/Formation System (Combat Sandbox).md",
-    "Ideas/Unique Building Art.md",
-    "Welcome.md"
+    "Home.md"
   ]
 }

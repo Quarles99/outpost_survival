@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://bxfjkiu2i7mvk"
+path="res://.godot/imported/Dirt Run 4.ogg-cffe0ab4e6aece32fc11ae0c733062b3.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Footsteps/Dirt/Dirt Run 4.ogg"
+dest_files=["res://.godot/imported/Dirt Run 4.ogg-cffe0ab4e6aece32fc11ae0c733062b3.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
