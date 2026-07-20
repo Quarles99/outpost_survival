@@ -23,15 +23,28 @@ const BUILDING_PROPERTIES := [
 ## across the map. Total count raised alongside the spread so each grove
 ## is still a real, harvestable cluster rather than a handful of isolated
 ## trees.
-const INITIAL_TREE_COUNT := 40
+##
+## COUNT/GROVE_COUNT both scaled x4 (40->160, 5->20) alongside the map's own
+## 4x area increase (Expand map size 4x.md - IsoGround 28x28 -> 56x56, see
+## Base.tscn) so tree density per tile stays the same rather than the same
+## 40 trees reading as sparse on a map 4x the size. GROVE_COUNT scaled by
+## the same factor as COUNT (not left fixed) specifically so trees_per_grove
+## (COUNT / GROVE_COUNT) - and therefore how dense/how large a single grove
+## reads - stays exactly 8, unchanged from before; only the *number* of
+## groves visible across the map grows. INITIAL_TREE_RADIUS deliberately
+## NOT scaled - it controls one grove's own physical size, which should
+## stay the same regardless of how many groves now exist.
+const INITIAL_TREE_COUNT := 160
 const INITIAL_TREE_RADIUS := 5.0
-const TREE_GROVE_COUNT := 5
+const TREE_GROVE_COUNT := 20
 
 const ROCK_SCENE := preload("res://scenes/nature/RockDecoration.tscn")
-const INITIAL_ROCK_COUNT := 14
+## Scaled x4 alongside the map, same reasoning as INITIAL_TREE_COUNT above.
+const INITIAL_ROCK_COUNT := 56
 
 const GRASS_CLUMP_SCENE := preload("res://scenes/nature/GrassClump.tscn")
-const INITIAL_GRASS_COUNT := 30
+## Scaled x4 alongside the map, same reasoning as INITIAL_TREE_COUNT above.
+const INITIAL_GRASS_COUNT := 120
 
 ## --- Fast-forward -----------------------------------------------------
 ## Companion to slowing base movement/work speed down by a factor of 2 (see
@@ -102,7 +115,27 @@ const DAY_NIGHT_TRANSITION_SECONDS := 8.0
 ## ConstructionSite.materials_needed) and a construction-skilled worker then
 ## spends labor on (see Character._run_construction_loop) before it becomes
 ## the real building (see _on_construction_complete).
-const CONSTRUCTION_SITE_SCENE := preload("res://scenes/workstation/ConstructionSite.tscn")
+## One composite-clutter scene per distinct footprint shape currently in
+## BuildingCatalog (Replace the construction site sprite with a composite
+## sprite made with current sprite packs.md - "a unique construction site
+## sprite for every shape of building we have") rather than one generic
+## scaffold stretched to fit - see _construction_site_scene_for. Keyed by
+## grid_size directly (not a string) since Vector2i already hashes/compares
+## correctly as a Dictionary key.
+const CONSTRUCTION_SITE_SCENES := {
+	Vector2i(1, 1): preload("res://scenes/workstation/ConstructionSite1x1.tscn"),
+	Vector2i(2, 2): preload("res://scenes/workstation/ConstructionSite2x2.tscn"),
+	Vector2i(2, 4): preload("res://scenes/workstation/ConstructionSite2x4.tscn"),
+}
+
+
+## Falls back to the 1x1 scene for a footprint shape with no dedicated
+## composite (defensive only - every shape BuildingCatalog.OPTIONS actually
+## uses today has an entry above; a future new footprint shape would need
+## its own composite added rather than silently stretching an existing one,
+## since these are scattered individual props, not a resizable silhouette).
+func _construction_site_scene_for(size: Vector2i) -> PackedScene:
+	return CONSTRUCTION_SITE_SCENES.get(size, CONSTRUCTION_SITE_SCENES[Vector2i(1, 1)])
 
 ## A site's total labor_required is derived from its own material cost
 ## (bigger/more expensive buildings take longer to build) rather than a
@@ -252,7 +285,7 @@ func _ready() -> void:
 
 	var min_cell := Vector2i(iso_ground.start_x, iso_ground.start_y)
 	var max_cell := Vector2i(iso_ground.start_x + iso_ground.width - 1, iso_ground.start_y + iso_ground.depth - 1)
-	WorldGrid.configure(iso_ground.position, min_cell, max_cell, self)
+	WorldGrid.configure(iso_ground.position, min_cell, max_cell, self, iso_ground)
 	WorldGrid.register_stockpile($OutpostHall.get_stockpile_spot())
 	_configure_camera_limits(min_cell, max_cell)
 
@@ -317,6 +350,7 @@ func _ready() -> void:
 	building_info_panel.employee_selected.connect(_on_citizen_selected_from_panel)
 	crop_panel.employee_selected.connect(_on_citizen_selected_from_panel)
 	$OutpostHall.clicked.connect(_on_outpost_hall_clicked)
+	_wire_building_tooltip($OutpostHall)
 
 	crop_panel.option_selected.connect(_on_crop_selected)
 	DayNightCycle.day_started.connect(_on_day_started)
@@ -905,7 +939,7 @@ func _on_training_ground_clicked(building: TrainingGround) -> void:
 				"id": "unit_%d" % unit_type,
 				"label": "%sTrain: %s" % [prefix, CombatUnit.TYPE_NAMES[unit_type]],
 			})
-	training_ground_panel.open_for(building.display_name, options, _employees_of(building), building.description)
+	training_ground_panel.open_for(building.display_name, options, _employees_of(building), building.description, building.get_effective_worker_cap(), building.max_workers, func(delta: int) -> void: building.set_desired_workers(building.desired_workers + delta))
 
 
 ## training_ground_panel's own signal handler - branches into the same
@@ -994,6 +1028,47 @@ func _wire_building_info_clicks(building: Node) -> void:
 		building.info_clicked.connect(_on_building_info_clicked.bind(building))
 
 
+## Mouseover tooltip system (Actionable Ideas/Mouseover tooltip system.md) -
+## "any resource or building". Every building class (Workstation and its
+## subclasses, House, OutpostHall, StorageFacility, Well) extends Area2D,
+## so mouse_entered/mouse_exited already exist on all of them generically -
+## no per-class branching needed here the way the click-signal _wire_*
+## helpers above need, since none of them defines its own hover meaning to
+## conflict with. Uses building.get(...) rather than a typed accessor since
+## display_name/description are duck-typed across these otherwise-unrelated
+## classes (none of them share a common base beyond Area2D itself) - same
+## reasoning CLAUDE.md's Character/post interaction pattern already
+## documents for job posts.
+func _wire_building_tooltip(building: Node) -> void:
+	if not (building is Area2D):
+		return
+	building.mouse_entered.connect(func() -> void:
+		TooltipManager.request(String(building.get("display_name")), _tooltip_body(building))
+	)
+	building.mouse_exited.connect(func() -> void: TooltipManager.cancel())
+
+
+## "1 Stone -> 0.5 Brick / cycle\nWorkers: 1/1" under a building's
+## description - the same description + _recipe_text() BuildingInfoPanel
+## already shows on click, condensed for a hover tooltip so the two stay
+## consistent rather than describing the same building two different ways.
+## ConstructionSite is excluded from the recipe/worker lines for the same
+## reason _recipe_text() itself excludes it (unused default resource_type/
+## output_per_tick) - its own always-visible label already communicates
+## phase/progress, so the tooltip just shows its (usually empty) description.
+func _tooltip_body(building: Node) -> String:
+	var lines: Array[String] = []
+	var description: Variant = building.get("description")
+	if description is String and not description.is_empty():
+		lines.append(description)
+	if building is Workstation and not (building is ConstructionSite):
+		var recipe := _recipe_text(building)
+		if not recipe.is_empty():
+			lines.append(recipe)
+		lines.append("Workers: %d/%d" % [building.active_workers, building.max_workers])
+	return "\n".join(lines)
+
+
 ## A House's `clicked` signal opens the building-info panel showing its
 ## description and, if not already upgraded, an Upgrade button previewing
 ## House.UPGRADE_COST before anything is spent - matching
@@ -1041,7 +1116,7 @@ func _on_farm_clicked(farm: Farm) -> void:
 	citizens_panel.close()
 	building_info_panel.close()
 	_crop_target = farm
-	crop_panel.open_for(BuildingCatalog.farm_family_options(), farm.display_name, _employees_of(farm), farm.description)
+	crop_panel.open_for(BuildingCatalog.farm_family_options(), farm.display_name, _employees_of(farm), farm.description, farm.get_effective_worker_cap(), farm.max_workers, func(delta: int) -> void: farm.set_desired_workers(farm.desired_workers + delta))
 
 
 ## Every Character whose assigned_post is exactly this building - "who
@@ -1068,7 +1143,7 @@ func _on_building_info_clicked(building: Workstation) -> void:
 	crop_panel.close()
 	training_ground_panel.close()
 	citizens_panel.close()
-	building_info_panel.open_for(building.display_name, _employees_of(building), building.description, _recipe_text(building))
+	building_info_panel.open_for(building.display_name, _employees_of(building), building.description, _recipe_text(building), true, "", Callable(), building.get_effective_worker_cap(), building.max_workers, func(delta: int) -> void: building.set_desired_workers(building.desired_workers + delta))
 
 
 ## "0.6 Stone / cycle", "1 Stone -> 0.5 Brick / cycle", "2 Wood / chop" -
@@ -1135,6 +1210,30 @@ func _on_post_disabled_changed(is_disabled: bool, post: Workstation) -> void:
 		for citizen in characters:
 			if citizen.assigned_post == post:
 				citizen.assign_to(null)
+	_run_job_assignment()
+
+
+## Same wiring shape as _wire_workstation_disable/_on_post_disabled_changed
+## above, for the other way a post's effective capacity can drop below
+## max_workers (see Workstation.desired_workers's own doc comment).
+func _wire_workstation_desired_workers(building: Node) -> void:
+	if building is Workstation:
+		building.desired_workers_changed.connect(_on_desired_workers_changed.bind(building))
+
+
+## A desired_workers reduction can leave more citizens assigned to this
+## specific post than its new capacity allows - evict just enough of them
+## (which one(s) isn't meaningful to control precisely here) before
+## re-running assignment, same "evict immediately, then let a fresh pass
+## redistribute" shape _on_post_disabled_changed uses for the disabled
+## case, generalized from "evict everyone" to "evict down to the new cap."
+func _on_desired_workers_changed(_value: int, post: Workstation) -> void:
+	var assigned: Array[Character] = []
+	for citizen in characters:
+		if citizen.assigned_post == post:
+			assigned.append(citizen)
+	while assigned.size() > post.get_effective_worker_cap():
+		assigned.pop_back().assign_to(null)
 	_run_job_assignment()
 
 
@@ -1207,8 +1306,7 @@ func _run_job_assignment() -> void:
 	for skill_id in posts_by_skill:
 		var capacity := 0
 		for post in posts_by_skill[skill_id]:
-			if not post.disabled:
-				capacity += post.max_workers
+			capacity += post.get_effective_worker_cap()
 		capacity_by_skill[skill_id] = capacity
 
 	var preferences: Dictionary = {}
@@ -1259,9 +1357,7 @@ func _run_job_assignment() -> void:
 		var pool: Array = accepted[skill_id]
 		var pool_index := 0
 		for post in posts_by_skill[skill_id]:
-			if post.disabled:
-				continue
-			for _i in range(post.max_workers):
+			for _i in range(post.get_effective_worker_cap()):
 				if pool_index >= pool.size():
 					break
 				target_post[pool[pool_index]] = post
@@ -1271,6 +1367,31 @@ func _run_job_assignment() -> void:
 		var target: Node = target_post.get(citizen, null)
 		if citizen.assigned_post != target:
 			citizen.assign_to(target)
+
+	_update_resource_worker_counts()
+
+
+## resource_name -> total active_workers across every post producing it
+## (e.g. two Farms both retooled to Cabbage sum together), plus the count
+## of citizens with no assigned_post at all - "idle" in the sense of Make
+## the resource display consistent across all resources.md's ask, even
+## though an unassigned citizen isn't actually idle (see Character/post
+## interaction pattern's doc comment - they haul automatically instead).
+## Called at the end of _run_job_assignment() specifically (not
+## standalone) since that function already re-runs on every trigger that
+## could change either number (recruit/depart, post built/disabled/
+## re-enabled, save loaded) - see its own doc comment.
+func _update_resource_worker_counts() -> void:
+	var per_resource: Dictionary = {}
+	for post in posts:
+		if post is Workstation and not (post is ConstructionSite):
+			var resource_type: String = post.resource_type
+			per_resource[resource_type] = per_resource.get(resource_type, 0) + post.active_workers
+	var idle_count := 0
+	for character in characters:
+		if character.assigned_post == null:
+			idle_count += 1
+	hud.set_worker_counts(per_resource, idle_count)
 
 
 ## Reconfigures _crop_target in place with `option`'s Farm-family fields
@@ -1496,7 +1617,7 @@ func _confirm_placement() -> void:
 ## as _on_construction_materials_ready would do the moment that happens live.
 func _spawn_construction_site(option: Dictionary, origin: Vector2i, save_id: String, materials_needed: Dictionary, labor_completed: float = 0.0) -> ConstructionSite:
 	var size: Vector2i = option["grid_size"]
-	var site: ConstructionSite = CONSTRUCTION_SITE_SCENE.instantiate()
+	var site: ConstructionSite = _construction_site_scene_for(size).instantiate()
 	site.display_name = option["display_name"]
 	site.target_option_id = option["id"]
 	site.materials_needed = materials_needed.duplicate()
@@ -1507,7 +1628,9 @@ func _spawn_construction_site(option: Dictionary, origin: Vector2i, save_id: Str
 	site.set_meta("origin", origin)
 	add_child(site)
 	_wire_workstation_disable(site)
+	_wire_workstation_desired_workers(site)
 	_wire_building_info_clicks(site)
+	_wire_building_tooltip(site)
 	site.materials_ready.connect(_on_construction_materials_ready.bind(site))
 	site.construction_complete.connect(_on_construction_complete.bind(site))
 	site.refresh_label()
@@ -1583,7 +1706,9 @@ func _materialize_building(option: Dictionary, origin: Vector2i, save_id: String
 	_wire_house_clicks(building)
 	_wire_training_ground_clicks(building)
 	_wire_workstation_disable(building)
+	_wire_workstation_desired_workers(building)
 	_wire_building_info_clicks(building)
+	_wire_building_tooltip(building)
 
 	if option.has("population_capacity"):
 		GameState.add_population_capacity(option["population_capacity"])
@@ -1930,6 +2055,8 @@ func _serialize_placed_buildings() -> Array:
 			out_entry["chosen_unit_type"] = entry["node"].chosen_unit_type
 		if entry["node"] is Workstation and entry["node"].disabled:
 			out_entry["disabled"] = true
+		if entry["node"] is Workstation and entry["node"].desired_workers < entry["node"].max_workers:
+			out_entry["desired_workers"] = entry["node"].desired_workers
 		out.append(out_entry)
 	return out
 
@@ -1971,7 +2098,9 @@ func _restore_placed_buildings(entries: Array) -> void:
 		_wire_house_clicks(building)
 		_wire_training_ground_clicks(building)
 		_wire_workstation_disable(building)
+		_wire_workstation_desired_workers(building)
 		_wire_building_info_clicks(building)
+		_wire_building_tooltip(building)
 		if building is House and entry.get("upgraded", false):
 			building.mark_upgraded()
 		if building is TrainingGround and entry.has("last_recruit_day"):
@@ -1982,6 +2111,8 @@ func _restore_placed_buildings(entries: Array) -> void:
 			building.chosen_unit_type = int(entry["chosen_unit_type"]) as CombatUnit.UnitType
 		if building is Workstation and entry.get("disabled", false):
 			building.disabled = true
+		if building is Workstation and entry.has("desired_workers"):
+			building.desired_workers = int(entry["desired_workers"])
 		if building.has_method("add_worker"):
 			posts.append(building)
 		if building.has_method("get_stockpile_spot"):

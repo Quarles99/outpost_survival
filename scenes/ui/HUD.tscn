@@ -6,89 +6,100 @@
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1")
 
-[node name="Control" type="Control" parent="."]
+[node name="Control" type="PanelContainer" parent="."]
 theme = ExtResource("2")
+theme_type_variation = &"Panel"
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -260.0
 offset_top = 16.0
 offset_right = -16.0
-offset_bottom = 560.0
 grow_horizontal = 0
 
-[node name="Panel" type="Panel" parent="Control"]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="Margin" type="MarginContainer" parent="Control"]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
 
-[node name="Rows" type="VBoxContainer" parent="Control"]
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = 8.0
-offset_right = -12.0
-offset_bottom = -8.0
+[node name="Rows" type="VBoxContainer" parent="Control/Margin"]
 
-[node name="FoodHeader" type="Label" parent="Control/Rows"]
+[node name="FoodHeader" type="Label" parent="Control/Margin/Rows"]
 text = "Food"
 horizontal_alignment = 2
 
-[node name="FoodBreakdown" type="GridContainer" parent="Control/Rows"]
+[node name="FoodBreakdown" type="GridContainer" parent="Control/Margin/Rows"]
 columns = 3
 
-[node name="WoodRow" type="HBoxContainer" parent="Control/Rows"]
+[node name="WoodRow" type="HBoxContainer" parent="Control/Margin/Rows"]
 alignment = 2
 
-[node name="Icon" type="TextureRect" parent="Control/Rows/WoodRow"]
+[node name="Icon" type="TextureRect" parent="Control/Margin/Rows/WoodRow"]
 custom_minimum_size = Vector2(28, 28)
 texture_filter = 1
 stretch_mode = 5
 
-[node name="WoodLabel" type="Label" parent="Control/Rows/WoodRow"]
+[node name="WoodLabel" type="Label" parent="Control/Margin/Rows/WoodRow"]
 text = "0"
 
-[node name="StoneRow" type="HBoxContainer" parent="Control/Rows"]
+[node name="StoneRow" type="HBoxContainer" parent="Control/Margin/Rows"]
 alignment = 2
 
-[node name="Icon" type="TextureRect" parent="Control/Rows/StoneRow"]
+[node name="Icon" type="TextureRect" parent="Control/Margin/Rows/StoneRow"]
 custom_minimum_size = Vector2(28, 28)
 texture_filter = 1
 stretch_mode = 5
 
-[node name="StoneLabel" type="Label" parent="Control/Rows/StoneRow"]
+[node name="StoneLabel" type="Label" parent="Control/Margin/Rows/StoneRow"]
 text = "0"
 
-[node name="WaterLabel" type="Label" parent="Control/Rows"]
+[node name="BrickRow" type="HBoxContainer" parent="Control/Margin/Rows"]
+alignment = 2
+
+[node name="Icon" type="TextureRect" parent="Control/Margin/Rows/BrickRow"]
+custom_minimum_size = Vector2(28, 28)
+texture_filter = 1
+stretch_mode = 5
+
+[node name="BrickLabel" type="Label" parent="Control/Margin/Rows/BrickRow"]
+text = "0"
+
+[node name="WaterLabel" type="Label" parent="Control/Margin/Rows"]
 text = "Water: None"
 horizontal_alignment = 2
 
-[node name="PopulationLabel" type="Label" parent="Control/Rows"]
+[node name="PopulationLabel" type="Label" parent="Control/Margin/Rows"]
 text = "Population: 0/0"
 horizontal_alignment = 2
 
-[node name="HappinessLabel" type="Label" parent="Control/Rows"]
+[node name="IdleLabel" type="Label" parent="Control/Margin/Rows"]
+text = "Idle: 0"
+horizontal_alignment = 2
+
+[node name="HappinessLabel" type="Label" parent="Control/Margin/Rows"]
 text = "Happiness: 50%"
 horizontal_alignment = 2
 
-[node name="DayLabel" type="Label" parent="Control/Rows"]
+[node name="DayLabel" type="Label" parent="Control/Margin/Rows"]
 text = "Day 1 - Day"
 horizontal_alignment = 2
 
-[node name="ButtonSpacer" type="Control" parent="Control/Rows"]
+[node name="ButtonSpacer" type="Control" parent="Control/Margin/Rows"]
 custom_minimum_size = Vector2(0, 8)
 
-[node name="BuildButton" type="Button" parent="Control/Rows"]
+[node name="BuildButton" type="Button" parent="Control/Margin/Rows"]
 text = "Build"
 
-[node name="CitizensButton" type="Button" parent="Control/Rows"]
+[node name="CitizensButton" type="Button" parent="Control/Margin/Rows"]
 text = "Citizens"
 
-[node name="AttackButton" type="Button" parent="Control/Rows"]
+[node name="AttackButton" type="Button" parent="Control/Margin/Rows"]
 text = "Simulate Attack"
 
-[node name="SpeedButton" type="Button" parent="Control/Rows"]
+[node name="SpeedButton" type="Button" parent="Control/Margin/Rows"]
 text = "Speed: 1x"
 
-[node name="MenuButton" type="Button" parent="Control/Rows"]
+[node name="MenuButton" type="Button" parent="Control/Margin/Rows"]
 text = "Menu"
 
 [node name="FoodBarPanel" type="VBoxContainer" parent="."]
@@ -98,7 +109,7 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -76.0
-offset_top = -160.0
+offset_top = -104.0
 offset_right = -16.0
 offset_bottom = -16.0
 grow_horizontal = 0
@@ -110,7 +121,7 @@ text = "Food"
 horizontal_alignment = 1
 
 [node name="FoodBarFrame" type="Control" parent="FoodBarPanel"]
-custom_minimum_size = Vector2(36, 100)
+custom_minimum_size = Vector2(36, 50)
 
 [node name="Background" type="Panel" parent="FoodBarPanel/FoodBarFrame"]
 anchor_right = 1.0

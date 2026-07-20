@@ -1,0 +1,64 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/construction_site.gd" id="1"]
+[ext_resource type="Texture2D" path="res://art/Tiny Pixel Art/Isometric_MedievalFantasy_Tiles.png" id="2"]
+[ext_resource type="Texture2D" path="res://art/Pixel Isometric 16x16/Structures2.png" id="3"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_Log"]
+atlas = ExtResource("2")
+region = Rect2(128, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_Rock"]
+atlas = ExtResource("2")
+region = Rect2(128, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_Pile"]
+atlas = ExtResource("3")
+region = Rect2(98, 43, 28, 20)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(64, 64)
+
+[node name="ConstructionSite" type="Area2D"]
+script = ExtResource("1")
+resource_type = "construction"
+sprite_tint = Color(0.68, 0.62, 0.5, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -35)
+shape = SubResource("RectangleShape2D_1")
+
+[node name="Log" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(-16, -14)
+scale = Vector2(3, 3)
+texture = SubResource("AtlasTexture_Log")
+centered = false
+offset = Vector2(-8, -14)
+
+[node name="Rock" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(14, -12)
+scale = Vector2(3, 3)
+texture = SubResource("AtlasTexture_Rock")
+centered = false
+offset = Vector2(-8, -14)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(0, -34)
+scale = Vector2(2.6, 2.6)
+texture = SubResource("AtlasTexture_Pile")
+centered = false
+offset = Vector2(-13, -18)
+
+[node name="WorkSpot" type="Marker2D" parent="."]
+position = Vector2(0, 26)
+
+[node name="Label" type="Label" parent="."]
+offset_left = -70.0
+offset_top = -130.0
+offset_right = 70.0
+offset_bottom = -94.0
+horizontal_alignment = 1
+text = "Construction Site"

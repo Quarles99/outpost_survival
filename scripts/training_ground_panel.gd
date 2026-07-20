@@ -21,21 +21,35 @@ const SLIDE_OFFSET := Vector2(0, 20)
 const ANIM_DURATION := 0.18
 
 @onready var panel_control: Control = $Control
-@onready var title_label: Label = $Control/Panel/VBoxContainer/TitleLabel
-@onready var description_label: Label = $Control/Panel/VBoxContainer/DescriptionLabel
-@onready var button_container: VBoxContainer = $Control/Panel/VBoxContainer/ButtonContainer
-@onready var employee_container: VBoxContainer = $Control/Panel/VBoxContainer/EmployeeScroll/EmployeeContainer
+@onready var title_label: Label = $Control/Margin/VBoxContainer/TitleLabel
+@onready var description_label: Label = $Control/Margin/VBoxContainer/DescriptionLabel
+@onready var button_container: VBoxContainer = $Control/Margin/VBoxContainer/ButtonContainer
+@onready var worker_count_label: Label = $Control/Margin/VBoxContainer/WorkerCountRow/WorkerCountLabel
+@onready var worker_minus_button: Button = $Control/Margin/VBoxContainer/WorkerCountRow/MinusButton
+@onready var worker_plus_button: Button = $Control/Margin/VBoxContainer/WorkerCountRow/PlusButton
+@onready var employee_container: VBoxContainer = $Control/Margin/VBoxContainer/EmployeeScroll/EmployeeContainer
 
 var _buttons: Array[Button] = []
 var _employee_rows: Array[Control] = []
 var _option_callables: Array[Callable] = []
 var _base_position: Vector2
 var _anim_tween: Tween
+## See BuildingInfoPanel._worker_delta_callable's own doc comment - same
+## shape, called with +1/-1 by the WorkerCountRow's +/- buttons.
+var _worker_delta_callable: Callable
 
 
 func _ready() -> void:
 	visible = false
 	_base_position = panel_control.position
+	worker_minus_button.pressed.connect(func() -> void:
+		if _worker_delta_callable.is_valid():
+			_worker_delta_callable.call(-1)
+	)
+	worker_plus_button.pressed.connect(func() -> void:
+		if _worker_delta_callable.is_valid():
+			_worker_delta_callable.call(1)
+	)
 
 
 ## Each option: {"id": String, "label": String, "enabled": bool (default
@@ -49,10 +63,14 @@ func _ready() -> void:
 ## this can be several units (Workstation.max_workers is overridden to
 ## TrainingGround.get_unit_cap(), 3+ per upgrade), hence the scrollable
 ## EmployeeScroll wrapper rather than a single unbounded-height row list.
-func open_for(building_name: String, options: Array[Dictionary], employees: Array[Character] = [], description: String = "") -> void:
+func open_for(building_name: String, options: Array[Dictionary], employees: Array[Character] = [], description: String = "", worker_count: int = 0, worker_max: int = 1, on_worker_delta: Callable = Callable()) -> void:
 	title_label.text = building_name
 	description_label.visible = not description.is_empty()
 	description_label.text = description
+	worker_count_label.text = "Workers: %d/%d" % [worker_count, worker_max]
+	worker_minus_button.disabled = worker_count <= 0
+	worker_plus_button.disabled = worker_count >= worker_max
+	_worker_delta_callable = on_worker_delta
 	_clear_buttons()
 	_option_callables.clear()
 	_rebuild_employees(employees)

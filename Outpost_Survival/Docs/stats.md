@@ -13,7 +13,7 @@ Every concrete number currently in the game. Grouped by system; see [mechanics.m
 | Starting population capacity | 3 |
 | Starting water access | None (no Well built) |
 | Starting citizen skill levels | All skills level 1 (0 xp) |
-| Initial scattered trees | 12, mature, scattered within 5 tiles of the starting Lumber Camp |
+| Initial scattered trees | 160, mature, planted as 20 groves of 8 (`base.gd`'s `INITIAL_TREE_COUNT`/`TREE_GROVE_COUNT`), each grove centered on a random map cell with trees scattered within 5 tiles of that center |
 
 ## Resource Storage
 
@@ -311,8 +311,8 @@ Pikeman and Skirmisher are new unit types - see the combat sandbox's own balance
 
 | | Value |
 |---|---|
-| Playable grid | 28×28 tiles (784 total) |
-| Grid coordinate range | x: -12..15, y: -12..15 |
+| Playable grid | 56×56 tiles (3136 total) |
+| Grid coordinate range | x: -26..29, y: -26..29 |
 
 ## Display (`project.godot`)
 

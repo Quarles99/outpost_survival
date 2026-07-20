@@ -39,3 +39,27 @@ static func get_icon(resource_name: String) -> AtlasTexture:
 	atlas.atlas = entry[0]
 	atlas.region = Rect2(entry[1] * CELL, entry[2] * CELL, CELL, CELL)
 	return atlas
+
+
+## One-line blurb per resource for the mouseover tooltip system (Actionable
+## Ideas/Mouseover tooltip system.md) - same spirit as BuildingCatalog's
+## per-building "description" field, just keyed by resource name instead
+## since resources don't have their own catalog entry. "wood"/"stone" cover
+## the two HUD.Rows icons; the rest are FOOD_BREAKDOWN_ORDER's grid.
+const RESOURCE_DESCRIPTIONS := {
+	"wood": "Chopped from trees by Lumber Camps. Used to build and feeds Mills.",
+	"stone": "Mined by Stone Mines. Used to build and feeds Brickmakers.",
+	"brick": "Baked from stone at a Brickmaker. A sturdier building material.",
+	"cabbage": "Grown at a Cabbage Farm. Edible on its own.",
+	"potato": "Grown at a Potato Farm. Edible on its own.",
+	"fruit": "Grown at a Fruit Orchard. Edible on its own.",
+	"grain": "Grown at a Grain Farm. Not edible on its own - mill it into flour.",
+	"flour": "Milled from grain. Not edible on its own - bake it into bread.",
+	"bread": "Baked from flour at a Bakery. Edible.",
+	"beer": "Brewed from hops at a Brewery. Edible (counts as food).",
+	"hops": "Grown at a Hops Farm. Not edible on its own - brew it into ale.",
+}
+
+
+static func get_description(resource_name: String) -> String:
+	return RESOURCE_DESCRIPTIONS.get(resource_name, "")

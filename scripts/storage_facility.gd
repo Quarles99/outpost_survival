@@ -2,6 +2,12 @@ extends Area2D
 class_name StorageFacility
 
 @export var display_name: String = "Storage Facility"
+## Same purpose/wiring as Workstation.description - shown in the mouseover
+## tooltip (see Base._wire_building_tooltip). StorageFacility doesn't
+## extend Workstation, so (like House) it needs its own copy of this
+## field; set from BuildingCatalog's "storage_facility" entry via the
+## existing _apply_option_properties machinery, same as display_name.
+@export var description: String = ""
 
 ## See Workstation.XRAY_MATERIAL's doc comment - same shared material, same
 ## reasoning.

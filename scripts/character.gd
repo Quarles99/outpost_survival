@@ -182,6 +182,7 @@ var current_task := "Idle"
 @onready var select_sound: AudioStreamPlayer2D = $SelectSound
 @onready var assign_sound: AudioStreamPlayer2D = $AssignSound
 @onready var gather_sound: AudioStreamPlayer2D = $GatherSound
+@onready var level_up_sound: AudioStreamPlayer2D = $LevelUpSound
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 
 var _base_position: Vector2
@@ -452,10 +453,14 @@ func _gain_skill_xp(skill_id: String, amount: float) -> void:
 		_on_skill_level_up()
 
 
+## Dedicated LevelUpSound (Level_up_fireworks.ogg) rather than reusing
+## assign_sound the way this used to - that meant a level-up sounded
+## identical to an ordinary job (re)assignment, with nothing distinguishing
+## the moment a citizen actually got better at their skill.
 func _on_skill_level_up() -> void:
 	_punch()
 	_update_label()
-	assign_sound.play()
+	level_up_sound.play()
 
 
 ## Floating "+1.2 Food  +4 xp" feedback for a single gather tick - see

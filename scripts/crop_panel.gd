@@ -17,16 +17,22 @@ const BACKGROUND_DARKEN := 0.35
 const DEFAULT_BACKGROUND := Color(0.22, 0.24, 0.28)
 
 @onready var panel_control: Control = $Control
-@onready var title_label: Label = $Control/Panel/VBoxContainer/TitleLabel
-@onready var description_label: Label = $Control/Panel/VBoxContainer/DescriptionLabel
-@onready var button_container: GridContainer = $Control/Panel/VBoxContainer/ButtonContainer
-@onready var employee_container: VBoxContainer = $Control/Panel/VBoxContainer/EmployeeContainer
+@onready var title_label: Label = $Control/Margin/VBoxContainer/TitleLabel
+@onready var description_label: Label = $Control/Margin/VBoxContainer/DescriptionLabel
+@onready var button_container: GridContainer = $Control/Margin/VBoxContainer/ButtonContainer
+@onready var worker_count_label: Label = $Control/Margin/VBoxContainer/WorkerCountRow/WorkerCountLabel
+@onready var worker_minus_button: Button = $Control/Margin/VBoxContainer/WorkerCountRow/MinusButton
+@onready var worker_plus_button: Button = $Control/Margin/VBoxContainer/WorkerCountRow/PlusButton
+@onready var employee_container: VBoxContainer = $Control/Margin/VBoxContainer/EmployeeContainer
 
 var _buttons: Array[Button] = []
 var _employee_rows: Array[Control] = []
 var _option_callables: Array[Callable] = []
 var _base_position: Vector2
 var _anim_tween: Tween
+## See BuildingInfoPanel._worker_delta_callable's own doc comment - same
+## shape, called with +1/-1 by the WorkerCountRow's +/- buttons.
+var _worker_delta_callable: Callable
 
 ## Shares BuildMenu's text-on-color square button design (see its own doc
 ## comment on _add_button for why - shrunk-down in-world sprites read as an
@@ -42,6 +48,14 @@ var _anim_tween: Tween
 func _ready() -> void:
 	visible = false
 	_base_position = panel_control.position
+	worker_minus_button.pressed.connect(func() -> void:
+		if _worker_delta_callable.is_valid():
+			_worker_delta_callable.call(-1)
+	)
+	worker_plus_button.pressed.connect(func() -> void:
+		if _worker_delta_callable.is_valid():
+			_worker_delta_callable.call(1)
+	)
 
 
 ## `target_display_name` names the building being retooled (e.g. "Farm"),
@@ -51,10 +65,14 @@ func _ready() -> void:
 ## cap at 1 worker (Workstation's own max_workers default), so this is
 ## always a single row or the empty state, never a scrollable list the way
 ## TrainingGroundPanel's needs to be.
-func open_for(options: Array, target_display_name: String, employees: Array[Character] = [], description: String = "") -> void:
+func open_for(options: Array, target_display_name: String, employees: Array[Character] = [], description: String = "", worker_count: int = 0, worker_max: int = 1, on_worker_delta: Callable = Callable()) -> void:
 	title_label.text = "Change Crop: %s" % target_display_name
 	description_label.visible = not description.is_empty()
 	description_label.text = description
+	worker_count_label.text = "Workers: %d/%d" % [worker_count, worker_max]
+	worker_minus_button.disabled = worker_count <= 0
+	worker_plus_button.disabled = worker_count >= worker_max
+	_worker_delta_callable = on_worker_delta
 	_clear_buttons()
 	_option_callables.clear()
 	_rebuild_employees(employees)

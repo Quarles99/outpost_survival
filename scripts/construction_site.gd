@@ -15,6 +15,31 @@ const MAX_BUILDERS := 3
 func _ready() -> void:
 	max_workers = MAX_BUILDERS
 	super._ready()
+	## Each of the per-footprint-shape scenes (ConstructionSite1x1/2x2/2x4)
+	## scatters several Sprite2D props (Replace the construction site sprite
+	## with a composite sprite made with current sprite packs.md) instead of
+	## the single $Sprite2D Workstation.refresh_visual() already applies
+	## XRAY_MATERIAL to - same "walk every Sprite2D child" pattern
+	## StorageFacility.gd uses for its own Pile1-4, so every prop (not just
+	## the canonical one) correctly x-ray-reveals when a character walks
+	## behind the site, same as every other occluder class.
+	for child in get_children():
+		if child is Sprite2D:
+			child.material = XRAY_MATERIAL
+
+
+## Workstation.refresh_visual() only modulates the single canonical
+## $Sprite2D - same "walk every Sprite2D child" reasoning as the
+## XRAY_MATERIAL pass in _ready() above, so every scattered prop shares the
+## same sprite_tint/disabled dimming instead of just the one Workstation
+## itself knows about.
+func refresh_visual() -> void:
+	super.refresh_visual()
+	var tint: Color = sprite_tint * (DISABLED_TINT if disabled else Color.WHITE)
+	for child in get_children():
+		if child is Sprite2D:
+			child.modulate = tint
+
 
 ## Emitted once every entry in materials_needed has been fully delivered -
 ## Base listens (Base._on_construction_materials_ready) to add this site to

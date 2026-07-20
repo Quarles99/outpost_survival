@@ -19,6 +19,11 @@ var ground_origin := Vector2.ZERO
 var bounds_min := Vector2i.ZERO
 var bounds_max := Vector2i.ZERO
 var trees_container: Node = null
+## Set by configure() - lets plant_tree/_on_tree_matured/_on_tree_depleted
+## mark/clear the dirt "canopy" tile under a tree directly (Expand map size
+## 4x.md's "make the tile under the tree dirt to reflect canopy cover"),
+## without threading a new signal through Base for every plant/harvest.
+var iso_ground: IsoGround = null
 ## Every position workers can walk to drop off/pick up hauled resources -
 ## the Outpost Hall (registered once by Base._ready()) plus every placed
 ## Storage Facility (registered/unregistered as they're built or a save is
@@ -32,11 +37,12 @@ var _occupied: Dictionary = {}
 var _trees: Array[WorldTree] = []
 
 
-func configure(ground_pos: Vector2, min_cell: Vector2i, max_cell: Vector2i, trees_node: Node) -> void:
+func configure(ground_pos: Vector2, min_cell: Vector2i, max_cell: Vector2i, trees_node: Node, ground: IsoGround = null) -> void:
 	ground_origin = ground_pos
 	bounds_min = min_cell
 	bounds_max = max_cell
 	trees_container = trees_node
+	iso_ground = ground
 	_occupied.clear()
 	_trees.clear()
 	## WorldGrid is an autoload, unlike Base itself - a fresh Base.tscn
@@ -112,16 +118,33 @@ func plant_tree(cell: Vector2i, mature: bool) -> WorldTree:
 	tree.grid_cell = cell
 	tree.is_mature = mature
 	tree.depleted.connect(_on_tree_depleted)
+	tree.matured.connect(_on_tree_matured.bind(tree))
 	reserve(cell)
 	trees_container.add_child(tree)
 	tree.position = grid_to_local(Vector2(cell.x, cell.y))
 	_trees.append(tree)
+	## A tree planted already-mature (the initial map scatter) never fires
+	## its own matured signal - that only happens via the sapling-growth
+	## tween _ready() starts for is_mature=false (see WorldTree._ready()) -
+	## so this is the only place that case's canopy ever gets marked.
+	if mature and iso_ground:
+		iso_ground.mark_canopy(cell)
 	return tree
+
+
+## A replanted sapling (lumberjack replanting, or find_plantable_cell's own
+## callers) only grows a real canopy once it actually matures - see
+## plant_tree's own doc comment for the already-mature case.
+func _on_tree_matured(tree: WorldTree) -> void:
+	if iso_ground:
+		iso_ground.mark_canopy(tree.grid_cell)
 
 
 func _on_tree_depleted(tree: WorldTree) -> void:
 	release(tree.grid_cell)
 	_trees.erase(tree)
+	if iso_ground:
+		iso_ground.clear_canopy(tree.grid_cell)
 
 
 func get_trees() -> Array[WorldTree]:

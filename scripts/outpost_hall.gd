@@ -8,6 +8,14 @@ class_name OutpostHall
 signal clicked
 
 @export var display_name: String = "Outpost Hall"
+## Same purpose/wiring as Workstation.description/House.description - shown
+## in the mouseover tooltip (see Base._wire_building_tooltip). The Outpost
+## Hall is never instantiated via BuildingCatalog/_apply_option_properties
+## (it's the one fixed starting building, placed directly in Base.tscn -
+## see CLAUDE.md), so this default has to match BuildingCatalog's
+## "outpost_hall" entry text by hand rather than being copied in at
+## placement time the way a freshly-built structure's would be.
+@export var description: String = "The settlement's founding hall - the recruitment point and central stockpile."
 
 ## See Workstation.XRAY_MATERIAL's doc comment - same shared material, same
 ## reasoning.

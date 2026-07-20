@@ -17,18 +17,26 @@ const SLIDE_OFFSET := Vector2(0, 20)
 const ANIM_DURATION := 0.18
 
 @onready var panel_control: Control = $Control
-@onready var title_label: Label = $Control/Panel/VBoxContainer/TitleLabel
-@onready var description_label: Label = $Control/Panel/VBoxContainer/DescriptionLabel
-@onready var recipe_label: Label = $Control/Panel/VBoxContainer/RecipeLabel
-@onready var upgrade_button: Button = $Control/Panel/VBoxContainer/UpgradeButton
-@onready var empty_label: Label = $Control/Panel/VBoxContainer/EmptyLabel
-@onready var scroll_container: ScrollContainer = $Control/Panel/VBoxContainer/ScrollContainer
-@onready var button_container: VBoxContainer = $Control/Panel/VBoxContainer/ScrollContainer/ButtonContainer
+@onready var title_label: Label = $Control/Margin/VBoxContainer/TitleLabel
+@onready var description_label: Label = $Control/Margin/VBoxContainer/DescriptionLabel
+@onready var recipe_label: Label = $Control/Margin/VBoxContainer/RecipeLabel
+@onready var upgrade_button: Button = $Control/Margin/VBoxContainer/UpgradeButton
+@onready var worker_count_row: HBoxContainer = $Control/Margin/VBoxContainer/WorkerCountRow
+@onready var worker_count_label: Label = $Control/Margin/VBoxContainer/WorkerCountRow/WorkerCountLabel
+@onready var worker_minus_button: Button = $Control/Margin/VBoxContainer/WorkerCountRow/MinusButton
+@onready var worker_plus_button: Button = $Control/Margin/VBoxContainer/WorkerCountRow/PlusButton
+@onready var empty_label: Label = $Control/Margin/VBoxContainer/EmptyLabel
+@onready var scroll_container: ScrollContainer = $Control/Margin/VBoxContainer/ScrollContainer
+@onready var button_container: VBoxContainer = $Control/Margin/VBoxContainer/ScrollContainer/ButtonContainer
 
 var _buttons: Array[Button] = []
 var _base_position: Vector2
 var _anim_tween: Tween
 var _upgrade_pressed_callable: Callable
+## Called with +1/-1 - see open_for's worker_count/worker_max/on_worker_delta
+## params (Actionable Ideas/Implement the ability to increase or decrease
+## the desired amount of workers...md).
+var _worker_delta_callable: Callable
 
 
 func _ready() -> void:
@@ -37,6 +45,14 @@ func _ready() -> void:
 	upgrade_button.pressed.connect(func() -> void:
 		if _upgrade_pressed_callable.is_valid():
 			_upgrade_pressed_callable.call()
+	)
+	worker_minus_button.pressed.connect(func() -> void:
+		if _worker_delta_callable.is_valid():
+			_worker_delta_callable.call(-1)
+	)
+	worker_plus_button.pressed.connect(func() -> void:
+		if _worker_delta_callable.is_valid():
+			_worker_delta_callable.call(1)
 	)
 
 
@@ -51,7 +67,11 @@ func _ready() -> void:
 ## Brick)") above the employee section when both are given - House's own
 ## one-time upgrade uses this; a plain job post with no upgrade path (the
 ## common case) leaves both empty/invalid and the button stays hidden.
-func open_for(building_name: String, employees: Array[Character] = [], description: String = "", recipe: String = "", show_employees: bool = true, upgrade_label: String = "", on_upgrade: Callable = Callable()) -> void:
+## `worker_count`/`worker_max`/`on_worker_delta` are only meaningful when
+## `show_employees` is true (a House, the only show_employees=false caller,
+## isn't a job post and has no desired_workers concept) - the +/- stepper
+## row is gated on that same flag rather than a redundant extra bool.
+func open_for(building_name: String, employees: Array[Character] = [], description: String = "", recipe: String = "", show_employees: bool = true, upgrade_label: String = "", on_upgrade: Callable = Callable(), worker_count: int = 0, worker_max: int = 1, on_worker_delta: Callable = Callable()) -> void:
 	title_label.text = building_name
 	description_label.visible = not description.is_empty()
 	description_label.text = description
@@ -60,6 +80,11 @@ func open_for(building_name: String, employees: Array[Character] = [], descripti
 	upgrade_button.visible = not upgrade_label.is_empty() and on_upgrade.is_valid()
 	upgrade_button.text = upgrade_label
 	_upgrade_pressed_callable = on_upgrade
+	worker_count_row.visible = show_employees
+	worker_count_label.text = "Workers: %d/%d" % [worker_count, worker_max]
+	worker_minus_button.disabled = worker_count <= 0
+	worker_plus_button.disabled = worker_count >= worker_max
+	_worker_delta_callable = on_worker_delta
 	_clear_buttons()
 
 	empty_label.visible = show_employees and employees.is_empty()

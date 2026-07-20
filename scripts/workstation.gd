@@ -7,6 +7,12 @@ class_name Workstation
 ## job assignment either direction.
 signal disabled_changed(is_disabled: bool)
 
+## Fired whenever desired_workers changes (see its own doc comment) - Base
+## listens (_wire_workstation_desired_workers/_on_desired_workers_changed)
+## to re-run job assignment, same as disabled_changed does for the other
+## way a post's effective capacity can drop below max_workers.
+signal desired_workers_changed(value: int)
+
 ## Fired on left-click - lets Base show a generic building-info panel
 ## (name + who's currently employed here, see Base._on_building_info_
 ## clicked/BuildingInfoPanel) for whichever Workstation subclass doesn't
@@ -103,6 +109,19 @@ const RESOURCE_VISUALS := {}
 ## worker (Base._on_post_disabled_changed) and is treated as zero capacity
 ## until re-enabled.
 var disabled := false
+## Player-set cap on how many of this post's max_workers slots job
+## assignment is allowed to fill (Actionable Ideas/Implement the ability to
+## increase or decrease the desired amount of workers...md) - a softer,
+## steppable version of `disabled` (which is an all-or-nothing toggle) set
+## via +/- buttons on BuildingInfoPanel/CropPanel/TrainingGroundPanel. -1
+## is a sentinel meaning "not yet set" - _ready() normalizes it to
+## max_workers (full capacity, today's implicit default) the moment this
+## node enters the tree, so every existing catalog entry/save that's never
+## heard of this field behaves exactly as before. Independent of
+## `disabled` - effective capacity is 0 whenever disabled is true
+## regardless of this value (see get_effective_worker_cap), same as it
+## always has been.
+@export var desired_workers: int = -1
 
 @onready var label: Label = $Label
 @onready var sprite: Sprite2D = $Sprite2D
@@ -128,6 +147,8 @@ var _default_offset: Vector2
 
 
 func _ready() -> void:
+	if desired_workers < 0:
+		desired_workers = max_workers
 	_update_label()
 	_default_texture = sprite.texture
 	_default_centered = sprite.centered
@@ -169,6 +190,29 @@ func _on_workstation_input_event(_viewport: Node, event: InputEvent, _shape_idx:
 	elif event.button_index == MOUSE_BUTTON_LEFT:
 		get_viewport().set_input_as_handled()
 		info_clicked.emit()
+
+
+## The capacity Base._run_job_assignment actually fills this post to -
+## min(desired_workers, max_workers) (defensive clamp in case max_workers
+## itself ever changes, e.g. a future retool that alters it), or 0 whenever
+## disabled - see disabled's own doc comment for why that one still wins
+## outright regardless of desired_workers.
+func get_effective_worker_cap() -> int:
+	if disabled:
+		return 0
+	return clampi(desired_workers, 0, max_workers)
+
+
+## Clamped to [0, max_workers] - a caller passing an out-of-range delta
+## (e.g. pressing + at max_workers) just gets clamped rather than needing
+## to check bounds itself. No-ops (doesn't emit) if the clamped value is
+## unchanged, same guard set_disabled uses.
+func set_desired_workers(value: int) -> void:
+	var clamped := clampi(value, 0, max_workers)
+	if clamped == desired_workers:
+		return
+	desired_workers = clamped
+	desired_workers_changed.emit(desired_workers)
 
 
 func set_disabled(value: bool) -> void:

@@ -2,6 +2,12 @@ extends Node2D
 class_name WorldTree
 
 signal depleted(tree: WorldTree)
+## Fired once a replanted sapling finishes growing (see _on_matured) -
+## WorldGrid listens (plant_tree/_on_tree_matured) to mark the ground tile
+## beneath it as dirt, matching what an already-mature tree gets
+## immediately on planting. Never fires for a tree planted already-mature -
+## see WorldGrid.plant_tree's own doc comment.
+signal matured
 
 const SAPLING_SCALE := 0.35
 ## See Workstation.XRAY_MATERIAL's doc comment - same shared material, same
@@ -53,6 +59,7 @@ func _ready() -> void:
 func _on_matured() -> void:
 	is_mature = true
 	wood_remaining = max_wood
+	matured.emit()
 
 
 func harvest(amount: float) -> float:

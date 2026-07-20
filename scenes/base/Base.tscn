@@ -32,10 +32,10 @@ script = ExtResource("15")
 
 [node name="IsoGround" parent="." unique_id=757546459 instance=ExtResource("9")]
 position = Vector2(576, 170)
-width = 28
-depth = 28
-start_x = -12
-start_y = -12
+width = 56
+depth = 56
+start_x = -26
+start_y = -26
 
 [node name="OutpostHall" parent="." unique_id=1153227806 instance=ExtResource("13")]
 position = Vector2(576, 298)

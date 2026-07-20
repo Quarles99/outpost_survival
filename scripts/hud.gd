@@ -26,20 +26,23 @@ const FOOD_BREAKDOWN_LABELS := {
 	"flour": "Flour",
 }
 
-@onready var food_breakdown: GridContainer = $Control/Rows/FoodBreakdown
-@onready var wood_label: Label = $Control/Rows/WoodRow/WoodLabel
-@onready var wood_icon: TextureRect = $Control/Rows/WoodRow/Icon
-@onready var stone_label: Label = $Control/Rows/StoneRow/StoneLabel
-@onready var stone_icon: TextureRect = $Control/Rows/StoneRow/Icon
-@onready var water_label: Label = $Control/Rows/WaterLabel
-@onready var population_label: Label = $Control/Rows/PopulationLabel
-@onready var happiness_label: Label = $Control/Rows/HappinessLabel
-@onready var day_label: Label = $Control/Rows/DayLabel
-@onready var build_button: Button = $Control/Rows/BuildButton
-@onready var citizens_button: Button = $Control/Rows/CitizensButton
-@onready var attack_button: Button = $Control/Rows/AttackButton
-@onready var speed_button: Button = $Control/Rows/SpeedButton
-@onready var menu_button: Button = $Control/Rows/MenuButton
+@onready var food_breakdown: GridContainer = $Control/Margin/Rows/FoodBreakdown
+@onready var wood_label: Label = $Control/Margin/Rows/WoodRow/WoodLabel
+@onready var wood_icon: TextureRect = $Control/Margin/Rows/WoodRow/Icon
+@onready var stone_label: Label = $Control/Margin/Rows/StoneRow/StoneLabel
+@onready var stone_icon: TextureRect = $Control/Margin/Rows/StoneRow/Icon
+@onready var brick_label: Label = $Control/Margin/Rows/BrickRow/BrickLabel
+@onready var brick_icon: TextureRect = $Control/Margin/Rows/BrickRow/Icon
+@onready var water_label: Label = $Control/Margin/Rows/WaterLabel
+@onready var population_label: Label = $Control/Margin/Rows/PopulationLabel
+@onready var idle_label: Label = $Control/Margin/Rows/IdleLabel
+@onready var happiness_label: Label = $Control/Margin/Rows/HappinessLabel
+@onready var day_label: Label = $Control/Margin/Rows/DayLabel
+@onready var build_button: Button = $Control/Margin/Rows/BuildButton
+@onready var citizens_button: Button = $Control/Margin/Rows/CitizensButton
+@onready var attack_button: Button = $Control/Margin/Rows/AttackButton
+@onready var speed_button: Button = $Control/Margin/Rows/SpeedButton
+@onready var menu_button: Button = $Control/Margin/Rows/MenuButton
 @onready var save_indicator: Label = $SaveIndicator
 @onready var food_bar_frame: Control = $FoodBarPanel/FoodBarFrame
 @onready var food_bar_fill: ColorRect = $FoodBarPanel/FoodBarFrame/Fill
@@ -55,24 +58,41 @@ const FOOD_BAR_MEAL_WARNING_COLOR := Color(0.85, 0.25, 0.25, 0.85)
 ## (_update_food_display), since one HUD row no longer maps to one
 ## GameState.resources entry for food.
 var _resource_labels: Dictionary = {}
-var _displayed := {"wood": 0.0, "stone": 0.0}
+var _displayed := {"wood": 0.0, "stone": 0.0, "brick": 0.0}
 var _count_tweens := {}
 var _save_indicator_tween: Tween
 var _rate_timer: Timer
 var _food_breakdown_labels: Dictionary = {}
 var _food_breakdown_icons: Dictionary = {}
+## resource_name -> total active_workers currently producing it, pushed by
+## Base.set_worker_counts (see that function's own doc comment for why this
+## has to be a direct call rather than a GameState signal - it needs the
+## character/post roster, which only Base owns). Read by _update_label_text/
+## _update_food_display to append the "(workers)" suffix every resource row
+## now shows (Make the resource display consistent across all resources.md).
+var _worker_counts: Dictionary = {}
+var _idle_count := 0
 
 
 func _ready() -> void:
-	_resource_labels = {"wood": wood_label, "stone": stone_label}
+	_resource_labels = {"wood": wood_label, "stone": stone_label, "brick": brick_label}
 	wood_icon.texture = ResourceIcons.get_icon("wood")
-	wood_icon.tooltip_text = "Wood"
 	stone_icon.texture = ResourceIcons.get_icon("stone")
-	stone_icon.tooltip_text = "Stone"
+	brick_icon.texture = ResourceIcons.get_icon("brick")
+	_wire_tooltip(wood_icon, func() -> String: return "Wood", func() -> String: return _tooltip_body_for_resource("wood"))
+	_wire_tooltip(stone_icon, func() -> String: return "Stone", func() -> String: return _tooltip_body_for_resource("stone"))
+	_wire_tooltip(brick_icon, func() -> String: return "Brick", func() -> String: return _tooltip_body_for_resource("brick"))
+	_wire_tooltip(water_label, func() -> String: return "Water", func() -> String: return "Available once any Well is built - also boosts nearby Farm output (see Well's own description).\nStatus: %s" % ("Available" if GameState.has_water() else "None"))
+	_wire_tooltip(population_label, func() -> String: return "Population", func() -> String: return "Housed citizens vs. total capacity, from House and the Outpost Hall.")
+	_wire_tooltip(idle_label, func() -> String: return "Idle Workers", func() -> String: return "Citizens with no job post assigned. They haul resources automatically until a post opens up for them.")
+	_wire_tooltip(happiness_label, func() -> String: return "Happiness", func() -> String: return "Average citizen happiness. Higher happiness boosts production; low happiness hurts it.")
+	_wire_tooltip(day_label, func() -> String: return "Day/Night", func() -> String: return "The settlement's day/night clock - affects work schedules and meal timing.")
 	wood_label.resized.connect(func() -> void: wood_label.pivot_offset = wood_label.size / 2)
 	stone_label.resized.connect(func() -> void: stone_label.pivot_offset = stone_label.size / 2)
+	brick_label.resized.connect(func() -> void: brick_label.pivot_offset = brick_label.size / 2)
 	water_label.resized.connect(func() -> void: water_label.pivot_offset = water_label.size / 2)
 	population_label.resized.connect(func() -> void: population_label.pivot_offset = population_label.size / 2)
+	idle_label.resized.connect(func() -> void: idle_label.pivot_offset = idle_label.size / 2)
 	happiness_label.resized.connect(func() -> void: happiness_label.pivot_offset = happiness_label.size / 2)
 	## food_bar_frame's actual size isn't reliable until the VBoxContainer it
 	## sits in has completed a layout pass (it stretches the frame to the
@@ -106,6 +126,7 @@ func _ready() -> void:
 		food_breakdown.add_child(cell)
 		_food_breakdown_icons[food_resource] = icon
 		_food_breakdown_labels[food_resource] = label
+		_wire_tooltip(icon, func() -> String: return FOOD_BREAKDOWN_LABELS[food_resource], func() -> String: return _tooltip_body_for_resource(food_resource))
 
 	for resource_name in _resource_labels:
 		_set_display(resource_name, GameState.resources[resource_name])
@@ -163,33 +184,34 @@ func _set_display(resource_name: String, value: float) -> void:
 	_update_label_text(resource_name)
 
 
-## Rebuilds a resource label's full text (amount + rate) without touching
-## _displayed - called both when the amount changes (_set_display) and on
-## the independent per-second rate refresh, so the rate updates smoothly
-## even while the amount itself is momentarily unchanged.
+## "50 (2)" - amount, then the count of citizens currently working a post
+## that produces this resource (_worker_counts, pushed by Base.
+## set_worker_counts) in parens. Capacity/rate used to be inline here too -
+## moved to the tooltip instead (see _tooltip_body_for_resource) once the
+## mouseover tooltip system existed to hold it, per Make the resource
+## display consistent across all resources.md's "Icon: Amount (workers)"
+## format applying to every resource the same way, not just wood/stone.
 func _update_label_text(resource_name: String) -> void:
 	var label: Label = _resource_labels.get(resource_name)
 	if not label:
 		return
 	var value: float = _displayed[resource_name]
-	var rate := GameState.get_income_per_minute(resource_name)
-	label.text = "%d/%d (%s%.1f/min)" % [value, GameState.storage_capacity, "+" if rate >= 0.0 else "", rate]
+	label.text = "%d (%d)" % [value, _worker_counts.get(resource_name, 0)]
 
 
 ## Rebuilds the Food grid: every individual food resource always shows its
-## own icon + amount (no collapsed/expanded state anymore - removed per an
-## explicit request that each food type stay individually visible rather
-## than folded under a dropdown). Just the amount, not the full
-## amount/cap/rate wood and stone get - capacity is the same shared number
-## for every resource (already visible via wood/stone and the Food bar
-## below) and a full "%d/%d (+%.1f/min)" readout per row doesn't fit a
-## multi-column grid at a legible width, so the rate/capacity detail moves
-## to the icon's tooltip instead. Not smoothly tweened like wood/stone's
-## count-up (7 sub-values changing independently would read as more
-## animation than this compact a readout can support) - `punch` still gets
-## the same on-change juice, just applied to the whole grid at once, and
-## skipped for the purely time-based per-second rate refresh so it doesn't
-## visibly pulse every second even when nothing actually changed.
+## own icon + "amount (workers)" (no collapsed/expanded state anymore -
+## removed per an explicit request that each food type stay individually
+## visible rather than folded under a dropdown), the same format
+## _update_label_text now gives wood/stone - capacity/rate live in the
+## tooltip only (see that function's own doc comment) since a full
+## "%d/%d (+%.1f/min)" readout per row doesn't fit a multi-column grid at a
+## legible width. Not smoothly tweened like wood/stone's count-up (7
+## sub-values changing independently would read as more animation than
+## this compact a readout can support) - `punch` still gets the same
+## on-change juice, just applied to the whole grid at once, and skipped
+## for the purely time-based per-second rate refresh so it doesn't visibly
+## pulse every second even when nothing actually changed.
 func _update_food_display(punch: bool = false) -> void:
 	for resource_name in FOOD_BREAKDOWN_ORDER:
 		var label: Label = _food_breakdown_labels.get(resource_name)
@@ -197,9 +219,7 @@ func _update_food_display(punch: bool = false) -> void:
 		if not label or not icon:
 			continue
 		var amount: float = GameState.resources.get(resource_name, 0.0)
-		var rate := GameState.get_income_per_minute(resource_name)
-		label.text = "%d" % amount
-		icon.tooltip_text = "%s: %d/%d (%s%.1f/min)" % [FOOD_BREAKDOWN_LABELS[resource_name], amount, GameState.storage_capacity, "+" if rate >= 0.0 else "", rate]
+		label.text = "%d (%d)" % [amount, _worker_counts.get(resource_name, 0)]
 
 	if punch:
 		_punch_control(food_breakdown)
@@ -256,6 +276,47 @@ func _refresh_rates() -> void:
 		_update_label_text(resource_name)
 	_update_food_display()
 	_update_food_bar()
+
+
+## Connects a Control to TooltipManager (Actionable Ideas/Mouseover tooltip
+## system.md) - `title`/`body` are Callables rather than plain Strings so
+## the tooltip always reflects live game state (current water/population/
+## resource totals) at the moment the hover delay actually elapses, not
+## whatever those values happened to be back when _ready() first wired the
+## connection.
+func _wire_tooltip(control: Control, title: Callable, body: Callable) -> void:
+	control.mouse_entered.connect(func() -> void: TooltipManager.request(title.call(), body.call()))
+	control.mouse_exited.connect(func() -> void: TooltipManager.cancel())
+
+
+## Shared by every resource icon (wood/stone/brick rows and the Food grid's
+## per-crop icons) - description (ResourceIcons.get_description) plus "Max
+## capacity" per Mouseover tooltip system.md's companion note (this file).
+## Rate (the old inline "+2.0/min") was tried here too but dropped
+## entirely per an explicit request - just description + capacity now.
+func _tooltip_body_for_resource(resource_name: String) -> String:
+	var lines: Array[String] = []
+	var description := ResourceIcons.get_description(resource_name)
+	if not description.is_empty():
+		lines.append(description)
+	lines.append("Max capacity: %d" % GameState.storage_capacity)
+	return "\n".join(lines)
+
+
+## Pushed directly by Base at the end of _run_job_assignment() (see
+## Base._update_resource_worker_counts's own doc comment for why this has
+## to be a direct call, not a GameState signal) - refreshes every resource
+## row's "(workers)" suffix and the Idle Workers stat in one pass.
+func set_worker_counts(per_resource: Dictionary, idle_count: int) -> void:
+	_worker_counts = per_resource
+	for resource_name in _resource_labels:
+		_update_label_text(resource_name)
+	_update_food_display()
+	var changed := idle_count != _idle_count
+	_idle_count = idle_count
+	idle_label.text = "Idle: %d" % idle_count
+	if changed:
+		_punch_control(idle_label)
 
 
 func _punch(resource_name: String) -> void:

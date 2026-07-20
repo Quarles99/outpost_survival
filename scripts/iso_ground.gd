@@ -90,6 +90,13 @@ var _edge_noise := FastNoiseLite.new()
 ## ambient patch noise says at that cell - a Dictionary used as a Set
 ## (value is always true, only key membership matters).
 var _forced_dirt: Dictionary = {}
+## Vector2i -> the AtlasTexture backing that cell's tile (not the Sprite2D
+## itself - the region is the only thing that ever needs mutating after
+## _build(), for mark_canopy/clear_canopy below) - Expand map size 4x.md's
+## "make the tile under the tree dirt to reflect canopy cover". Populated
+## in _place_tile so a canopy toggle is an O(1) lookup rather than a full
+## rebuild.
+var _tile_atlases: Dictionary = {}
 
 
 func _ready() -> void:
@@ -104,6 +111,7 @@ func _ready() -> void:
 func _build() -> void:
 	for child in get_children():
 		child.queue_free()
+	_tile_atlases.clear()
 
 	_patch_noise.seed = NOISE_SEED
 	_patch_noise.frequency = PATCH_FREQUENCY
@@ -142,6 +150,33 @@ func _place_tile(gx: int, gy: int) -> void:
 	tile.flip_h = spatial_hash % 2 == 0
 	tile.position = IsoUtils.grid_to_screen(Vector2(gx, gy))
 	add_child(tile)
+	_tile_atlases[Vector2i(gx, gy)] = atlas
+
+
+## Forces a single cell to the dirt/worn region regardless of the ambient
+## noise/clearings/paths - called by WorldGrid when a tree at this cell
+## matures (see WorldGrid.plant_tree/_on_tree_matured), so a canopy visibly
+## kills the grass beneath it. A no-op for a cell outside the built grid
+## (_tile_atlases has no entry) - defensive only, every caller today only
+## ever passes a WorldTree's own grid_cell, which WorldGrid already
+## constrains to bounds_min/bounds_max.
+func mark_canopy(cell: Vector2i) -> void:
+	var atlas: AtlasTexture = _tile_atlases.get(cell)
+	if atlas:
+		atlas.region = WORN_REGION
+
+
+## Reverts a cell to whatever it would naturally be (still dirt if it's
+## also inside a clearing/path/ambient patch, grass otherwise) - called
+## once the tree that was marking it canopy is harvested away (see
+## WorldGrid._on_tree_depleted). Deliberately re-derives via _is_dirt()
+## rather than hardcoding grass, so a tree planted inside a clearing
+## doesn't leave a "hole" of grass in what should stay a dirt clearing
+## once it's gone.
+func clear_canopy(cell: Vector2i) -> void:
+	var atlas: AtlasTexture = _tile_atlases.get(cell)
+	if atlas:
+		atlas.region = WORN_REGION if _is_dirt(cell.x, cell.y) else GRASS_REGION
 
 
 func _is_dirt(gx: int, gy: int) -> bool:

@@ -22,6 +22,7 @@ WorldGrid="*res://autoload/world_grid.gd"
 SaveManager="*res://autoload/save_manager.gd"
 BattleState="*res://autoload/battle_state.gd"
 DayNightCycle="*res://autoload/day_night_cycle.gd"
+TooltipManager="*res://autoload/tooltip_manager.gd"
 
 [display]
 

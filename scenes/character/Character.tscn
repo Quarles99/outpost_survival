@@ -5,6 +5,7 @@
 [ext_resource type="AudioStream" uid="uid://dd0rfospvgkf5" path="res://sound/select_chime.wav" id="4"]
 [ext_resource type="AudioStream" uid="uid://dellnxyri88gn" path="res://sound/assign_task.wav" id="5"]
 [ext_resource type="AudioStream" uid="uid://blf1f4v4m036i" path="res://sound/resource_gain.wav" id="6"]
+[ext_resource type="AudioStream" uid="uid://bqber6uc6ahr0" path="res://sound/Level_up_fireworks.ogg" id="7"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_1"]
 radius = 36.0
@@ -46,4 +47,8 @@ stream = ExtResource("5")
 
 [node name="GatherSound" type="AudioStreamPlayer2D" parent="." unique_id=434225189]
 stream = ExtResource("6")
+volume_db = -6.0
+
+[node name="LevelUpSound" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("7")
 volume_db = -6.0
