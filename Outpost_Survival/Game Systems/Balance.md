@@ -83,6 +83,9 @@ All three are real feature work, not numeric tuning - say the word if you want a
 | Speed-skill XP per second moving | 2.5          | `scripts/character.gd:96` `SPEED_XP_PER_SECOND` |                                                                                                                                                                 |
 | Citizen avoidance radius | 18 px | `scripts/character.gd:39` `AVOIDANCE_RADIUS` | RVO radius vs. other citizens, well under CollisionShape2D's 36px click-hitbox - new (Add collisions to villagers so they can't stack up on the same spot.md), first-pass, not tuned via playtesting |
 | Citizen avoidance neighbor distance / time horizon | 150 px / 1.5s | `scripts/character.gd:40-41` `AVOIDANCE_NEIGHBOR_DISTANCE`/`AVOIDANCE_TIME_HORIZON_AGENTS` | Pulled down from NavigationServer's crowd-sim defaults (500px/~20s), same reasoning as CombatUnit's own tuning above |
+| Dirt path wear gain / decay per second | 0.5 / 0.05 | `autoload/world_grid.gd:50,55` `WEAR_PER_SECOND`/`WEAR_DECAY_PER_SECOND` | New (Dynamic path building system.md), first-pass, not tuned via playtesting. Decay is 10x slower than gain on purpose - a constantly-crossed route stays worn, a one-off crossing fades in well under a minute |
+| Dirt path threshold / max wear | 1.0 / 2.0 | `autoload/world_grid.gd:58,62` `WEAR_PATH_THRESHOLD`/`WEAR_MAX` | A cell becomes a visible worn path at 1.0 wear; clamped at 2.0 so a heavily-trodden tile doesn't take proportionally longer to decay back down once traffic stops |
+| Dirt path speed bonus | 1.15x | `autoload/world_grid.gd:65` `PATH_SPEED_MULTIPLIER` | Applied to any citizen currently standing on a worn-path cell while moving |
 
 ## Day / Night
 

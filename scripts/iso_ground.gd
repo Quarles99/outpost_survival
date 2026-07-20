@@ -97,6 +97,17 @@ var _forced_dirt: Dictionary = {}
 ## in _place_tile so a canopy toggle is an O(1) lookup rather than a full
 ## rebuild.
 var _tile_atlases: Dictionary = {}
+## Cells forced to dirt by a mature tree's canopy (see mark_canopy/
+## clear_canopy) - kept as its own Set, separate from _worn_path_cells
+## below, so the two dynamic "why is this dirt" reasons compose instead of
+## clobbering each other: a path worn under a tree that's since grown a
+## canopy shouldn't revert to grass just because foot traffic there
+## happened to decay away, and vice versa. See _refresh_tile_region.
+var _canopy_cells: Dictionary = {}
+## Cells forced to dirt by WorldGrid's foot-traffic wear tracking (Dynamic
+## path building system.md) - same Set-of-Vector2i shape as _canopy_cells,
+## composed the same way in _refresh_tile_region.
+var _worn_path_cells: Dictionary = {}
 
 
 func _ready() -> void:
@@ -112,6 +123,8 @@ func _build() -> void:
 	for child in get_children():
 		child.queue_free()
 	_tile_atlases.clear()
+	_canopy_cells.clear()
+	_worn_path_cells.clear()
 
 	_patch_noise.seed = NOISE_SEED
 	_patch_noise.frequency = PATCH_FREQUENCY
@@ -161,22 +174,58 @@ func _place_tile(gx: int, gy: int) -> void:
 ## ever passes a WorldTree's own grid_cell, which WorldGrid already
 ## constrains to bounds_min/bounds_max.
 func mark_canopy(cell: Vector2i) -> void:
-	var atlas: AtlasTexture = _tile_atlases.get(cell)
-	if atlas:
-		atlas.region = WORN_REGION
+	_canopy_cells[cell] = true
+	_refresh_tile_region(cell)
 
 
 ## Reverts a cell to whatever it would naturally be (still dirt if it's
-## also inside a clearing/path/ambient patch, grass otherwise) - called
-## once the tree that was marking it canopy is harvested away (see
-## WorldGrid._on_tree_depleted). Deliberately re-derives via _is_dirt()
-## rather than hardcoding grass, so a tree planted inside a clearing
-## doesn't leave a "hole" of grass in what should stay a dirt clearing
-## once it's gone.
+## also inside a clearing/path/ambient patch, a worn foot-traffic path, or
+## another tree's canopy - see _refresh_tile_region - grass otherwise) -
+## called once the tree that was marking it canopy is harvested away (see
+## WorldGrid._on_tree_depleted).
 func clear_canopy(cell: Vector2i) -> void:
+	_canopy_cells.erase(cell)
+	_refresh_tile_region(cell)
+
+
+## Forces a single cell to the dirt/worn region because foot traffic has
+## worn it into a path (WorldGrid's wear tracking, see Dynamic path
+## building system.md) - same shape as mark_canopy, kept as an entirely
+## separate Set (_worn_path_cells) so the two dynamic "why is this dirt"
+## reasons compose instead of one clobbering the other (see
+## _canopy_cells's own doc comment).
+func mark_worn_path(cell: Vector2i) -> void:
+	_worn_path_cells[cell] = true
+	_refresh_tile_region(cell)
+
+
+## Reverts a cell once its foot-traffic wear has fully decayed away (see
+## WorldGrid._process) - same "re-derive rather than hardcode" reasoning as
+## clear_canopy.
+func clear_worn_path(cell: Vector2i) -> void:
+	_worn_path_cells.erase(cell)
+	_refresh_tile_region(cell)
+
+
+## True if `cell` currently reads as a worn dirt path from foot traffic
+## specifically (not ambient noise/clearings/canopy) - Character reads this
+## to apply the path speed bonus (see Dynamic path building system.md's
+## "small boost to movement speed").
+func is_worn_path(cell: Vector2i) -> bool:
+	return _worn_path_cells.has(cell)
+
+
+## The single source of truth for what a cell's tile should actually look
+## like, given every reason (static noise/clearing/path baked at build
+## time, a tree's canopy, foot-traffic wear) it might currently be dirt -
+## called after any one of those changes for just the one affected cell,
+## rather than a full _build() rebuild.
+func _refresh_tile_region(cell: Vector2i) -> void:
 	var atlas: AtlasTexture = _tile_atlases.get(cell)
-	if atlas:
-		atlas.region = WORN_REGION if _is_dirt(cell.x, cell.y) else GRASS_REGION
+	if not atlas:
+		return
+	var dirt := _is_dirt(cell.x, cell.y) or _canopy_cells.has(cell) or _worn_path_cells.has(cell)
+	atlas.region = WORN_REGION if dirt else GRASS_REGION
 
 
 func _is_dirt(gx: int, gy: int) -> bool:

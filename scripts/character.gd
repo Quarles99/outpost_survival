@@ -433,7 +433,15 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 		_move_delta = delta
 		var next_pos: Vector2 = nav_agent.get_next_path_position()
 		var direction := _base_position.direction_to(next_pos)
-		nav_agent.set_velocity(direction * move_speed)
+		## Dynamic path building system.md - wears the tile currently underfoot
+		## toward a dirt path, and (once it's already worn) moves a little
+		## faster while on it. Registered/read every frame this citizen is
+		## actually walking, not just at trip start/end, so a long haul route
+		## wears in gradually and the speed bonus applies for exactly the
+		## stretch that's actually a worn path, not the whole trip.
+		WorldGrid.register_foot_traffic(_base_position)
+		var path_speed_multiplier := WorldGrid.get_speed_multiplier(_base_position)
+		nav_agent.set_velocity(direction * move_speed * path_speed_multiplier)
 		if absf(direction.x) > 0.01:
 			sprite.flip_h = direction.x < 0.0
 		elapsed += delta

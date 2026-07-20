@@ -36,6 +36,34 @@ var stockpile_spots: Array[Vector2] = []
 var _occupied: Dictionary = {}
 var _trees: Array[WorldTree] = []
 
+## Dynamic path building system.md - "the more frequently villagers walk
+## over the same tile the more progress it gets to becoming a dirt path
+## tile ... if left untraveled for awhile they will revert back to grass."
+## Vector2i -> current wear (0..WEAR_MAX) - only cells with any wear at all
+## are ever present as keys (removed once decayed back to 0, see _process),
+## so this stays bounded to "recently walked" cells rather than growing to
+## cover the whole map. Not part of save data, same as every other IsoGround
+## cosmetic state (ambient noise, canopy) - see IsoGround's own doc comment
+## on why the ground is fully regenerated fresh every session rather than
+## persisted.
+var _path_wear: Dictionary = {}
+const WEAR_PER_SECOND := 0.5
+## Much slower than WEAR_PER_SECOND - a route crossed constantly stays worn
+## while a one-off crossing fades back to grass in well under a minute,
+## matching "if left untraveled for awhile" rather than reverting almost
+## immediately.
+const WEAR_DECAY_PER_SECOND := 0.05
+## Wear level at which a cell visually becomes a worn path (see
+## IsoGround.mark_worn_path) and starts granting PATH_SPEED_MULTIPLIER.
+const WEAR_PATH_THRESHOLD := 1.0
+## Clamp - without this a super-highway tile crossed nonstop for a long
+## session would take proportionally longer to decay back down too, which
+## reads as "stuck" rather than "reverts if left untraveled."
+const WEAR_MAX := 2.0
+## "A small boost" (Dynamic path building system.md) - first-pass, not
+## tuned via playtesting.
+const PATH_SPEED_MULTIPLIER := 1.15
+
 
 func configure(ground_pos: Vector2, min_cell: Vector2i, max_cell: Vector2i, trees_node: Node, ground: IsoGround = null) -> void:
 	ground_origin = ground_pos
@@ -45,6 +73,7 @@ func configure(ground_pos: Vector2, min_cell: Vector2i, max_cell: Vector2i, tree
 	iso_ground = ground
 	_occupied.clear()
 	_trees.clear()
+	_path_wear.clear()
 	## WorldGrid is an autoload, unlike Base itself - a fresh Base.tscn
 	## instantiation (New Game, or MainMenu -> Continue) calls configure()
 	## exactly once in _ready(), so this is where stale stockpile spots
@@ -74,6 +103,54 @@ func nearest_stockpile(from: Vector2) -> Vector2:
 			best = spot
 			best_dist = dist
 	return best
+
+
+## Called every frame (Character._move_to's loop, while actually walking)
+## with the citizen's current world position - bumps that cell's wear, and
+## once it crosses WEAR_PATH_THRESHOLD, tells IsoGround to render it as a
+## worn dirt path. No-op for a cell outside the built grid (no iso_ground
+## configured yet, or genuinely out of bounds) - defensive only.
+func register_foot_traffic(world_pos: Vector2) -> void:
+	if not iso_ground:
+		return
+	var grid := local_to_grid(world_pos)
+	var cell := Vector2i(round(grid.x), round(grid.y))
+	var wear: float = minf(_path_wear.get(cell, 0.0) + WEAR_PER_SECOND * get_process_delta_time(), WEAR_MAX)
+	_path_wear[cell] = wear
+	if wear >= WEAR_PATH_THRESHOLD:
+		iso_ground.mark_worn_path(cell)
+
+
+## True if the cell at `world_pos` currently reads as a worn path -
+## Character reads this each frame while moving to apply
+## PATH_SPEED_MULTIPLIER.
+func get_speed_multiplier(world_pos: Vector2) -> float:
+	if not iso_ground:
+		return 1.0
+	var grid := local_to_grid(world_pos)
+	var cell := Vector2i(round(grid.x), round(grid.y))
+	return PATH_SPEED_MULTIPLIER if iso_ground.is_worn_path(cell) else 1.0
+
+
+## Decays every tracked cell's wear continuously (not just the ones
+## actively being walked on this frame, unlike register_foot_traffic) -
+## this is what makes a path actually "revert back to grass" once foot
+## traffic stops, rather than staying worn forever once it first crosses
+## the threshold. Cells fully decayed back to 0 are dropped from
+## _path_wear entirely, so this dict only ever holds recently-active cells.
+func _process(delta: float) -> void:
+	if _path_wear.is_empty():
+		return
+	var to_clear: Array[Vector2i] = []
+	for cell in _path_wear:
+		var wear: float = maxf(_path_wear[cell] - WEAR_DECAY_PER_SECOND * delta, 0.0)
+		_path_wear[cell] = wear
+		if wear <= 0.0:
+			to_clear.append(cell)
+		elif wear < WEAR_PATH_THRESHOLD and iso_ground and iso_ground.is_worn_path(cell):
+			iso_ground.clear_worn_path(cell)
+	for cell in to_clear:
+		_path_wear.erase(cell)
 
 
 func grid_to_local(grid: Vector2) -> Vector2:

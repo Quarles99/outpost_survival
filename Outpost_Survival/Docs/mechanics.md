@@ -47,6 +47,8 @@ When several construction sites need the same resource at once and there isn't e
 
 Citizens route around buildings and trees rather than cutting through them - the same `NavigationAgent2D`-driven approach the Battle Test sandbox already used, ported to the settlement. The navmesh re-bakes automatically whenever a building is placed/completed or a tree is planted/harvested, so pathing always reflects the current layout. Citizens also steer around each other while walking (RVO avoidance, same mechanism combat units use), so two crossing paths dodge rather than overlap - this only applies while actually moving, so several citizens stationed at the same shared work spot can still stand on top of each other once arrived.
 
+**Dirt paths** wear in on their own wherever citizens actually walk - a tile crossed often enough visibly turns to dirt and gives anyone on it a small movement speed boost, while a tile that stops seeing traffic gradually reverts to grass. This happens automatically on every route citizens actually take (hauling, commuting to a job, anything that moves them) - there's no separate "build a road" action.
+
 ## Sustainable Forestry
 
 A Lumber Camp maintains a target forest size within its search radius (see stats.md) rather than depleting trees outright - a lumberjack plants a sapling instead of chopping if the local tree count (mature + growing) is under target. Saplings take real time to mature before they're harvestable. A tree with wood left when a chopper's carry limit caps out is left standing, not clear-cut.
