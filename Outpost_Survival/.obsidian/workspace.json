@@ -34,9 +34,93 @@
               "icon": "lucide-file",
               "title": "Balance"
             }
+          },
+          {
+            "id": "1529067983226457",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Actionable Ideas/Ideas.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Ideas"
+            }
+          },
+          {
+            "id": "4930d1043b8e6f1a",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Actionable Ideas/Make rock size consistent between rocks and with other sprites.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Make rock size consistent between rocks and with other sprites"
+            }
+          },
+          {
+            "id": "66f3d0b7ec8c0987",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Actionable Ideas/Performance pass.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Performance pass"
+            }
+          },
+          {
+            "id": "ce2b3d2d8dc88dca",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Actionable Ideas/Stuck-worker failsafe.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Stuck-worker failsafe"
+            }
+          },
+          {
+            "id": "4f8b293dacf2d286",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Actionable Ideas/Make rock size consistent between rocks and with other sprites.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Make rock size consistent between rocks and with other sprites"
+            }
+          },
+          {
+            "id": "4a790b4354378ad7",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Actionable Ideas/Change game vision towards dwarf fortress like.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Change game vision towards dwarf fortress like"
+            }
           }
         ],
-        "currentTab": 1
+        "currentTab": 7
       }
     ],
     "direction": "vertical"
@@ -93,7 +177,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 249.5
+    "width": 200
   },
   "right": {
     "id": "b450c9c8c919234d",
@@ -171,13 +255,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Actionable Ideas/Dynamic path building system.md",
+                "file": "Bugs/Fix mouseover tooltips on resources and skills.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of Dynamic path building system"
+              "title": "Outline of Fix mouseover tooltips on resources and skills"
             }
           }
         ],
@@ -185,7 +269,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 225.5
+    "width": 200,
+    "collapsed": true
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -198,44 +283,44 @@
       "bases:Create new base": false
     }
   },
-  "active": "39f47837cf23bea7",
+  "active": "4a790b4354378ad7",
   "lastOpenFiles": [
-    "Actionable Ideas/Completed/Dynamic path building system.md",
-    "Actionable Ideas/Completed/Dynamic path building system.md.tmp.5943.4b01e7af472d",
-    "Game Systems/Balance.md.tmp.5943.df266b06f4f1",
-    "Docs/mechanics.md.tmp.5943.5f272709dc64",
-    "Actionable Ideas/Completed/Add collisions to villagers so they can't stack up on the same spot.md",
-    "Actionable Ideas/Completed/Add collisions to villagers so they can't stack up on the same spot.md.tmp.5943.07e5713b851b",
-    "Docs/mechanics.md.tmp.5943.ce86f1e73cd9",
-    "Game Systems/Balance.md.tmp.5943.6068930624a2",
-    "Actionable Ideas/Completed/Increase max zoom out level.md.tmp.5943.ed77b57b98c7",
-    "Actionable Ideas/Completed/Fix character stats sheet overflowing menu.md",
-    "Actionable Ideas/Completed/Fix character stats sheet overflowing menu.md.tmp.5943.70788663f7d8",
-    "Actionable Ideas/Completed/Increase max zoom out level.md",
-    "Actionable Ideas/Completed/Increase max zoom out level.md.tmp.5943.55789beed03d",
-    "Docs/mechanics.md.tmp.5943.781d38fa918d",
-    "Actionable Ideas/Increase max zoom out level.md",
+    "Actionable Ideas/Make rock size consistent between rocks and with other sprites.md",
+    "Actionable Ideas/Change game vision towards dwarf fortress like.md",
+    "Actionable Ideas/Performance pass.md",
+    "Actionable Ideas/seasons.md",
+    "Actionable Ideas/Stuck-worker failsafe.md",
+    "2026-07-23.md",
+    "Bugs/Fix mouseover tooltips on resources and skills.md",
+    "Bugs/Issue with villagers getting stuck delivering wood to farms.md",
+    "Bugs",
+    "Actionable Ideas/Ideas.md",
+    "Game Systems/Balance.md.tmp.7129.2d6d906fa000",
+    "Game Systems/Combat Units.md.tmp.7129.9f53f8dc51aa",
+    "Game Systems/Combat Units.md.tmp.7129.5abf5e872003",
+    "Game Systems/Combat System.md.tmp.7129.4462d69f9661",
+    "Game Systems/Combat System.md.tmp.7129.20461e8988f5",
+    "Actionable Ideas/Combat polish - sound, animations, morale bars.md",
+    "Actionable Ideas/Completed/Combat polish - sound, animations, morale bars.md",
+    "Actionable Ideas/Combat polish - sound, animations, morale bars.md.tmp.7129.3fa52e182411",
+    "Actionable Ideas/Stuck-worker failsafe.md.tmp.7129.924a194df75a",
+    "Actionable Ideas/Combat polish - sound, animations, morale bars.md.tmp.7129.f0fc22b13d8e",
+    "Actionable Ideas/Completed/Add demolish mode.md",
+    "Actionable Ideas/Completed/Add demolish mode.md.tmp.7129.d17495ee9c91",
+    "Game Systems/Balance.md",
+    "Game Systems/Village Raids.md",
+    "Actionable Ideas/Implement orc enemies present on the village map..md",
+    "Actionable Ideas/Completed/Implement orc enemies present on the village map..md",
+    "Actionable Ideas/Completed/Implement New Art.md",
     "Actionable Ideas/Dynamic path building system.md",
+    "Actionable Ideas/Completed/Dynamic path building system.md",
+    "Actionable Ideas/Completed/Add collisions to villagers so they can't stack up on the same spot.md",
+    "Actionable Ideas/Completed/Fix character stats sheet overflowing menu.md",
+    "Actionable Ideas/Completed/Increase max zoom out level.md",
+    "Actionable Ideas/Increase max zoom out level.md",
     "Actionable Ideas/Add collisions to villagers so they can't stack up on the same spot.md",
     "Actionable Ideas/Fix character stats sheet overflowing menu.md",
-    "Game Systems/Balance.md",
     "Actionable Ideas/Implement New Art.md",
-    "Actionable Ideas/Implement orc enemies present on the village map..md",
-    "Actionable Ideas/Completed/Expand map size 4x.md",
-    "Actionable Ideas/Completed/Replace the construction site sprite with a composite sprite made with current sprite packs.md",
-    "Actionable Ideas/Implement wolf enemies present on the village map..md",
-    "Actionable Ideas/Replace the construction site sprite with a composite sprite made with current sprite packs.md",
-    "feedback_consult_on_major_decisions.md",
-    "Actionable Ideas/Completed/Implement the ability to increase or decrease the desired amount of workers in a building between 0 and the maximum for that building.md",
-    "Actionable Ideas/Implement the ability to increase or decrease the desired amount of workers in a building between 0 and the maximum for that building.md",
-    "Actionable Ideas/Completed/Resource Consumption UI.md",
-    "Actionable Ideas/Completed/Make the resource display consistent across all resources.md",
-    "Actionable Ideas/Completed/Mouseover tooltip system.md",
-    "Actionable Ideas/Completed/Allow multiple builders to work on one construction site at reduced effectiveness.md",
-    "Actionable Ideas/Completed/Building click UI.md",
-    "Actionable Ideas/Completed/Check balance sheet for adjustments.md",
-    "Actionable Ideas/Completed/Choosing what units to use at a barracks..md",
-    "Actionable Ideas/Completed/Fix bug with houses saying not enough stone to upgrade when you should have enough.md",
     "Art/items_sheet.png",
     "Art/Food.png"
   ]

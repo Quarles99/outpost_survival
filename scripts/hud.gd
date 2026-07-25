@@ -2,10 +2,16 @@ extends CanvasLayer
 class_name HUD
 
 signal build_pressed
+signal demolish_pressed
 signal menu_pressed
 signal attack_pressed
 signal speed_pressed
 signal citizens_pressed
+## Fired by RallyButton - see Base._on_rally_pressed. Only enabled while an
+## orc is selected (and at least one TrainingGround soldier exists) via
+## set_rally_enabled, same enable-gating idea as AttackButton's own guard
+## inside _on_attack_pressed, just surfaced on the button itself instead.
+signal rally_pressed
 
 const COUNT_DURATION := 0.35
 const PUNCH_SCALE := Vector2(1.15, 1.15)
@@ -39,8 +45,10 @@ const FOOD_BREAKDOWN_LABELS := {
 @onready var happiness_label: Label = $Control/Margin/Rows/HappinessLabel
 @onready var day_label: Label = $Control/Margin/Rows/DayLabel
 @onready var build_button: Button = $Control/Margin/Rows/BuildButton
+@onready var demolish_button: Button = $Control/Margin/Rows/DemolishButton
 @onready var citizens_button: Button = $Control/Margin/Rows/CitizensButton
 @onready var attack_button: Button = $Control/Margin/Rows/AttackButton
+@onready var rally_button: Button = $Control/Margin/Rows/RallyButton
 @onready var speed_button: Button = $Control/Margin/Rows/SpeedButton
 @onready var menu_button: Button = $Control/Margin/Rows/MenuButton
 @onready var save_indicator: Label = $SaveIndicator
@@ -108,8 +116,11 @@ func _ready() -> void:
 	GameState.water_changed.connect(_on_water_changed)
 	GameState.storage_capacity_changed.connect(_on_storage_capacity_changed)
 	build_button.pressed.connect(func() -> void: build_pressed.emit())
+	demolish_button.pressed.connect(func() -> void: demolish_pressed.emit())
 	citizens_button.pressed.connect(func() -> void: citizens_pressed.emit())
 	attack_button.pressed.connect(func() -> void: attack_pressed.emit())
+	rally_button.pressed.connect(func() -> void: rally_pressed.emit())
+	rally_button.disabled = true
 	speed_button.pressed.connect(func() -> void: speed_pressed.emit())
 	menu_button.pressed.connect(func() -> void: menu_pressed.emit())
 
@@ -141,6 +152,12 @@ func _ready() -> void:
 	_rate_timer.timeout.connect(_refresh_rates)
 	add_child(_rate_timer)
 	_rate_timer.start()
+
+
+## Base recomputes this every time orc selection (or the soldier roster)
+## could have changed - see Base._on_orc_selected/_deselect_orc.
+func set_rally_enabled(value: bool) -> void:
+	rally_button.disabled = not value
 
 
 ## Transient status text (e.g. "Saved"/"Loaded") - fades in, holds, fades out.

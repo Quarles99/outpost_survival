@@ -1,0 +1,1 @@
+- Walking to deposit wood they get stuck on the farmer and cannot make the delivery but continue to walk into the farmer

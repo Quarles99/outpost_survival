@@ -67,11 +67,17 @@ A resource-producing action (farming/lumberjacking/mining/masonry/milling/baking
 
 ## Battle Deployment
 
-The HUD's **Simulate Attack** button is the current stand-in for a real raid/siege trigger (there's no wandering-raider AI yet - see roadmap.md's Long-Term Design Vision). Every citizen currently assigned to a Barracks, Archery Range, or Mage Tower deploys as their own squad to the battle scene (the same sandbox reachable from the main menu's "Battle Test") against a generated enemy raiding party, using each citizen's real trained combat-skill level rather than a random one. A citizen not currently stationed at one of those three buildings never deploys - "soldier" is just whatever a citizen's current post happens to be, same as any other job.
+The HUD's **Simulate Attack** button is a manual dev/test trigger, separate from the real raid system (see Village Raids below). Every citizen currently assigned to a Barracks, Archery Range, or Mage Tower deploys as their own squad to the battle scene (the same sandbox reachable from the main menu's "Battle Test") against a generated enemy raiding party, using each citizen's real trained combat-skill level rather than a random one. A citizen not currently stationed at one of those three buildings never deploys - "soldier" is just whatever a citizen's current post happens to be, same as any other job.
 
-A `melee_combat`-trained citizen's concrete battlefield role (Shieldbearer/Marauder/Outrider/Trapper) is assigned round-robin, since the skill itself doesn't distinguish between the four - a first-pass simplification, not a player choice yet. The rest of the fight plays out exactly like the standalone sandbox (formations, AI, morale/routing).
+A citizen's concrete battlefield role (Shieldbearer/Marauder/Pikeman for melee_combat, Archer/Skirmisher for archery, Mage for spellcasting) is whatever unit type their building is currently trained to produce - each Barracks/Archery Range/Mage Tower can be retooled to a different role any time via its own panel, free and instant (see Building & Placement). The rest of the fight plays out exactly like the standalone sandbox (formations, AI, morale/routing).
 
 Returning to the settlement (automatic once the fight ends, or immediately on Esc to retreat early) restores the town exactly as it was left and reports the outcome plus any losses. A citizen who dies in battle doesn't come home - permanent, same as a sustained-unhappiness departure. A citizen who routs/flees always survives and returns, regardless of the battle's outcome.
+
+## Village Raids
+
+Small orc raiding parties spawn at a random map-edge cell each night starting the second night (the very first night is always quiet), scaling gradually in size and toughness the longer the settlement survives - see [stats.md](stats.md#village-raids-orcraider-raidcontroller-base) for the current numbers, explicitly a first pass not yet tuned via playtesting. They wander near their arrival point and occasionally catch a nearby working citizen, sending that citizen home and interrupting their work until the next dawn - not lethal, purely lost production (citizens have no health/wound system).
+
+Clicking an orc selects it and enables the HUD's **Rally** button. Pressing it gathers every citizen currently on Barracks/Archery Range/Mage Tower duty - the same squad Simulate Attack uses - into a real squad that marches out and fights the raiders live, right on the town map, using the same combat AI as Battle Deployment above. The fight resolves normally (casualties don't come home, survivors return to their post); a raid still unresolved by dawn ends automatically, the orcs withdrawing regardless of how the fight was going.
 
 ## Happiness
 
@@ -105,6 +111,16 @@ Confirming a placement starts a construction site, not a finished building, in t
 2. **Labor** - once materials are complete, the site becomes a normal job post training Construction, staffed automatically like any other job (preferring the highest Construction skill), and can take up to several builders at once - each additional one adds to build speed, but at reduced effectiveness per worker rather than linearly (see stats.md). Labor required scales with the building's total material cost (see stats.md). Label shows percent complete.
 
 Completing labor replaces the site with the real building on the spot, granting its capacity/water/storage bonus then, not at placement time. Progress (materials delivered + labor completed) survives save/load.
+
+## Demolishing
+
+Demolish Mode (the **Demolish** button, or `X`) lets the player remove things from the map:
+
+- **A placed building** - demolished instantly, refunding its full build cost to the stockpile. Evicts any assigned worker first. The Outpost Hall can't be demolished.
+- **An in-progress construction site** - cancelled instantly, refunding only whatever materials have actually been delivered so far (not the full cost).
+- **A mature tree or a mineable rock** - marked for removal, not removed instantly. An idle citizen walks over and fully harvests it (100% of its wood/stone value, with Lumberjacking/Mining skill boosting speed and yield the same as normal gathering) before it's cleared - ranked as a top-priority job, same as delivering construction materials. An immature sapling has no value yet and is cleared instantly for free.
+
+Esc, `X`, or clicking the Demolish button again exits the mode - right-click keeps its normal meaning (toggling a post disabled) even while demolishing.
 
 ## Main Menu & Save/Load
 

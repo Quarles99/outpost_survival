@@ -44,4 +44,5 @@ func _on_node_added(node: Node) -> void:
 
 
 func _play_click() -> void:
+	SfxVariation.randomize(_player, PITCH_SCALE, VOLUME_DB)
 	_player.play()

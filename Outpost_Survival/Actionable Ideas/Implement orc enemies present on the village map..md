@@ -1,3 +1,0 @@
-	- Soldiers at military buildings will patrol the village in small groups
-	- Orcs may sometimes choose to attack villagers
-	- The player can select orcs and select an attack option to have all of the town military units group up before moving out to attack

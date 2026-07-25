@@ -294,6 +294,20 @@ Each Barracks/Archery Range is locked to producing one specific combat unit type
 
 Pikeman and Skirmisher are new unit types - see the combat sandbox's own balance reference for their stats. Outrider and Trapper (the previous two melee options) aren't currently producible by any building - they're being held for a future Stable building, not removed from the game.
 
+## Village Raids (`OrcRaider`, `RaidController`, `Base`)
+
+First-pass numbers - not yet tuned via playtesting (see [[Balance]]'s "Village Raids" section for the full tunable list).
+
+| | Value |
+|---|---|
+| First raid | Night 2 (the very first night is always quiet) |
+| Starting raid size | 2 orcs, growing +1 every 2 raid nights up to a cap of 7 |
+| Composition | Marauder/Archer/Shieldbearer, repeating to fill the raid's size |
+| Orc skill level | Starts at 1-3, cap rising +1 per raid night up to 40 |
+| Notice check | Every 1.5s, 220px radius, 35% chance to catch a nearby citizen once noticed |
+| Villager caught | Sent home, work interrupted until the next dawn - no health/wound system, purely lost production |
+| Unresolved by dawn | Raid ends automatically, orcs withdraw |
+
 ## Day & Night (`DayNightCycle`)
 
 | | Value |

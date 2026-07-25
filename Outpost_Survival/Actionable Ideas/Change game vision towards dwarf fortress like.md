@@ -1,0 +1,14 @@
+- Complex world simulation
+- history
+- magic
+- long term progression in the same world
+- modding support
+- vertical z levels
+- things to improve from DF:
+	- gameplay not reliant on frame rate
+	- better naming conventions
+	- better UI
+	- more intuitive progression
+	- magic system
+	- sound effects
+	- building

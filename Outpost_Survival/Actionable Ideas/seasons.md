@@ -1,0 +1,8 @@
+- New season system to determine
+	- map temperature
+	- when plants grow / die on the map
+	- weather
+		- snow
+		- rain
+	- when trees,grass, and plants naturally regrow on the map
+	- growing seasons for crops

@@ -14,6 +14,7 @@ extends Node
 signal occupancy_changed
 
 const TREE_SCENE := preload("res://scenes/nature/Tree.tscn")
+const ROCK_SCENE := preload("res://scenes/nature/Rock.tscn")
 
 var ground_origin := Vector2.ZERO
 var bounds_min := Vector2i.ZERO
@@ -35,6 +36,7 @@ var stockpile_spots: Array[Vector2] = []
 
 var _occupied: Dictionary = {}
 var _trees: Array[WorldTree] = []
+var _rocks: Array[WorldRock] = []
 
 ## Dynamic path building system.md - "the more frequently villagers walk
 ## over the same tile the more progress it gets to becoming a dirt path
@@ -47,12 +49,26 @@ var _trees: Array[WorldTree] = []
 ## on why the ground is fully regenerated fresh every session rather than
 ## persisted.
 var _path_wear: Dictionary = {}
-const WEAR_PER_SECOND := 0.5
-## Much slower than WEAR_PER_SECOND - a route crossed constantly stays worn
-## while a one-off crossing fades back to grass in well under a minute,
-## matching "if left untraveled for awhile" rather than reverting almost
-## immediately.
-const WEAR_DECAY_PER_SECOND := 0.05
+## Reworked from the original 0.5 (reached WEAR_PATH_THRESHOLD after a
+## single 2-second crossing) per an explicit report: paths were forming and
+## fading far faster than "the more frequently villagers walk over the same
+## tile the more progress it gets to becoming a dirt path" was meant to
+## read as - the source design note calls for a route developing over real
+## in-game time, not two seconds. A citizen only registers foot traffic
+## while physically standing on a given cell mid-walk (~1-2s per crossing
+## at Character.MOVE_SPEED, see register_foot_traffic), so reaching
+## threshold now takes on the order of a few in-game days of a route being
+## walked repeatedly (DayNightCycle's full day+night cycle is 720s) rather
+## than a single pass. First-pass rescale, not verified against a live
+## playtest session - may need further tuning once actually watched over a
+## multi-day game.
+const WEAR_PER_SECOND := 0.005
+## Kept at the same 10x-slower-than-gain ratio as before rescaling (0.5:0.05
+## -> 0.005:0.0005) - a route crossed constantly still stays worn while an
+## abandoned one fades, just over several in-game days now instead of well
+## under a minute, matching "if left untraveled for awhile" at the same
+## timescale WEAR_PER_SECOND was rescaled to.
+const WEAR_DECAY_PER_SECOND := 0.0005
 ## Wear level at which a cell visually becomes a worn path (see
 ## IsoGround.mark_worn_path) and starts granting PATH_SPEED_MULTIPLIER.
 const WEAR_PATH_THRESHOLD := 1.0
@@ -73,6 +89,7 @@ func configure(ground_pos: Vector2, min_cell: Vector2i, max_cell: Vector2i, tree
 	iso_ground = ground
 	_occupied.clear()
 	_trees.clear()
+	_rocks.clear()
 	_path_wear.clear()
 	## WorldGrid is an autoload, unlike Base itself - a fresh Base.tscn
 	## instantiation (New Game, or MainMenu -> Continue) calls configure()
@@ -239,6 +256,29 @@ func clear_trees() -> void:
 	_trees.clear()
 
 
+## Whichever tree (if any) sits at `cell` - linear scan, same style as
+## find_available_tree. Used by Base's demolish-mode click handling (see
+## Character._run_demolish_harvest) to resolve a clicked grid cell to a
+## world object; doesn't exist for any other caller today.
+func get_tree_at(cell: Vector2i) -> WorldTree:
+	for tree in _trees:
+		if is_instance_valid(tree) and tree.grid_cell == cell:
+			return tree
+	return null
+
+
+## Instant free-removal path for demolishing an immature sapling (see Base's
+## demolish-mode click handling) - deliberately bypasses harvest()/depleted
+## entirely. A sapling's wood_remaining is 0 until it matures, and
+## WorldTree.harvest() returns 0 without ever reaching its own depletion
+## check for wood_remaining <= 0, so a sapling can never "harvest to zero"
+## the normal way; it has no value to gather, so clearing it is free.
+func remove_tree(tree: WorldTree) -> void:
+	release(tree.grid_cell)
+	_trees.erase(tree)
+	tree.queue_free()
+
+
 ## Total trees (mature or still growing) within radius_tiles of from_cell -
 ## the whole local population a lumberjack should be sustaining, not just
 ## the ones a given worker personally planted.
@@ -248,6 +288,46 @@ func count_trees_near(from_cell: Vector2, radius_tiles: float) -> int:
 		if is_instance_valid(tree) and Vector2(tree.grid_cell).distance_to(from_cell) <= radius_tiles:
 			count += 1
 	return count
+
+
+## Rock registry - WorldTree's sibling for stone (see WorldRock's own doc
+## comment for why it's simpler: no growth/replant, so no matured signal or
+## _on_rock_matured counterpart to plant_tree/_on_tree_matured).
+func place_rock(cell: Vector2i) -> WorldRock:
+	var rock: WorldRock = ROCK_SCENE.instantiate()
+	rock.grid_cell = cell
+	rock.depleted.connect(_on_rock_depleted)
+	reserve(cell)
+	trees_container.add_child(rock)
+	rock.position = grid_to_local(Vector2(cell.x, cell.y))
+	_rocks.append(rock)
+	return rock
+
+
+func _on_rock_depleted(rock: WorldRock) -> void:
+	release(rock.grid_cell)
+	_rocks.erase(rock)
+
+
+func get_rocks() -> Array[WorldRock]:
+	return _rocks.duplicate()
+
+
+## Mirrors clear_trees - see its own doc comment.
+func clear_rocks() -> void:
+	for rock in _rocks:
+		if is_instance_valid(rock):
+			release(rock.grid_cell)
+			rock.queue_free()
+	_rocks.clear()
+
+
+## Mirrors get_tree_at - see its own doc comment.
+func get_rock_at(cell: Vector2i) -> WorldRock:
+	for rock in _rocks:
+		if is_instance_valid(rock) and rock.grid_cell == cell:
+			return rock
+	return null
 
 
 ## Nearest unclaimed mature tree within radius_tiles of from_cell, or null.
@@ -292,6 +372,30 @@ func find_plantable_cell(from_cell: Vector2, radius_tiles: float):
 func find_random_cell_anywhere():
 	for i in 40:
 		var cell := Vector2i(randi_range(bounds_min.x, bounds_max.x), randi_range(bounds_min.y, bounds_max.y))
+		if is_free(cell):
+			return cell
+	return null
+
+
+## A free cell on one of the map's four boundary edges, picked uniformly at
+## random - used to spawn an orc raiding party arriving "from the edge of
+## the village" (see Base._on_night_started_raid) rather than appearing
+## already inside the settlement. Same bounded-retry contract as
+## find_random_cell_anywhere (a handful of retries is enough since the map
+## edge is mostly free space; giving up just means that spawn attempt is
+## skipped).
+func find_random_edge_cell():
+	for i in 40:
+		var cell: Vector2i
+		match randi_range(0, 3):
+			0:
+				cell = Vector2i(randi_range(bounds_min.x, bounds_max.x), bounds_min.y)
+			1:
+				cell = Vector2i(randi_range(bounds_min.x, bounds_max.x), bounds_max.y)
+			2:
+				cell = Vector2i(bounds_min.x, randi_range(bounds_min.y, bounds_max.y))
+			_:
+				cell = Vector2i(bounds_max.x, randi_range(bounds_min.y, bounds_max.y))
 		if is_free(cell):
 			return cell
 	return null

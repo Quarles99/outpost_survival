@@ -111,6 +111,26 @@ Real tuning, not a doc correction this time - construction sped back up:
 - Minimum labor required (floor): 5.0 → 2.0
 - Starving penalty: doc previously showed the net effect (-20.0); corrected to show the actual constant (20.0, negated at its one call site)
 
+## 2026-07-22
+
+Demolish Mode added (see the "Add demolish mode" completed idea note for the full write-up) - new knobs, no existing values changed:
+- Stone per rock: 40.0 (new knob - half of Trees' wood-per-tree, no growth/replant unlike a tree)
+- Initial mineable rocks: 20 (new knob - separate, much sparser population from the existing purely-decorative rock scatter)
+- Demolish-harvest work interval: 6.0s (new knob - matches Workstation's own default work_interval)
+- Demolish-harvest amount per tick: 2.0 (new knob - matches LumberCamp's default wood_per_chop)
+- Demolish-harvest carry limit: 10 (new knob - matches Workstation's own default carry_limit)
+
+## 2026-07-21
+
+Reported directly: dirt paths were forming and fading in seconds instead of developing over real in-game time.
+- Dirt path wear gain per second: 0.5 → 0.005 (100x slower - was reaching the path threshold after a single 2-second crossing)
+- Dirt path wear decay per second: 0.05 → 0.0005 (same rescale, keeping the existing 10x-slower-than-gain ratio)
+
+## 2026-07-21 (later)
+
+Explicit request to raise worker move speed.
+- Citizen move speed: 70.0 px/s → 100.0 px/s
+
 ## 2026-07-20 (later)
 
 `tools/check_balance.py` flagged four more mismatches, all doc-stale rather than pending code changes (each already had an explanatory code comment recording the real value/reasoning) - [[Balance]] reconciled to match actual code, no code changed:

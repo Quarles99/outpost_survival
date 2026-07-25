@@ -92,22 +92,34 @@ const UNIT_SPRITE_ROW := {
 ## FRAME_SIZE crop to the tight content bbox shared by every row this sheet
 ## is used for (villager included), kept in lockstep with that function
 ## since both draw from the same sheet's same grid.
+## ROUT_ANIM_SPEED_MULTIPLIER: the "rout" animation (see _begin_routing())
+## reuses the exact same 4 frames as "walk" - no distinct fleeing pose exists
+## anywhere in the sheet - just played back faster, the same "juice via
+## tween/speed, not new art" approach _punch()/_fade_and_free() already use
+## rather than needing a dedicated animation row.
+const ROUT_ANIM_SPEED_MULTIPLIER := 2.0
+
 static func _sprite_frames_for(row_1indexed: int) -> SpriteFrames:
 	const CELL_W := 16
 	const CELL_H := 17
 	const FRAME_INSET := Vector2(3, 2)
 	const FRAME_SIZE := Vector2(12, 11)
+	const WALK_SPEED := 6.0
 	var frames := SpriteFrames.new()
 	frames.remove_animation(&"default")
 	frames.add_animation(&"walk")
 	frames.set_animation_loop(&"walk", true)
-	frames.set_animation_speed(&"walk", 6.0)
+	frames.set_animation_speed(&"walk", WALK_SPEED)
+	frames.add_animation(&"rout")
+	frames.set_animation_loop(&"rout", true)
+	frames.set_animation_speed(&"rout", WALK_SPEED * ROUT_ANIM_SPEED_MULTIPLIER)
 	var y := (row_1indexed - 1) * CELL_H
 	for col in 4:
 		var atlas := AtlasTexture.new()
 		atlas.atlas = ENTITIES_SHEET
 		atlas.region = Rect2(col * CELL_W + FRAME_INSET.x, y + FRAME_INSET.y, FRAME_SIZE.x, FRAME_SIZE.y)
 		frames.add_frame(&"walk", atlas)
+		frames.add_frame(&"rout", atlas)
 	return frames
 
 ## Which types count as a "melee threat" ranged units evade - see
@@ -143,6 +155,62 @@ const SKILL_ID := {
 	UnitType.SKIRMISHER: "archery",
 	UnitType.MAGE: "spellcasting",
 }
+
+## Attack-swing sound pools, keyed by SKILL_ID above rather than per-type -
+## every melee type shares one sound, same "shared by role family" reasoning
+## SKILL_ID's own doc comment already gives. Same files character.gd's
+## SWORD_DRILL_SOUNDS/BOW_DRILL_SOUNDS/SPELL_DRILL_SOUNDS already use for
+## TrainingGround "drill" flavor - reused here for the real thing rather than
+## picked fresh, so a citizen's training already sounds like what they'll
+## actually do in a fight. IMPACT_SOUNDS/VOICE_SOUNDS below are new pools
+## this pass adds - the pack's own "Hits and Blocks"/Spells folders have
+## swing/cast sounds but no generic hit-landing or death/panic sound, so
+## those come from the theme-neutral FilmCow library instead (see
+## _play_combat_sound's own doc comment).
+const SWORD_ATTACK_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 1.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 2.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 3.ogg"),
+]
+const BOW_ATTACK_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Attack 1.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Attack 2.ogg"),
+]
+const SPELL_ATTACK_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 1.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 2.ogg"),
+	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 3.ogg"),
+]
+## Played on the *receiving* unit (see take_damage()) rather than picked by
+## the attacker's weapon type - a hit lands the same regardless of what dealt
+## it, so one generic pool covers every attacker type instead of needing a
+## sword/bow/spell-specific impact sound each. Free Fantasy's own "Hits and
+## Blocks" folders are swing/parry/block sounds, not a generic landed-hit
+## grunt, so this pulls from FilmCow's theme-neutral recorded library
+## instead - deliberately a handful of variants, not all 20 available, same
+## "a few numbered variants, not the whole pool" proportion every other sound
+## pool in this project uses.
+const IMPACT_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/FilmCow Recorded SFX/punch flesh 1.wav"),
+	preload("res://sound/FilmCow Recorded SFX/punch flesh 2.wav"),
+	preload("res://sound/FilmCow Recorded SFX/punch flesh 3.wav"),
+	preload("res://sound/FilmCow Recorded SFX/punch flesh 4.wav"),
+	preload("res://sound/FilmCow Recorded SFX/punch flesh 5.wav"),
+	preload("res://sound/FilmCow Recorded SFX/punch flesh 6.wav"),
+]
+## Shared by _die() and _begin_routing() - a death scream and a panic scream
+## are the same kind of sound, and the two never fire back-to-back for the
+## same unit in a way that would read as repetitive (routing precedes any
+## later death by several seconds - ROUT_ESCAPE_TIME - or the unit escapes
+## and this never plays a second time at all).
+const VOICE_SOUNDS: Array[AudioStream] = [
+	preload("res://sound/FilmCow Recorded SFX/scream 1.wav"),
+	preload("res://sound/FilmCow Recorded SFX/scream 2.wav"),
+	preload("res://sound/FilmCow Recorded SFX/scream 3.wav"),
+	preload("res://sound/FilmCow Recorded SFX/scream 4.wav"),
+	preload("res://sound/FilmCow Recorded SFX/scream 5.wav"),
+	preload("res://sound/FilmCow Recorded SFX/scream 6.wav"),
+]
 
 ## Deliberately much smaller than SkillCurve.MULTIPLIER_PER_LEVEL (0.02,
 ## ~2.96x at max level for the real citizen job skills) - per an explicit
@@ -895,13 +963,21 @@ var health: float
 var _attack_cooldown := 0.0
 var _target: CombatUnit = null
 var _dead := false
-## The delta passed to the _process() call that most recently called
-## nav_agent.set_velocity() - avoidance computes asynchronously, so
-## _on_velocity_computed() needs a delta from whenever it eventually fires,
-## not necessarily the current frame's.
-var _delta := 0.0
+## Most recently reported avoidance-adjusted velocity - cached rather than
+## applied to position directly inside _on_velocity_computed. That signal
+## fires once per physics tick (a fixed 60Hz, Engine.physics_ticks_per_second),
+## not once per _process frame - applying position only inside the callback
+## silently drops movement on any _process frame that doesn't happen to
+## coincide with a fresh signal, which is invisible at exactly 60fps but a
+## real, measured speed deficit whenever the two rates diverge (uncapped fps,
+## vsync on a high-refresh-rate display, etc. - see Character._current_velocity's
+## identical doc comment/fix, found and fixed there first). _integrate_velocity()
+## applies this every _process frame instead, using that frame's own real
+## delta, so total distance over real time stays correct regardless of how
+## often the cache itself gets refreshed.
+var _current_velocity := Vector2.ZERO
 ## True whenever this unit is in range of _target with nothing to evade -
-## see _process()'s "stand and fight" branch. Read by _on_velocity_computed()
+## see _process()'s "stand and fight" branch. Read by _integrate_velocity()
 ## to hold ground instead of applying avoidance's suggested nudge.
 var _holding_position := false
 ## True whenever this unit is actively kiting away from a melee threat -
@@ -1063,7 +1139,30 @@ var _full_scale: Vector2
 @onready var name_label: Label = $NameLabel
 @onready var health_bar_bg: ColorRect = $HealthBarBg
 @onready var health_bar_fill: ColorRect = $HealthBarFill
+@onready var morale_bar_bg: ColorRect = $MoraleBarBg
+@onready var morale_bar_fill: ColorRect = $MoraleBarFill
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
+## AttackSound (the swing, see _attack()) and VoiceSound (scream, see
+## _die()/_begin_routing()) stay on the Master bus - deliberate, deployed-
+## combat feedback the player should always hear clearly regardless of
+## camera zoom, the same "always audible" treatment Character.select_sound
+## gets (see its own doc comment) rather than Character.gather_sound's
+## fade-with-zoom World-bus treatment. ImpactSound (see take_damage()) is
+## routed to World instead - it fires once per hit landed, which in a large
+## fight would otherwise compete with/drown out the two Master-bus sounds
+## above; a hit landing is more "ambient battle noise" than a deliberate cue.
+@onready var attack_sound: AudioStreamPlayer2D = $AttackSound
+@onready var impact_sound: AudioStreamPlayer2D = $ImpactSound
+@onready var voice_sound: AudioStreamPlayer2D = $VoiceSound
+
+## Each player's authored volume_db, captured once in setup() before
+## SfxVariation.randomize ever touches it - same reasoning as Character's own
+## _select_sound_base_volume_db/etc. (see character.gd), randomize() must
+## offset from this fixed baseline every play, not from the player's current
+## (already-offset) volume_db.
+var _attack_sound_base_volume_db: float
+var _impact_sound_base_volume_db: float
+var _voice_sound_base_volume_db: float
 
 
 func setup(p_unit_type: UnitType, p_team: Team, p_enemies: Array, p_play_bounds: Rect2 = Rect2(), p_formation: Formation = null, p_slot_offset: Vector2 = Vector2.ZERO, p_skill_level: int = 1, p_terrain: BattlefieldTerrain = null) -> void:
@@ -1094,6 +1193,10 @@ func setup(p_unit_type: UnitType, p_team: Team, p_enemies: Array, p_play_bounds:
 	sprite.play("walk")
 	sprite.modulate = TEAM_COLORS[team]
 	_update_health_bar()
+	_update_morale_bar()
+	_attack_sound_base_volume_db = attack_sound.volume_db
+	_impact_sound_base_volume_db = impact_sound.volume_db
+	_voice_sound_base_volume_db = voice_sound.volume_db
 
 	nav_agent.radius = UNIT_RADIUS
 	nav_agent.max_speed = stats["move_speed"] * _skill_multiplier
@@ -1119,7 +1222,7 @@ func begin_slot_transition(new_offset: Vector2) -> void:
 func _process(delta: float) -> void:
 	if _dead:
 		return
-	_delta = delta
+	_integrate_velocity(delta)
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
 	_chase_stalled_target_timer = maxf(_chase_stalled_target_timer - delta, 0.0)
 
@@ -1413,14 +1516,24 @@ func _process(delta: float) -> void:
 		_attack_cooldown = float(stats["attack_interval"]) / _skill_multiplier
 
 
-## NavigationAgent2D avoidance computes off-thread - set_velocity() doesn't
-## move the unit itself, this signal (fired once the safe/collision-adjusted
-## velocity is ready, using whichever _process's delta was current at the
-## time) is what actually does.
+## NavigationAgent2D avoidance computes off-thread - only caches the result
+## here; see _current_velocity's own doc comment for why actually applying
+## it lives in _integrate_velocity instead of directly in this callback.
 func _on_velocity_computed(safe_velocity: Vector2) -> void:
+	_current_velocity = safe_velocity
+
+
+## Called every _process frame (both CombatUnit's own and OrcRaider's
+## patrol/alert override, which calls this directly since it skips
+## super._process() while not Mode.ENGAGED - see that class's own _process)
+## so movement never depends on how often velocity_computed happens to fire
+## relative to _process. _holding_position is checked here (the application
+## point) rather than in _on_velocity_computed (the caching point) so a
+## change to it between the last cache update and now is always respected.
+func _integrate_velocity(delta: float) -> void:
 	if _holding_position:
 		return
-	global_position += safe_velocity * _delta
+	global_position += _current_velocity * delta
 	if play_bounds.size != Vector2.ZERO:
 		global_position = global_position.clamp(play_bounds.position, play_bounds.end)
 
@@ -1943,6 +2056,7 @@ func _attack(target: CombatUnit) -> void:
 	var dmg: float = maxf(MIN_DAMAGE, (raw - float(ARMOR[target.unit_type])) * mult)
 	target.take_damage(dmg)
 	_punch()
+	_play_combat_sound(attack_sound, _attack_pool(), _attack_sound_base_volume_db)
 	if STATS[unit_type]["ranged"]:
 		_spawn_tracer(target.global_position)
 	if unit_type == UnitType.TRAPPER:
@@ -1983,6 +2097,10 @@ func take_damage(amount: float) -> void:
 	health = maxf(health - amount, 0.0)
 	_update_health_bar()
 	_spawn_floating_text("-%d" % int(round(amount)), Color(1.0, 0.35, 0.35))
+	## Played on the receiving unit, not the attacker - see IMPACT_SOUNDS's
+	## own doc comment for why this is one generic pool rather than picked by
+	## the attacker's weapon type.
+	_play_combat_sound(impact_sound, IMPACT_SOUNDS, _impact_sound_base_volume_db)
 	if health <= 0.0:
 		_die()
 
@@ -2002,6 +2120,7 @@ func apply_slow(multiplier: float, duration: float) -> void:
 func _die() -> void:
 	_dead = true
 	_notify_nearby_allies_of_death()
+	_play_combat_sound(voice_sound, VOICE_SOUNDS, _voice_sound_base_volume_db)
 	died.emit(self)
 	_fade_and_free()
 
@@ -2043,6 +2162,7 @@ func _update_morale(delta: float) -> void:
 	var wound_fraction: float = 1.0 - (health / max_health) if max_health > 0.0 else 0.0
 	var target: float = clampf(100.0 - wound_fraction * MORALE_WOUND_WEIGHT - _ally_death_shock, 0.0, 100.0)
 	morale = move_toward(morale, target, MORALE_EASE_RATE * delta)
+	_update_morale_bar()
 	if not _routing and morale <= ROUT_MORALE_THRESHOLD:
 		_begin_routing()
 
@@ -2056,6 +2176,13 @@ func _begin_routing() -> void:
 		return
 	_routing = true
 	name_label.text = "%s (Routing)" % name_label.text
+	## Reuses the "walk" animation's own 4 frames at a faster playback speed
+	## (see ROUT_ANIM_SPEED_MULTIPLIER) - no dedicated fleeing pose exists in
+	## the sheet. One-way: nothing ever plays "walk" again after this, since
+	## _routing never reverts to false (a routing unit either _escape()s or
+	## _die()s, both of which remove it).
+	sprite.play("rout")
+	_play_combat_sound(voice_sound, VOICE_SOUNDS, _voice_sound_base_volume_db)
 
 
 ## Called externally by Formation.force_rout_all() when enough of this
@@ -2118,6 +2245,43 @@ func _update_health_bar() -> void:
 	var frac := clampf(health / max_health, 0.0, 1.0) if max_health > 0.0 else 0.0
 	health_bar_fill.scale.x = frac
 	health_bar_fill.color = Color(0.3, 1.0, 0.3).lerp(Color(1.0, 0.2, 0.2), 1.0 - frac)
+
+
+## Same scale.x-as-fraction shape as _update_health_bar - a distinct blue
+## (steady) -> grey (broken) gradient rather than reusing health's green/red,
+## so the two bars read as different stats at a glance rather than looking
+## like a second, confusing health bar. morale is already 0-100 (see its own
+## var doc comment), same range health/max_health normalizes to.
+func _update_morale_bar() -> void:
+	var frac := clampf(morale / 100.0, 0.0, 1.0)
+	morale_bar_fill.scale.x = frac
+	morale_bar_fill.color = Color(0.35, 0.55, 1.0).lerp(Color(0.5, 0.5, 0.5), 1.0 - frac)
+
+
+## SWORD_ATTACK_SOUNDS/BOW_ATTACK_SOUNDS/SPELL_ATTACK_SOUNDS, keyed by
+## SKILL_ID[unit_type] - same dispatch shape character.gd's _run_training_
+## loop already uses for the same three pools.
+func _attack_pool() -> Array[AudioStream]:
+	match SKILL_ID[unit_type]:
+		"melee_combat":
+			return SWORD_ATTACK_SOUNDS
+		"archery":
+			return BOW_ATTACK_SOUNDS
+		_:
+			return SPELL_ATTACK_SOUNDS
+
+
+## Picks a random variant from `pool` and plays it through `player` - same
+## "pick one at random, feed through a shared player" shape as Character.
+## _play_gather_sound, generalized to take an explicit player since this
+## class has three (attack/impact/voice) rather than one shared gather
+## player. Runs every play through SfxVariation.randomize (see its own doc
+## comment) so repeated attacks/hits/screams in a fight don't all sound like
+## an identical loop of themselves.
+func _play_combat_sound(player: AudioStreamPlayer2D, pool: Array[AudioStream], base_volume_db: float) -> void:
+	player.stream = pool[randi() % pool.size()]
+	SfxVariation.randomize(player, 1.0, base_volume_db)
+	player.play()
 
 
 func _on_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:

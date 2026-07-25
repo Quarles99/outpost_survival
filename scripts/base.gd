@@ -42,6 +42,13 @@ const ROCK_SCENE := preload("res://scenes/nature/RockDecoration.tscn")
 ## Scaled x4 alongside the map, same reasoning as INITIAL_TREE_COUNT above.
 const INITIAL_ROCK_COUNT := 56
 
+## The real, mineable WorldRock population (see _scatter_initial_mineable_
+## rocks) - a separate, much sparser scatter from the purely decorative
+## RockDecoration pebbles above (ROCK_SCENE/INITIAL_ROCK_COUNT), which stay
+## untouched. First-pass value, not tuned via playtesting - tunable via
+## Outpost_Survival/Game Systems/Balance.md same as everything else here.
+const INITIAL_MINEABLE_ROCK_COUNT := 20
+
 const GRASS_CLUMP_SCENE := preload("res://scenes/nature/GrassClump.tscn")
 ## Scaled x4 alongside the map, same reasoning as INITIAL_TREE_COUNT above.
 const INITIAL_GRASS_COUNT := 120
@@ -93,6 +100,19 @@ const COMBAT_TEST_SCENE := "res://scenes/combat/CombatTest.tscn"
 ## barracks") - every TrainingGround now carries its own chosen_unit_type
 ## (see that class's own doc comment), so _on_attack_pressed below just
 ## reads it directly instead of guessing by position.
+
+## --- Orc raids (live, in-place - not BattleState/CombatTest.tscn) --------
+## See _on_night_started_raid/_on_rally_pressed/RaidController and
+## Outpost_Survival/Game Systems/Village Raids.md. Deliberately a separate
+## system from Battle deployment above: an orc raid fights right here on
+## Base's own map (this scene's own nav_region, see _rebake_navigation)
+## rather than scene-swapping to the sandbox, and never touches BattleState.
+const ORC_RAIDER_SCENE := preload("res://scenes/combat/OrcRaider.tscn")
+const COMBAT_UNIT_SCENE := preload("res://scenes/combat/CombatUnit.tscn")
+## How far apart spawned orcs are scattered around their party's shared
+## arrival point, so a multi-orc raid doesn't spawn as a single stacked
+## sprite.
+const ORC_SPAWN_SCATTER := 70.0
 
 ## --- Day/night visual tint ------------------------------------------------
 ## Multiplies onto every world CanvasItem (ground, buildings, characters,
@@ -263,10 +283,39 @@ var _next_placed_id := 0
 
 var _selected_character: Character = null
 
+## The single in-progress orc raid, if any - null whenever no raid is
+## active. See RaidController's own doc comment for the two-phase (spawned
+## -> engaged) lifecycle this drives from _process().
+var _raid: RaidController = null
+var _selected_orc: OrcRaider = null
+
 var _placing_option: Dictionary = {}
 var _ghost: Node2D = null
 var _ghost_origin := Vector2i.ZERO
 var _ghost_valid := false
+
+## Demolish Mode - see this file's own doc comment block near
+## _on_demolish_pressed for the full design. Unlike _placing_option (a
+## Dictionary, since ghost placement needs to remember which catalog option
+## is being placed), demolishing has no per-instance state to remember beyond
+## "is the mode on right now."
+var _demolishing := false
+## A single reused translucent-red tile-diamond, following the cursor's grid
+## cell while _demolishing is true (see _update_demolish_highlight) - created
+## once in _ready(), not per-frame.
+var _demolish_highlight: Polygon2D = null
+## Half-extents of one ground tile's diamond (IsoUtils.TILE_WIDTH/HEIGHT,
+## 128x64, halved) - the highlight is exactly one tile, same footprint a
+## tree/rock (both always 1x1) occupies.
+const DEMOLISH_HIGHLIGHT_HALF_WIDTH := 64.0
+const DEMOLISH_HIGHLIGHT_HALF_HEIGHT := 32.0
+## Trees/rocks currently marked for demolition (see _mark_natural_feature) -
+## {"target": WorldTree or WorldRock, "resource": "wood"/"stone", "skill_id":
+## "lumberjacking"/"mining"} entries. Public (no leading underscore, unlike
+## most of Base's other mode-tracking state above) since Character reads it
+## directly (_find_demolition_job) the same way it already reads `posts`/
+## `construction_sites`.
+var demolition_targets: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -315,6 +364,7 @@ func _ready() -> void:
 
 	_scatter_initial_trees()
 	_scatter_initial_rocks()
+	_scatter_initial_mineable_rocks()
 	_scatter_initial_grass()
 
 	## Baked once here (after every starting cell reservation above) and
@@ -350,9 +400,23 @@ func _ready() -> void:
 	build_menu.option_selected.connect(_on_build_option_selected)
 	hud.build_pressed.connect(_on_build_pressed)
 	hud.attack_pressed.connect(_on_attack_pressed)
+	hud.rally_pressed.connect(_on_rally_pressed)
 	hud.speed_pressed.connect(_on_speed_button_pressed)
 	hud.menu_pressed.connect(_open_system_menu)
 	hud.citizens_pressed.connect(_on_citizens_pressed)
+	hud.demolish_pressed.connect(_on_demolish_pressed)
+
+	_demolish_highlight = Polygon2D.new()
+	_demolish_highlight.polygon = PackedVector2Array([
+		Vector2(0, -DEMOLISH_HIGHLIGHT_HALF_HEIGHT),
+		Vector2(DEMOLISH_HIGHLIGHT_HALF_WIDTH, 0),
+		Vector2(0, DEMOLISH_HIGHLIGHT_HALF_HEIGHT),
+		Vector2(-DEMOLISH_HIGHLIGHT_HALF_WIDTH, 0),
+	])
+	_demolish_highlight.color = Color(1.0, 0.25, 0.25, 0.45)
+	_demolish_highlight.visible = false
+	_demolish_highlight.z_index = 4096
+	add_child(_demolish_highlight)
 
 	recruit_panel.candidate_selected.connect(_on_candidate_selected)
 	training_ground_panel.option_chosen.connect(_on_training_ground_option_chosen)
@@ -366,6 +430,7 @@ func _ready() -> void:
 	crop_panel.option_selected.connect(_on_crop_selected)
 	DayNightCycle.day_started.connect(_on_day_started)
 	DayNightCycle.night_started.connect(_on_night_started)
+	DayNightCycle.night_started.connect(_on_night_started_raid)
 
 	system_menu.save_pressed.connect(func() -> void: _open_slot_panel("save"))
 	system_menu.load_pressed.connect(func() -> void: _open_slot_panel("load"))
@@ -455,9 +520,31 @@ func _register_xray_globals() -> void:
 	RenderingServer.global_shader_parameter_add(XRAY_RADIUS_PARAM, RenderingServer.GLOBAL_VAR_TYPE_FLOAT, XRAY_RADIUS)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	RenderingServer.global_shader_parameter_set(XRAY_ACTIVE_PARAM, 1.0 if Input.is_key_pressed(KEY_SHIFT) else 0.0)
 	RenderingServer.global_shader_parameter_set(XRAY_CENTER_PARAM, get_global_mouse_position())
+
+	if _raid:
+		_raid.update(delta)
+		if _raid.resolved:
+			_resolve_raid()
+
+	_update_demolish_highlight()
+
+
+## Snaps _demolish_highlight to the grid cell under the cursor while
+## _demolishing is true - pure visual feedback for what a click would target
+## (buildings are already readable via their own existing hover-tint
+## convention; this only needs to cover the empty-ground/tree/rock case a
+## demolish click actually hit-tests against, see _handle_demolish_input).
+func _update_demolish_highlight() -> void:
+	if not _demolishing:
+		_demolish_highlight.visible = false
+		return
+	_demolish_highlight.visible = true
+	var grid := WorldGrid.local_to_grid(to_local(get_global_mouse_position()))
+	var cell := Vector2i(roundi(grid.x), roundi(grid.y))
+	_demolish_highlight.position = WorldGrid.grid_to_local(Vector2(cell.x, cell.y))
 
 
 ## Runs before Area2D physics-picking dispatch (see RtsCamera's own _input()
@@ -485,6 +572,10 @@ func _input(event: InputEvent) -> void:
 		if collider is Character:
 			get_viewport().set_input_as_handled()
 			collider.handle_click()
+			return
+		if collider is OrcRaider:
+			get_viewport().set_input_as_handled()
+			(collider as OrcRaider).clicked.emit(collider)
 			return
 
 
@@ -582,11 +673,63 @@ func _cell_obstacle_outline(cell: Vector2i) -> PackedVector2Array:
 func _on_day_started(day: int) -> void:
 	_tween_day_night_tint(DAY_TINT)
 	hud.set_day_label(day, true)
+	_recall_fled_citizens()
+	## Orcs "withdraw" at dawn regardless of whether the player ever rallied -
+	## bounds every raid to end by morning. A raid already mid-engagement is
+	## cut short here too (not just an unrallied patrol) - see
+	## _force_end_raid_at_dawn's own doc comment.
+	if _raid:
+		_force_end_raid_at_dawn()
 
 
 func _on_night_started(day: int) -> void:
 	_tween_day_night_tint(NIGHT_TINT)
 	hud.set_day_label(day, false)
+
+
+## Undoes Character.flee_home_from_raid() for every citizen an orc caught
+## overnight - re-running assign_to() on their own (untouched) assigned_post
+## is what actually resumes work, same idempotent call
+## _restore_raid_survivors uses for a rallied soldier.
+func _recall_fled_citizens() -> void:
+	for character in characters:
+		if character._fled_raid:
+			character._fled_raid = false
+			character.assign_to(character.assigned_post)
+
+
+## See OrcRaider.RAID_START_DAY/roster_for_night/skill_level_for_night for
+## the actual spawn-timing/scaling numbers - explicitly flagged there as
+## needing playtesting/tuning, not derived from any existing balance number.
+## No-ops if a raid is already active (only one at a time).
+func _on_night_started_raid(day: int) -> void:
+	if _raid or day < OrcRaider.RAID_START_DAY:
+		return
+	var edge_cell = WorldGrid.find_random_edge_cell()
+	if edge_cell == null:
+		return
+	var spawn_pos: Vector2 = WorldGrid.grid_to_local(Vector2(edge_cell.x, edge_cell.y))
+	var roster: Array[CombatUnit.UnitType] = OrcRaider.roster_for_night(day)
+
+	var formation_b := Formation.new()
+	add_child(formation_b)
+	formation_b.setup(FormationCatalog.get_option("line"), 1.0)
+	formation_b.global_position = spawn_pos
+
+	var orcs: Array = []
+	for i in roster.size():
+		var orc: OrcRaider = ORC_RAIDER_SCENE.instantiate()
+		add_child(orc)
+		orc.global_position = spawn_pos + Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * ORC_SPAWN_SCATTER
+		var skill_level := OrcRaider.skill_level_for_night(day)
+		orc.setup(roster[i], CombatUnit.Team.B, [], Rect2(), formation_b, Vector2.ZERO, skill_level)
+		orc.setup_patrol(spawn_pos, characters)
+		orc.clicked.connect(_on_orc_selected)
+		orcs.append(orc)
+
+	_raid = RaidController.new()
+	_raid.setup_orcs(orcs, formation_b)
+	hud.flash_message("Orc raiders spotted at the edge of the village!")
 
 
 func _tween_day_night_tint(target: Color) -> void:
@@ -741,6 +884,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			speed_index = maxi(speed_index - 1, 0)
 			_apply_speed()
 			return
+		elif event.keycode == KEY_X:
+			get_viewport().set_input_as_handled()
+			_on_demolish_pressed()
+			return
 	## SystemMenu/SlotPanel handle their own Esc-to-close via their own
 	## _input() (which always runs before _unhandled_input regardless of
 	## tree order - see CLAUDE.md's RtsCamera note for the same mechanism),
@@ -754,6 +901,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _placing_option:
 		_handle_placement_input(event)
+		return
+	if _demolishing:
+		_handle_demolish_input(event)
 		return
 	if build_menu.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
 		build_menu.close()
@@ -773,9 +923,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if building_info_panel.visible and ((event is InputEventMouseButton and event.pressed) or event.is_action_pressed("ui_cancel")):
 		building_info_panel.close()
 		return
-	if _selected_character == null:
+	if _selected_character == null and _selected_orc == null:
 		## Esc only reaches here once nothing else above had anything to
-		## back out of - deselecting a citizen (below) takes priority over
+		## back out of - deselecting a citizen/orc (below) takes priority over
 		## opening the system menu, so Esc backs out one layer at a time
 		## rather than jumping straight to the menu while something's
 		## still selected.
@@ -785,8 +935,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.pressed:
 		_deselect()
+		_deselect_orc()
 	elif event.is_action_pressed("ui_cancel"):
 		_deselect()
+		_deselect_orc()
 
 
 ## Clicking a citizen selects them and opens their (view-only) skill panel -
@@ -799,6 +951,7 @@ func _on_character_selected(character: Character) -> void:
 	if _selected_character == character:
 		_deselect()
 		return
+	_deselect_orc()
 	if _selected_character:
 		_selected_character.set_selected(false)
 	_selected_character = character
@@ -813,6 +966,32 @@ func _deselect() -> void:
 	skill_panel.close()
 
 
+## Same toggle-off-if-already-selected shape as _on_character_selected -
+## clicking an orc reveals the Rally action (see hud.set_rally_enabled)
+## instead of opening a panel, since an orc has nothing player-configurable
+## about it. Rally itself is only enabled once a soldier squad also exists
+## (see _on_rally_pressed's own guard) - selecting an orc with no soldiers
+## stationed still selects it, just leaves Rally disabled, same as
+## AttackButton's existing "no soldiers" guard.
+func _on_orc_selected(orc: OrcRaider) -> void:
+	if _selected_orc == orc:
+		_deselect_orc()
+		return
+	_deselect()
+	if is_instance_valid(_selected_orc):
+		_selected_orc.set_selected(false)
+	_selected_orc = orc
+	_selected_orc.set_selected(true)
+	hud.set_rally_enabled(true)
+
+
+func _deselect_orc() -> void:
+	if is_instance_valid(_selected_orc):
+		_selected_orc.set_selected(false)
+	_selected_orc = null
+	hud.set_rally_enabled(false)
+
+
 ## Builds CitizensPanel's row data here rather than in the panel itself
 ## (same "Base decides, panel just renders" split RecruitPanel's own
 ## candidates already follow) - "job"/"location"/"happiness_text" are
@@ -823,6 +1002,7 @@ func _deselect() -> void:
 ## every unassigned citizen, not just one caught mid-haul-trip).
 func _on_citizens_pressed() -> void:
 	_cancel_placement()
+	_cancel_demolish()
 	build_menu.close()
 	recruit_panel.close()
 	crop_panel.close()
@@ -856,6 +1036,7 @@ func _on_citizen_selected_from_panel(character: Character) -> void:
 
 func _on_build_pressed() -> void:
 	_cancel_placement()
+	_cancel_demolish()
 	if _selected_character:
 		_deselect()
 	recruit_panel.close()
@@ -872,6 +1053,7 @@ func _on_build_pressed() -> void:
 ## an unrelated selection/panel.
 func _open_system_menu() -> void:
 	_cancel_placement()
+	_cancel_demolish()
 	if _selected_character:
 		_deselect()
 	build_menu.close()
@@ -888,6 +1070,9 @@ func _open_system_menu() -> void:
 ## fact), same "block the action upfront" shape _on_attack_pressed's empty-
 ## squad guard already uses.
 func _on_outpost_hall_clicked() -> void:
+	if _demolishing:
+		hud.flash_message("The Outpost Hall can't be demolished")
+		return
 	if not DayNightCycle.can_recruit():
 		var days := DayNightCycle.days_until_next_recruit()
 		hud.flash_message("Recruiting available in %d more day%s" % [days, "" if days == 1 else "s"])
@@ -913,6 +1098,9 @@ func _on_outpost_hall_clicked() -> void:
 ## the cooldown message baked into its label) rather than refusing to open
 ## at all - Upgrade needs to stay reachable even mid-recruit-cooldown.
 func _on_training_ground_clicked(building: TrainingGround) -> void:
+	if _demolishing:
+		_try_demolish_building(building)
+		return
 	_cancel_placement()
 	build_menu.close()
 	crop_panel.close()
@@ -1092,6 +1280,9 @@ func _tooltip_body(building: Node) -> String:
 ## post, so "No one currently employed here" would be actively wrong here,
 ## not just unused.
 func _on_house_clicked(house: House) -> void:
+	if _demolishing:
+		_try_demolish_building(house)
+		return
 	_cancel_placement()
 	build_menu.close()
 	recruit_panel.close()
@@ -1120,6 +1311,9 @@ func _confirm_house_upgrade(house: House) -> void:
 
 
 func _on_farm_clicked(farm: Farm) -> void:
+	if _demolishing:
+		_try_demolish_building(farm)
+		return
 	_cancel_placement()
 	build_menu.close()
 	recruit_panel.close()
@@ -1148,6 +1342,12 @@ func _employees_of(post: Node) -> Array[Character]:
 ## Farm/TrainingGround never do, they show the same info in their own
 ## panel instead).
 func _on_building_info_clicked(building: Workstation) -> void:
+	if _demolishing:
+		if building is ConstructionSite:
+			_cancel_construction_site(building)
+		else:
+			_try_demolish_building(building)
+		return
 	_cancel_placement()
 	build_menu.close()
 	recruit_panel.close()
@@ -1743,6 +1943,196 @@ func _cancel_placement() -> void:
 	_placing_option = {}
 
 
+## Entry point for the HUD's Demolish button and the X key (see
+## _unhandled_input) - toggles _demolishing, closing every other mode first
+## the same way every other opener in this file does.
+##
+## Demolish Mode overview: two click paths, split by whether the target
+## already has its own clickable Area2D. Buildings/construction sites are
+## handled from *inside* their own existing click handlers (see the
+## `if _demolishing:` guard at the top of _on_farm_clicked/_on_house_clicked/
+## _on_training_ground_clicked/_on_building_info_clicked/
+## _on_outpost_hall_clicked) rather than intercepted here - those handlers
+## already fire from a pixel-accurate Area2D and already call
+## set_input_as_handled() before Base ever sees the click, so reusing them
+## avoids both re-deriving hit-testing with imprecise grid-cell math (a tall
+## building's sprite rises above its own footprint diamond) and the trap of
+## blanket-consuming clicks in _input() (which would also silently kill every
+## HUD button, including the Demolish toggle itself, since Control GUI input
+## resolves after _input()). Trees/rocks have no Area2D at all, so a click on
+## one falls through to _unhandled_input untouched - _handle_demolish_input
+## below is where that's resolved via grid-cell math instead.
+func _on_demolish_pressed() -> void:
+	if _demolishing:
+		_cancel_demolish()
+		return
+	_cancel_placement()
+	build_menu.close()
+	recruit_panel.close()
+	crop_panel.close()
+	training_ground_panel.close()
+	citizens_panel.close()
+	building_info_panel.close()
+	if _selected_character:
+		_deselect()
+	_demolishing = true
+	hud.demolish_button.button_pressed = true
+
+
+func _cancel_demolish() -> void:
+	_demolishing = false
+	if hud.demolish_button.button_pressed:
+		hud.demolish_button.button_pressed = false
+
+
+## Mouse/Esc handling while _demolishing is true. Deliberately doesn't treat
+## right-click as "cancel" the way placement mode does - Workstation already
+## gives right-click a global, always-on meaning (toggle disabled,
+## scripts/workstation.gd:187-189) that fires from its own Area2D regardless
+## of _demolishing, so right-clicking a building would toggle it disabled
+## rather than exit this mode; unifying the two would only work when
+## right-clicking a spot with nothing pickable under it. Esc and the
+## button/X key are the only ways out.
+func _handle_demolish_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		get_viewport().set_input_as_handled()
+		_try_demolish_natural_feature(to_local(get_global_mouse_position()))
+	elif event.is_action_pressed("ui_cancel"):
+		_cancel_demolish()
+
+
+## Resolves a demolish-mode click that fell through to empty ground to
+## whichever tree/rock (if any) occupies that grid cell - buildings never
+## reach here, see _on_demolish_pressed's own doc comment.
+func _try_demolish_natural_feature(local_pos: Vector2) -> void:
+	var grid := WorldGrid.local_to_grid(local_pos)
+	var cell := Vector2i(roundi(grid.x), roundi(grid.y))
+
+	var tree := WorldGrid.get_tree_at(cell)
+	if tree:
+		if not tree.is_mature:
+			## A sapling has no value to gather yet (see WorldGrid.remove_tree's
+			## own doc comment for why it can't go through the normal
+			## harvest-to-zero path at all) - clearing it is instant and free.
+			WorldGrid.remove_tree(tree)
+			hud.flash_message("Sapling cleared")
+		else:
+			_mark_natural_feature(tree, "wood", "lumberjacking")
+		return
+
+	var rock := WorldGrid.get_rock_at(cell)
+	if rock:
+		_mark_natural_feature(rock, "stone", "mining")
+
+
+## Queues `target` for a citizen to fully harvest before it's removed (see
+## Character._find_demolition_job/_run_demolish_harvest) - a no-op (with a
+## flash) if it's already queued, rather than appending a duplicate entry two
+## citizens could both think they're the one harvesting.
+func _mark_natural_feature(target: Node, resource: String, skill_id: String) -> void:
+	for entry in demolition_targets:
+		if entry["target"] == target:
+			hud.flash_message("Already marked for demolition")
+			return
+	demolition_targets.append({"target": target, "resource": resource, "skill_id": skill_id})
+	hud.flash_message("Marked for demolition")
+
+
+## Finds the _placed_buildings entry for `node` (linear scan, settlement
+## scale - same acceptable cost _under_max_count already takes) and
+## demolishes it. `node` not being found is a defensive no-op - shouldn't
+## happen, since every clickable building only reaches here through its own
+## click handler, which only exists for a node actually in _placed_buildings.
+func _try_demolish_building(node: Node) -> void:
+	for entry in _placed_buildings:
+		if entry["node"] == node:
+			_demolish_building(entry)
+			return
+
+
+## Instant demolish + full refund - the reverse of _materialize_building,
+## mirroring the same teardown sequence _restore_placed_buildings already
+## performs per-entry. Refund happens *before* reversing any storage-capacity
+## grant: refunding after would clamp the refund against an already-reduced
+## cap if demolishing a Storage Facility itself while stock is near the old,
+## higher cap, silently losing part of the refund.
+func _demolish_building(entry: Dictionary) -> void:
+	var node: Node = entry["node"]
+	var option := BuildingCatalog.get_option(entry["option_id"])
+
+	for citizen in characters:
+		if citizen.assigned_post == node:
+			citizen.assign_to(null)
+	posts.erase(node)
+
+	for resource_name in option.get("cost", {}):
+		GameState.add_resource(resource_name, option["cost"][resource_name])
+
+	if option.has("population_capacity"):
+		GameState.add_population_capacity(-int(option["population_capacity"]))
+	if option.has("water_wells"):
+		GameState.add_water_well(-int(option["water_wells"]))
+	if option.has("storage_capacity"):
+		GameState.add_storage_capacity(-float(option["storage_capacity"]))
+
+	if node.has_method("get_stockpile_spot"):
+		WorldGrid.unregister_stockpile(node.get_stockpile_spot())
+	_release_cells(entry["origin"], option["grid_size"])
+
+	_placed_buildings.erase(entry)
+	node.queue_free()
+	hud.flash_message("%s demolished - refunded" % String(option["display_name"]))
+	_run_job_assignment()
+
+
+## The construction-site equivalent of _demolish_building - cancels an
+## in-progress site instead of a finished building, refunding only whatever
+## materials have actually been delivered so far (the option's full cost
+## minus whatever's still outstanding in materials_needed), not the full cost.
+func _cancel_construction_site(site: ConstructionSite) -> void:
+	var option := BuildingCatalog.get_option(site.target_option_id)
+
+	for citizen in characters:
+		if citizen.assigned_post == site:
+			citizen.assign_to(null)
+	posts.erase(site)
+	construction_sites.erase(site)
+
+	for resource_name in option.get("cost", {}):
+		var delivered: float = option["cost"][resource_name] - site.materials_needed.get(resource_name, 0.0)
+		if delivered > 0.0:
+			GameState.add_resource(resource_name, delivered)
+
+	_release_cells(site.get_meta("origin"), option["grid_size"])
+	site.queue_free()
+	hud.flash_message("%s construction cancelled - materials refunded" % String(option["display_name"]))
+	_run_job_assignment()
+
+
+## Called by Character._run_demolish_harvest once a natural feature it was
+## demolishing has been fully harvested - the node itself is already gone by
+## then (see WorldGrid._on_tree_depleted/_on_rock_depleted, both wired since
+## before Demolish Mode existed) - this just drops the now-stale entry from
+## demolition_targets. Iterates backward since remove_at shifts every later
+## index, though in practice at most one entry ever matches a given target.
+func finish_demolition(target: Node) -> void:
+	for i in range(demolition_targets.size() - 1, -1, -1):
+		if demolition_targets[i]["target"] == target:
+			demolition_targets.remove_at(i)
+
+
+## Sparse scatter of real, mineable WorldRock boulders across the whole map -
+## see WorldGrid.place_rock. A separate, much sparser population from the
+## purely decorative RockDecoration pebbles _scatter_initial_rocks already
+## places (untouched).
+func _scatter_initial_mineable_rocks() -> void:
+	for i in INITIAL_MINEABLE_ROCK_COUNT:
+		var cell = WorldGrid.find_random_cell_anywhere()
+		if cell == null:
+			break
+		WorldGrid.place_rock(cell)
+
+
 func _apply_option_properties(node: Node, option: Dictionary) -> void:
 	for key in BUILDING_PROPERTIES:
 		if option.has(key):
@@ -1853,12 +2243,14 @@ func _stop_all_character_work() -> void:
 ## already works (see Combat Units.md's "whether they keep their town job
 ## meanwhile" question - they do, this reads assignment directly rather than
 ## unassigning first).
-func _on_attack_pressed() -> void:
+## Every citizen currently assigned to a TrainingGround, as
+## {citizen_id, citizen_name, unit_type, skill_level} dicts - shared by
+## _on_attack_pressed (deploys to the CombatTest.tscn sandbox) and
+## _on_rally_pressed (fights the current orc raid in place). See
+## _on_attack_pressed's own doc comment for why "soldier" is just whatever a
+## citizen's current post happens to be.
+func _gather_soldier_squad() -> Array:
 	var squad := characters.filter(func(c: Character) -> bool: return c.assigned_post is TrainingGround)
-	if squad.is_empty():
-		hud.flash_message("No soldiers stationed to defend!")
-		return
-
 	var pending: Array = []
 	for citizen in squad:
 		var post: TrainingGround = citizen.assigned_post
@@ -1868,6 +2260,14 @@ func _on_attack_pressed() -> void:
 			"unit_type": post.chosen_unit_type,
 			"skill_level": citizen.data.get_skill_level(post.skill_id),
 		})
+	return pending
+
+
+func _on_attack_pressed() -> void:
+	var pending := _gather_soldier_squad()
+	if pending.is_empty():
+		hud.flash_message("No soldiers stationed to defend!")
+		return
 
 	BattleState.pending_squad = pending
 	## In-memory only - see _serialize_state's doc comment for why this
@@ -1909,6 +2309,123 @@ func _apply_battle_result(result: Dictionary) -> void:
 	hud.flash_message(outcome_text + loss_text)
 
 
+## Every Character currently hidden as a rallied soldier avatar (see
+## _on_rally_pressed) - populated there, consumed by _restore_raid_survivors,
+## cleared by _teardown_raid. Single flat list (not per-raid-scoped) since
+## only one raid can be active at a time (see _on_night_started_raid's own
+## guard).
+var _rallied_characters: Array[Character] = []
+
+
+## HUD's Rally action - the in-place counterpart to _on_attack_pressed,
+## fighting the currently-selected orc raid's party right here on Base's own
+## map instead of scene-swapping to CombatTest.tscn. See Outpost_Survival/
+## Game Systems/Village Raids.md. Reuses _gather_soldier_squad (identical
+## roster definition to a real deployment) and mirrors
+## CombatTestManager._spawn_battle's roster/Formation/enemies wiring, just
+## without BattleState/a scene change - RaidController.begin_engagement owns
+## that wiring here.
+func _on_rally_pressed() -> void:
+	if not is_instance_valid(_selected_orc) or not _raid or _raid.engaged:
+		return
+	var pending := _gather_soldier_squad()
+	if pending.is_empty():
+		hud.flash_message("No soldiers stationed to defend!")
+		return
+
+	var formation_a := Formation.new()
+	add_child(formation_a)
+	var average_pos := Vector2.ZERO
+	for entry in pending:
+		var match_list := characters.filter(func(c: Character) -> bool: return c.data.id == entry["citizen_id"])
+		average_pos += match_list[0].global_position if not match_list.is_empty() else Vector2.ZERO
+	average_pos /= pending.size()
+	formation_a.setup(FormationCatalog.get_option("line"), sign(_raid.formation_b.global_position.x - average_pos.x) if _raid.formation_b.global_position.x != average_pos.x else 1.0)
+	formation_a.global_position = average_pos
+
+	var soldier_units: Array = []
+	var offsets := formation_a.assign_slots(pending.map(func(e): return e["unit_type"]))
+	for i in pending.size():
+		var entry: Dictionary = pending[i]
+		var match_list := characters.filter(func(c: Character) -> bool: return c.data.id == entry["citizen_id"])
+		if match_list.is_empty():
+			continue
+		var citizen: Character = match_list[0]
+		citizen._stop_work()
+		citizen.visible = false
+		citizen.input_pickable = false
+		_rallied_characters.append(citizen)
+
+		var unit: CombatUnit = COMBAT_UNIT_SCENE.instantiate()
+		add_child(unit)
+		unit.global_position = citizen.global_position
+		unit.citizen_id = entry["citizen_id"]
+		unit.citizen_name = entry["citizen_name"]
+		unit.setup(entry["unit_type"], CombatUnit.Team.A, [], Rect2(), formation_a, offsets[i], entry["skill_level"])
+		soldier_units.append(unit)
+
+	_raid.begin_engagement(soldier_units, formation_a)
+	_deselect_orc()
+	hud.flash_message("The garrison marches to meet the raiders!")
+
+
+## Called from _process() the frame RaidController.resolved flips true
+## (natural end - all orcs or all soldiers dead/routed) - reuses
+## _apply_battle_result verbatim, exactly the same casualty-removal +
+## outcome-message shape a real deployment's return already uses.
+func _resolve_raid() -> void:
+	_apply_battle_result({"outcome": _raid.outcome, "casualty_ids": _raid.casualty_ids})
+	_teardown_raid()
+
+
+## Orcs "withdraw" at dawn regardless of how far the raid got - see
+## _on_day_started's own call site. A raid that was never rallied (still
+## just patrolling/harassing) has no casualties to report at all; one that
+## was mid-fight reports whatever casualties had already happened as a
+## "draw" (interrupted, not a clean win/lose for either side).
+func _force_end_raid_at_dawn() -> void:
+	if _raid.engaged:
+		_apply_battle_result({"outcome": "draw", "casualty_ids": _raid.casualty_ids})
+	else:
+		hud.flash_message("The orc raiders withdrew at dawn.")
+	_teardown_raid()
+
+
+## Restores visible/input_pickable + resumes work for every soldier avatar
+## still hidden (a casualty was already removed entirely by
+## _apply_battle_result's _character_leaves, so it's simply absent from
+## `characters`/this list's still-valid entries by the time this runs -
+## nothing extra to skip explicitly). assign_to() is safe to call
+## unconditionally even if _run_job_assignment() already reassigned this
+## citizen mid-raid (e.g. reacting to a different casualty) - it's the
+## authoritative "resume whatever your current assigned_post now is" call
+## either way.
+func _restore_raid_survivors() -> void:
+	for character in _rallied_characters:
+		if is_instance_valid(character) and character in characters:
+			character.visible = true
+			character.input_pickable = true
+			character.assign_to(character.assigned_post)
+	_rallied_characters = []
+
+
+## Idempotent - safe to call unconditionally more than once. Frees every
+## orc/soldier-avatar node and both Formations (RaidController.teardown())
+## and restores any still-hidden soldier (_restore_raid_survivors). Called
+## both at natural/forced raid resolution above and, unconditionally, from
+## _apply_state()'s own preamble - a load mid-raid always reverts cleanly to
+## "no raid in progress" rather than leaving orphaned combat nodes or a
+## permanently-hidden, unclickable citizen behind; in-progress raid state is
+## never persisted or resumed, only discarded.
+func _teardown_raid() -> void:
+	if not _raid:
+		return
+	_raid.teardown()
+	_raid = null
+	_deselect_orc()
+	_restore_raid_survivors()
+
+
 func _save_game() -> void:
 	SaveManager.save_game(SaveManager.active_slot, _serialize_state())
 	hud.flash_message("Saved")
@@ -1935,6 +2452,7 @@ func _serialize_state() -> Dictionary:
 		"water_wells": GameState.water_wells,
 		"storage_capacity": GameState.storage_capacity,
 		"trees": _serialize_trees(),
+		"rocks": _serialize_rocks(),
 		"placed_buildings": _serialize_placed_buildings(),
 		"construction_sites": _serialize_construction_sites(),
 		"post_buffers": _serialize_post_buffers(),
@@ -1963,8 +2481,22 @@ func _load_game() -> void:
 ## entirely rather than reusing SaveManager.save_game/load_game.
 func _apply_state(data: Dictionary) -> void:
 	_cancel_placement()
+	_cancel_demolish()
 	_deselect()
 	build_menu.close()
+	## A raid is never persisted (see _teardown_raid's own doc comment) - any
+	## in-progress raid always reverts cleanly to "no raid in progress" on
+	## load rather than leaving orphaned combat nodes or a permanently-
+	## hidden citizen behind.
+	_teardown_raid()
+
+	## Not persisted either (see this file's own Demolish Mode doc comment's
+	## "Known gaps") - _restore_trees/_restore_rocks below fully replace every
+	## WorldTree/WorldRock instance regardless, which would leave any old
+	## entry here referencing a stale node anyway. Cleared explicitly rather
+	## than relying on is_instance_valid guards to quietly drop them over
+	## time.
+	demolition_targets.clear()
 
 	## Merged onto the current resource schema (not a wholesale replace): a
 	## save made before a new resource type existed (e.g. an old save
@@ -2003,6 +2535,7 @@ func _apply_state(data: Dictionary) -> void:
 	_restore_placed_buildings(data.get("placed_buildings", []))
 	_restore_construction_sites(data.get("construction_sites", []))
 	_restore_trees(data.get("trees", []))
+	_restore_rocks(data.get("rocks", []))
 	_restore_post_buffers(data.get("post_buffers", {}))
 	_restore_characters(data.get("characters", []))
 
@@ -2043,6 +2576,29 @@ func _restore_trees(entries: Array) -> void:
 		var cell := Vector2i(int(cell_arr[0]), int(cell_arr[1]))
 		var tree := WorldGrid.plant_tree(cell, entry.get("is_mature", true))
 		tree.wood_remaining = entry.get("wood_remaining", tree.wood_remaining)
+
+
+func _serialize_rocks() -> Array:
+	var out := []
+	for rock in WorldGrid.get_rocks():
+		out.append({
+			"cell": [rock.grid_cell.x, rock.grid_cell.y],
+			"stone_remaining": rock.stone_remaining,
+		})
+	return out
+
+
+## Mirrors _restore_trees - see its own doc comment. An old save predating
+## this key just restores zero rocks via the data.get("rocks", []) default at
+## the call site - same graceful-degrade shape every other optional save
+## field here already gets.
+func _restore_rocks(entries: Array) -> void:
+	WorldGrid.clear_rocks()
+	for entry in entries:
+		var cell_arr: Array = entry["cell"]
+		var cell := Vector2i(int(cell_arr[0]), int(cell_arr[1]))
+		var rock := WorldGrid.place_rock(cell)
+		rock.stone_remaining = entry.get("stone_remaining", rock.stone_remaining)
 
 
 func _serialize_placed_buildings() -> Array:

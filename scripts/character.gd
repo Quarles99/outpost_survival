@@ -8,14 +8,19 @@ signal clicked(character: Character)
 
 const BOB_AMPLITUDE := 2.5
 const BOB_SPEED := 1.4
-## Deliberately slow ("realistic travel time" over instant snapping) - a
-## work post sitting a few tiles from the stockpile should read as a real
-## walk, not a blip. Halved (140.0 -> 70.0), with MIN/MAX_MOVE_DURATION
-## doubled to match, per an explicit request to slow the whole town economy
-## down by a factor of 2 - see Base's fast-forward system (Engine.time_scale)
-## for the companion feature letting a player compress that back down when
-## they don't need to watch every trip in real time.
-const MOVE_SPEED := 70.0
+## "Realistic travel time" over instant snapping - a work post sitting a
+## few tiles from the stockpile should read as a real walk, not a blip.
+## Originally 140.0, halved to 70.0 per an explicit request to slow the
+## whole town economy down by a factor of 2 (see Base's fast-forward system,
+## Engine.time_scale, for the companion feature letting a player compress
+## that back down when they don't need to watch every trip in real time),
+## raised back up to 100.0 per a later explicit request. MIN/MAX_MOVE_
+## DURATION below aren't coupled to this value in the current nav-agent-
+## driven _move_to (they only bound the minimum trip wait / xp-grant cap,
+## not actual movement speed - see that function's own doc comment), so
+## they don't need to move in lockstep with this the way an older
+## distance/speed-clamped-duration implementation once required.
+const MOVE_SPEED := 100.0
 const MIN_MOVE_DURATION := 0.6
 ## RVO avoidance radius/crowd tuning (Add collisions to villagers so they
 ## can't stack up on the same spot.md) - same NavigationAgent2D.
@@ -186,6 +191,18 @@ const TRAINING_DRILL_PER_TICK := 1.0
 ## playtesting.
 const SPEED_XP_PER_SECOND := 2.5
 
+## Demolish Mode's harvest-to-zero job (see _run_demolish_harvest) - a citizen
+## walking up to a marked tree/rock and fully harvesting it, one fixed target
+## at a time, rather than searching for the nearest available one the way
+## _run_lumberjack_loop does. Deliberately mirrors Workstation's own defaults
+## (work_interval/carry_limit) and LumberCamp.wood_per_chop rather than
+## introducing different pacing just for this - tunable independently later
+## via Balance.md if demolish-harvesting ends up feeling too fast/slow
+## relative to normal gathering.
+const DEMOLISH_WORK_INTERVAL := 6.0
+const DEMOLISH_HARVEST_PER_TICK := 2.0
+const DEMOLISH_CARRY_LIMIT := 10.0
+
 @export var data: CharacterData
 var assigned_post: Node = null
 var is_selected := false
@@ -215,15 +232,41 @@ var current_task := "Idle"
 @onready var level_up_sound: AudioStreamPlayer2D = $LevelUpSound
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 
+## Each player's authored volume_db, captured once in _ready() before
+## SfxVariation.randomize ever touches it - randomize() must offset from
+## this fixed baseline every play, not from the player's current (already-
+## offset) volume_db, or the variation would drift further off-baseline
+## on every successive call. None of the three has a custom pitch_scale
+## authored in Character.tscn, so their pitch baseline is always 1.0.
+var _select_sound_base_volume_db: float
+var _gather_sound_base_volume_db: float
+var _level_up_sound_base_volume_db: float
+
 var _base_position: Vector2
 var _home_position: Vector2
-## Delta from whichever _process frame most recently called
-## nav_agent.set_velocity() inside _move_to's loop - avoidance computes
-## asynchronously, so _on_velocity_computed() needs a delta from whenever
-## it eventually fires, not necessarily the current frame's. Same reason
-## CombatUnit tracks its own `_delta` this way, see that class's own doc
-## comment on it.
-var _move_delta := 0.0
+## Most recently reported avoidance-adjusted velocity (see
+## _on_velocity_computed) - cached rather than applied directly to position
+## the instant it arrives, and integrated into _base_position every _process
+## frame instead (see _process). velocity_computed fires once per physics
+## tick (a fixed 60Hz, Engine.physics_ticks_per_second), not once per
+## _process frame - the two are only guaranteed to match 1:1 when the
+## engine's actual process-frame rate happens to equal 60fps. Applying
+## position only inside the signal callback (the original design here)
+## silently dropped a citizen's movement for every _process frame that
+## fired without a matching fresh velocity_computed alongside it -
+## harmless at exactly 60fps, but a real, measured ~59% speed deficit
+## confirmed via a headless instrumented test with process frames running
+## faster than the physics rate (uncapped fps - the same mismatch a real
+## high-refresh-rate display with vsync on would also produce, since vsync
+## caps process/render to the display's own refresh rate, not to
+## Engine.physics_ticks_per_second). Integrating every _process frame using
+## whichever velocity was most recently reported - rather than only on the
+## frames a fresh report happens to land - fixes this regardless of how the
+## two rates relate. Applied only while _is_moving (see _move_to) so a
+## stale cached velocity from a citizen's last trip can't make them drift
+## once they've stopped.
+var _current_velocity := Vector2.ZERO
+var _is_moving := false
 var _move_tween: Tween
 var _scale_tween: Tween
 var _bob_phase := randf() * TAU
@@ -235,6 +278,12 @@ var _bob_phase := randf() * TAU
 var _work_active := false
 var _work_session := 0
 var _claimed_tree: WorldTree = null
+## Set only while _run_demolish_harvest is actively working a target - mirrors
+## _claimed_tree's own release-on-interrupt handling (see _stop_work) so a
+## citizen pulled off a demolition job mid-harvest (reassigned, or a job post
+## opens up) always releases WorldTree/WorldRock.claimed rather than leaving
+## it permanently stuck true.
+var _demolish_target: Node = null
 
 ## Time left until this worker's current production tick fires - see
 ## _wait_for_tick's own doc comment for why this exists (saving/restoring
@@ -261,6 +310,9 @@ func _ready() -> void:
 	_base_position = position
 	_home_position = position
 	selection_outline.modulate.a = 0.0
+	_select_sound_base_volume_db = select_sound.volume_db
+	_gather_sound_base_volume_db = gather_sound.volume_db
+	_level_up_sound_base_volume_db = level_up_sound.volume_db
 	sprite.sprite_frames = _build_sprite_frames(VILLAGER_ROW)
 	sprite.play("walk")
 	label.modulate.a = 0.0
@@ -275,6 +327,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	## Integrated here, every _process frame, rather than inside
+	## _on_velocity_computed - see _current_velocity's own doc comment for
+	## why applying it only when that signal happens to fire silently drops
+	## movement on any frame that doesn't line up with a physics tick.
+	if _is_moving:
+		_base_position += _current_velocity * delta
 	_bob_phase += delta * BOB_SPEED
 	position = _base_position + Vector2(0, sin(_bob_phase) * BOB_AMPLITUDE)
 
@@ -291,6 +349,7 @@ func _on_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> voi
 ## manually picks this character out from underneath an occluding building,
 ## instead of duplicating these two lines at both call sites.
 func handle_click() -> void:
+	SfxVariation.randomize(select_sound, 1.0, _select_sound_base_volume_db)
 	select_sound.play()
 	clicked.emit(self)
 
@@ -417,6 +476,7 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 	var move_speed := MOVE_SPEED * speed_multiplier
 	nav_agent.target_position = target
 	var elapsed := 0.0
+	_is_moving = true
 	## Hard escape hatch, not just a "typical trip" bound - a target outside
 	## the baked navmesh (off the ground entirely, or unreachable for any
 	## other reason) leaves is_navigation_finished() permanently false, and
@@ -430,7 +490,6 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 	const MOVE_HANG_SAFETY_SECONDS := 60.0
 	while not nav_agent.is_navigation_finished() and elapsed < MOVE_HANG_SAFETY_SECONDS:
 		var delta := get_process_delta_time()
-		_move_delta = delta
 		var next_pos: Vector2 = nav_agent.get_next_path_position()
 		var direction := _base_position.direction_to(next_pos)
 		## Dynamic path building system.md - wears the tile currently underfoot
@@ -456,8 +515,10 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 		## can't run until this coroutine resumes and reaches them, which is
 		## exactly what this guard preempts.
 		if not is_inside_tree():
+			_is_moving = false
 			return
 		await get_tree().process_frame
+	_is_moving = false
 	while elapsed < MIN_MOVE_DURATION:
 		elapsed += get_process_delta_time()
 		if not is_inside_tree():
@@ -467,15 +528,15 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 		_gain_skill_xp("speed", SPEED_XP_PER_SECOND * minf(elapsed, MAX_MOVE_DURATION))
 
 
-## NavigationAgent2D avoidance computes off-thread - set_velocity() (in the
-## loop above) doesn't move the citizen itself, this signal (fired once the
-## safe/collision-adjusted velocity is ready) is what actually does. Same
-## split CombatUnit._on_velocity_computed already uses, see that class's
-## own doc comment. A citizen not currently inside _move_to's loop never
-## calls set_velocity in the first place, so this simply doesn't fire for
-## someone standing still.
+## NavigationAgent2D avoidance computes off-thread, at the physics rate
+## (Engine.physics_ticks_per_second, a fixed 60Hz) rather than once per
+## _process frame - this signal fires whenever a fresh safe/collision-
+## adjusted velocity is ready. Only caches it (see _current_velocity's own
+## doc comment for why actually applying it lives in _process instead) - a
+## citizen not currently inside _move_to's loop never calls set_velocity in
+## the first place, so this simply doesn't fire for someone standing still.
 func _on_velocity_computed(safe_velocity: Vector2) -> void:
-	_base_position += safe_velocity * _move_delta
+	_current_velocity = safe_velocity
 
 
 func _punch() -> void:
@@ -529,6 +590,7 @@ func _gain_skill_xp(skill_id: String, amount: float) -> void:
 func _on_skill_level_up() -> void:
 	_punch()
 	_update_label()
+	SfxVariation.randomize(level_up_sound, 1.0, _level_up_sound_base_volume_db)
 	level_up_sound.play()
 
 
@@ -548,6 +610,7 @@ func _show_gather_feedback(resource_type: String, amount: float, xp: float) -> v
 ## AudioStreamPlayer2D per sound category.
 func _play_gather_sound(pool: Array[AudioStream]) -> void:
 	gather_sound.stream = pool[randi() % pool.size()]
+	SfxVariation.randomize(gather_sound, 1.0, _gather_sound_base_volume_db)
 	gather_sound.play()
 
 
@@ -581,6 +644,31 @@ func _stop_work() -> void:
 	if _claimed_tree and is_instance_valid(_claimed_tree):
 		_claimed_tree.claimed = false
 	_claimed_tree = null
+	if _demolish_target and is_instance_valid(_demolish_target):
+		_demolish_target.claimed = false
+	_demolish_target = null
+
+
+## Called by an OrcRaider that's caught up to this citizen while patrolling
+## (see OrcRaider._process_alert) - see Outpost_Survival/Game Systems/
+## Village Raids.md for why this is the whole "villager under attack"
+## mechanic rather than a wound/HP system: interrupts whatever this citizen
+## was doing and sends them home, purely economic (lost production, an idle
+## citizen standing around) rather than lethal. Guarded by _fled_raid so a
+## second orc catching an already-fleeing citizen doesn't restart the trip.
+## Deliberately leaves assigned_post untouched - this is a temporary
+## interruption, not a departure/reassignment - recalled at the next dawn
+## via Base._on_day_started calling assign_to(assigned_post) again.
+var _fled_raid := false
+
+func flee_home_from_raid() -> void:
+	if _fled_raid:
+		return
+	_fled_raid = true
+	_stop_work()
+	current_task = "Fleeing raid"
+	_update_label()
+	_move_to(_home_position)
 
 
 func _start_hauling() -> void:
@@ -655,6 +743,10 @@ func _execute_haul_job(job: Dictionary, session: int) -> bool:
 		current_task = "Delivering %s" % String(job["resource"]).capitalize()
 		return await _deliver_construction_material(job["post"], session, job["resource"])
 
+	if job["type"] == "demolition":
+		current_task = "Demolishing"
+		return await _run_demolish_harvest(job["target"], job["resource"], job["skill_id"], session)
+
 	var post: Workstation = job["post"]
 
 	if job["type"] == "output":
@@ -714,6 +806,10 @@ func _find_haul_job() -> Dictionary:
 	var construction_job := _find_construction_haul_job(base)
 	if not construction_job.is_empty():
 		return construction_job
+
+	var demolition_job := _find_demolition_job(base)
+	if not demolition_job.is_empty():
+		return demolition_job
 
 	var best_output: Workstation = null
 	var best_output_amount := HAUL_MIN_THRESHOLD
@@ -789,6 +885,35 @@ func _find_construction_haul_job(base: Base) -> Dictionary:
 	if best_site:
 		return {"post": best_site, "type": "construction", "resource": best_resource}
 	return {}
+
+
+## Nearest not-already-claimed entry in Base.demolition_targets (a tree/rock
+## marked in demolish mode - see Base._mark_natural_feature), or {} if none.
+## Checked right after construction, ahead of routine output/input hauling -
+## same "a deliberate one-off player action beats routine hauling busywork"
+## reasoning _find_construction_haul_job's own doc comment already argues for
+## construction, applied identically here: demolishing something is a
+## deliberate player action with a bounded amount of work behind it, not an
+## ongoing production stream that can always wait one more comparison.
+## Skips a target still `claimed` by an ordinary Lumber Camp/Stone Mine
+## worker mid-chop (see WorldTree/WorldRock's own `claimed` field - shared
+## with normal gathering, not a separate lock) and drops (rather than
+## crashing on) an entry whose target already got fully harvested or
+## otherwise freed by something else before a demolition job ever reached it.
+func _find_demolition_job(base: Base) -> Dictionary:
+	var best_entry: Dictionary = {}
+	var best_dist := INF
+	for entry in base.demolition_targets:
+		var target: Node = entry["target"]
+		if not is_instance_valid(target) or target.claimed:
+			continue
+		var dist: float = global_position.distance_to(target.global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best_entry = entry
+	if best_entry.is_empty():
+		return {}
+	return {"type": "demolition", "target": best_entry["target"], "resource": best_entry["resource"], "skill_id": best_entry["skill_id"]}
 
 
 ## Walks from wherever the character currently is to whichever registered
@@ -1207,6 +1332,95 @@ func _run_lumberjack_loop(camp: LumberCamp, session: int) -> void:
 		if is_instance_valid(tree) and tree.wood_remaining > 0.0:
 			tree.claimed = false
 		_claimed_tree = null
+
+
+## Demolish Mode's harvest-to-zero job (see Base._mark_natural_feature /
+## _find_demolition_job above) - same chop-until-buffer-full/haul/repeat
+## interleave _run_lumberjack_loop uses, just against one fixed target
+## instead of searching for the nearest available tree, and with no replant
+## step (the target is gone for good once depleted - see WorldRock's own doc
+## comment for why that's true of rocks, and demolishing a tree is precisely
+## the "don't replant this one" case for a tree). `resource`/`skill_id` come
+## from Base.demolition_targets ("wood"/"lumberjacking" for a WorldTree,
+## "stone"/"mining" for a WorldRock) - kept as plain strings/dispatch rather
+## than giving WorldTree/WorldRock a shared interface, since there are only
+## ever these two cases.
+func _run_demolish_harvest(target: Node, resource: String, skill_id: String, session: int) -> bool:
+	target.claimed = true
+	_demolish_target = target
+	current_task = "Walking to demolition target"
+	await _move_to(target.global_position)
+	if session != _work_session:
+		return false
+
+	var buffer := 0.0
+	var carry_limit: float = DEMOLISH_CARRY_LIMIT * (data.get_skill_multiplier("strength") if data else 1.0)
+
+	while is_instance_valid(target) and _remaining_value(target) > 0.0:
+		current_task = "Demolishing (%s)" % resource.capitalize()
+		await _wait_for_tick(DEMOLISH_WORK_INTERVAL)
+		if session != _work_session:
+			return false
+		if not is_instance_valid(target):
+			break
+		var gained: float = target.harvest(DEMOLISH_HARVEST_PER_TICK)
+		if gained > 0.0 and data:
+			var amount: float = gained * data.get_skill_multiplier(skill_id) * GameState.happiness_output_multiplier
+			buffer += amount
+			_play_gather_sound(CHOP_SOUNDS if resource == "wood" else MINE_SOUNDS)
+			var xp: float = amount * XP_PER_RESOURCE_UNIT
+			_gain_skill_xp(skill_id, xp)
+			_show_gather_feedback(resource, amount, xp)
+
+		## Only worth an interim trip if there's still more to gather
+		## afterward - if the target just ran out in this same tick, let the
+		## loop end naturally and the trailing haul below cover it in one
+		## trip instead of a wasted haul-then-immediately-return-and-haul-
+		## again pair.
+		if buffer >= carry_limit and is_instance_valid(target) and _remaining_value(target) > 0.0:
+			if not await _haul_demolition_buffer(resource, buffer, session):
+				return false
+			buffer = 0.0
+			await _move_to(target.global_position)
+			if session != _work_session:
+				return false
+
+	if buffer > 0.0:
+		if not await _haul_demolition_buffer(resource, buffer, session):
+			return false
+
+	_demolish_target = null
+	var base := get_parent() as Base
+	if base:
+		base.finish_demolition(target)
+	return true
+
+
+## 0.0 for an already-freed target (fully depleted, or gone by some other
+## means) - lets _run_demolish_harvest's loop conditions treat "depleted" and
+## "no longer exists" identically without a separate is_instance_valid check
+## at every call site.
+func _remaining_value(target: Node) -> float:
+	if not is_instance_valid(target):
+		return 0.0
+	return target.wood_remaining if target is WorldTree else target.stone_remaining
+
+
+## One demolition haul trip: walk to the stockpile, deposit `amount` of
+## `resource`, done - unlike _haul_to_stockpile this doesn't also pick up an
+## input delivery on the way out, since a demolition target has no input
+## side. Returns false if a reassignment interrupted the trip.
+func _haul_demolition_buffer(resource: String, amount: float, session: int) -> bool:
+	current_task = "Hauling %s" % resource.capitalize()
+	await _move_to(WorldGrid.nearest_stockpile(global_position))
+	if session != _work_session:
+		return false
+	GameState.add_resource(resource, amount)
+	_gain_skill_xp("strength", XP_PER_GATHER)
+	if not is_inside_tree():
+		return false
+	await get_tree().create_timer(STOCKPILE_PAUSE).timeout
+	return session == _work_session
 
 
 ## CELL_W/CELL_H are the sheet's per-frame grid stride (used to locate a

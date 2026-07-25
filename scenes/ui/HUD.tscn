@@ -90,11 +90,19 @@ custom_minimum_size = Vector2(0, 8)
 [node name="BuildButton" type="Button" parent="Control/Margin/Rows"]
 text = "Build"
 
+[node name="DemolishButton" type="Button" parent="Control/Margin/Rows"]
+toggle_mode = true
+text = "Demolish"
+
 [node name="CitizensButton" type="Button" parent="Control/Margin/Rows"]
 text = "Citizens"
 
 [node name="AttackButton" type="Button" parent="Control/Margin/Rows"]
 text = "Simulate Attack"
+
+[node name="RallyButton" type="Button" parent="Control/Margin/Rows"]
+text = "Rally"
+disabled = true
 
 [node name="SpeedButton" type="Button" parent="Control/Margin/Rows"]
 text = "Speed: 1x"

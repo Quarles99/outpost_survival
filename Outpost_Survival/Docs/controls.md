@@ -73,6 +73,19 @@ Job assignment is fully automatic — there's no way to manually assign a citize
 | Left-click (while placing, on a valid spot) | Confirm placement |
 | Right-click, or Esc (while placing) | Cancel placement |
 
+## Demolishing
+
+| Input | Action |
+|---|---|
+| Click the **Demolish** button (HUD), or `X` | Toggle Demolish Mode |
+| Left-click an already-placed building (while demolishing) | Demolish it instantly, refunding its full build cost (the Outpost Hall can't be demolished) |
+| Left-click an in-progress construction site (while demolishing) | Cancel it, refunding only whatever materials have actually been delivered so far |
+| Left-click a mature tree or mineable rock (while demolishing) | Mark it for removal - a citizen walks over and fully harvests it before it disappears (see [mechanics.md](mechanics.md#demolishing)) |
+| Left-click an immature sapling (while demolishing) | Clear it instantly for free - it has no value yet |
+| Esc, or click the **Demolish** button again | Exit Demolish Mode |
+
+Right-click keeps its normal meaning (toggling a post disabled/re-enabled) even while Demolish Mode is active - it doesn't exit the mode.
+
 ## Retooling a Farm
 
 | Input | Action |
@@ -98,6 +111,14 @@ Job assignment is fully automatic — there's no way to manually assign a citize
 | `R` (in the battle scene) | Restart the current fight with the same deployed squad against a freshly generated enemy |
 | `+`/`-` (in the battle scene) | Battle speed (0.5x–16x) |
 | Esc (in the battle scene) | Return to the settlement, applying the battle's outcome |
+
+## Village Raids
+
+| Input | Action |
+|---|---|
+| Left-click an orc raider | Select it (same toggle-off-if-already-selected behavior as selecting a citizen); deselects any selected citizen first |
+| Click the **Rally** button (HUD) | Only enabled while an orc is selected - gathers every citizen currently assigned to a Barracks/Archery Range/Mage Tower and sends them to fight the raid live, right on the town map (see [mechanics.md](mechanics.md#village-raids)) — no-op with a flashed warning if no citizen is currently stationed at one |
+| Left-click empty ground, or Esc | Deselect the current orc |
 
 ## System Menu (in-game)
 

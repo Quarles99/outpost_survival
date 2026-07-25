@@ -1,0 +1,3 @@
+- Optimize code for efficiency
+- Compress large files
+- Delete unused code
