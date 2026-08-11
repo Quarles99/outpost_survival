@@ -122,10 +122,19 @@ A Farm-class post's haul trip triggers when its input buffer can't cover the nex
 
 | | Value |
 |---|---|
-| Wood per mature tree | 20.0 |
-| Sapling → maturity grow time | 25 seconds |
+| Wood per mature tree | 80.0 |
+| Sapling → maturity grow time | 700 seconds |
 | Sapling starting visual scale | 0.35× of full size |
 | Wood harvested per chop | 2.0 × chopper's skill multiplier |
+
+## Rocks (`WorldRock`, `Base`)
+
+| | Value |
+|---|---|
+| Stone per rock | 40.0 |
+| Initial mineable rocks scattered | 20 |
+| Initial decorative pebbles scattered | 56 |
+| No growth/replant | A mined-out rock is gone for good, unlike a tree (see Sustainable Forestry) |
 
 ## Skill Curve (`SkillCurve`)
 
@@ -170,12 +179,15 @@ Title = tier word (by whichever job skill is trained highest) + that skill's job
 
 | | Value |
 |---|---|
-| Move speed | 70 px/s (before the speed skill's multiplier) |
+| Move speed | 100 px/s (before the speed skill's multiplier) |
 | Min move duration (even for very short trips) | 0.6 s |
 | Max move duration (even for very long trips) | 20.0 s |
 | Pause at stockpile per haul trip | 0.3 s |
 | Idle retry delay (no work found / target too empty) | 2.5 s |
 | Minimum buffer amount worth an idle-hauler trip | 1.0 |
+| Citizen-vs-citizen avoidance radius | 18 px - citizens dodge each other while moving (see mechanics.md#pathfinding) |
+| Arrival tolerance | 44 px - lets a citizen stop near an occupied destination (e.g. another citizen's WorkSpot) instead of trying to reach the exact point |
+| Dirt path speed bonus | 1.15× while standing on a worn path tile (see mechanics.md#pathfinding) |
 
 ## Water Farming Bonus (`Character`)
 

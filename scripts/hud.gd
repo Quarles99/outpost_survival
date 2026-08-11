@@ -302,6 +302,11 @@ func _refresh_rates() -> void:
 ## whatever those values happened to be back when _ready() first wired the
 ## connection.
 func _wire_tooltip(control: Control, title: Callable, body: Callable) -> void:
+	## Labels default to MOUSE_FILTER_IGNORE, which silently prevents
+	## mouse_entered from ever firing - set it here rather than at each call
+	## site so any Control can be wired regardless of its class default
+	## (mirrors skill_panel.gd's explicit MOUSE_FILTER_STOP on skill icons).
+	control.mouse_filter = Control.MOUSE_FILTER_STOP
 	control.mouse_entered.connect(func() -> void: TooltipManager.request(title.call(), body.call()))
 	control.mouse_exited.connect(func() -> void: TooltipManager.cancel())
 

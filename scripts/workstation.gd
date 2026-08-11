@@ -38,19 +38,6 @@ const DISABLED_TINT := Color(0.55, 0.55, 0.55)
 ## global uniform, not a per-instance one.
 const XRAY_MATERIAL := preload("res://shaders/xray_reveal_material.tres")
 
-## Emptied out - "cabbage" and "wood" used to force an override here
-## regardless of which scene a post actually was, which silently meant
-## LumberCamp (always resource_type "wood") rendered from this dict instead
-## of its own scene's baked-in Sprite2D, and a Farm-family post retooled
-## back to Cabbage would revert to whatever art lived here even if the
-## scene's own default had since moved on. Now that every Farm-family crop
-## and LumberCamp each carry their own correct baked-in sprite directly
-## (see _default_texture below), there's no resource_type left that needs
-## a cross-scene override - kept as an empty dict (not deleted) since
-## refresh_visual() still consults it and a future genuinely-shared-across-
-## scenes resource type could still want one.
-const RESOURCE_VISUALS := {}
-
 @export var display_name: String = "Workstation"
 @export var resource_type: String = "cabbage"
 @export var output_per_tick: float = 1.0
@@ -92,8 +79,8 @@ const RESOURCE_VISUALS := {}
 @export var max_workers: int = 1
 ## Lets several BuildingCatalog entries share one placeholder scene (e.g.
 ## every crop/refinement building in the Farm family) while still reading
-## visually distinct - applied over whatever RESOURCE_VISUALS or the scene's
-## own sprite picked. Identity tint (WHITE) leaves it untouched.
+## visually distinct - applied over whatever the scene's own sprite picked.
+## Identity tint (WHITE) leaves it untouched.
 @export var sprite_tint: Color = Color.WHITE
 ## Short player-facing blurb shown in whichever info panel this post's
 ## click opens (BuildingInfoPanel/CropPanel/TrainingGroundPanel - see
@@ -135,12 +122,10 @@ var output_buffer: float = 0.0
 ## is "" - LumberCamp and generic Workstation don't use it.
 var input_buffer: float = 0.0
 
-## The scene's own baked-in sprite, captured before any RESOURCE_VISUALS
-## override is applied - refresh_visual() falls back to this for a
-## resource_type with no RESOURCE_VISUALS entry (e.g. "grain"), so
-## reconfiguring resource_type at runtime (see Farm's crop-selection) can
-## correctly revert to it rather than getting stuck on whatever texture an
-## earlier resource_type happened to pick.
+## The scene's own baked-in sprite - refresh_visual() always resets back to
+## this, so reconfiguring resource_type at runtime (see Farm's crop-
+## selection) can correctly revert to it rather than getting stuck on
+## whatever texture an earlier resource_type happened to pick.
 var _default_texture: Texture2D
 var _default_centered: bool
 var _default_offset: Vector2
@@ -230,15 +215,9 @@ func set_disabled(value: bool) -> void:
 ## entering the tree).
 func refresh_visual() -> void:
 	_update_label()
-	var visual: Dictionary = RESOURCE_VISUALS.get(resource_type, {})
-	if visual:
-		sprite.texture = visual["texture"]
-		sprite.centered = visual["centered"]
-		sprite.offset = visual["offset"]
-	else:
-		sprite.texture = _default_texture
-		sprite.centered = _default_centered
-		sprite.offset = _default_offset
+	sprite.texture = _default_texture
+	sprite.centered = _default_centered
+	sprite.offset = _default_offset
 	sprite.modulate = sprite_tint * (DISABLED_TINT if disabled else Color.WHITE)
 
 

@@ -168,18 +168,18 @@ const SKILL_ID := {
 ## those come from the theme-neutral FilmCow library instead (see
 ## _play_combat_sound's own doc comment).
 const SWORD_ATTACK_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 1.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 2.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 3.ogg"),
+	preload("res://sound/sfx/Sword Attack 1.ogg"),
+	preload("res://sound/sfx/Sword Attack 2.ogg"),
+	preload("res://sound/sfx/Sword Attack 3.ogg"),
 ]
 const BOW_ATTACK_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Attack 1.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Attack 2.ogg"),
+	preload("res://sound/sfx/Bow Attack 1.ogg"),
+	preload("res://sound/sfx/Bow Attack 2.ogg"),
 ]
 const SPELL_ATTACK_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 1.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 2.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 3.ogg"),
+	preload("res://sound/sfx/Spell Impact 1.ogg"),
+	preload("res://sound/sfx/Spell Impact 2.ogg"),
+	preload("res://sound/sfx/Spell Impact 3.ogg"),
 ]
 ## Played on the *receiving* unit (see take_damage()) rather than picked by
 ## the attacker's weapon type - a hit lands the same regardless of what dealt
@@ -191,12 +191,12 @@ const SPELL_ATTACK_SOUNDS: Array[AudioStream] = [
 ## "a few numbered variants, not the whole pool" proportion every other sound
 ## pool in this project uses.
 const IMPACT_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/FilmCow Recorded SFX/punch flesh 1.wav"),
-	preload("res://sound/FilmCow Recorded SFX/punch flesh 2.wav"),
-	preload("res://sound/FilmCow Recorded SFX/punch flesh 3.wav"),
-	preload("res://sound/FilmCow Recorded SFX/punch flesh 4.wav"),
-	preload("res://sound/FilmCow Recorded SFX/punch flesh 5.wav"),
-	preload("res://sound/FilmCow Recorded SFX/punch flesh 6.wav"),
+	preload("res://sound/sfx/punch flesh 1.wav"),
+	preload("res://sound/sfx/punch flesh 2.wav"),
+	preload("res://sound/sfx/punch flesh 3.wav"),
+	preload("res://sound/sfx/punch flesh 4.wav"),
+	preload("res://sound/sfx/punch flesh 5.wav"),
+	preload("res://sound/sfx/punch flesh 6.wav"),
 ]
 ## Shared by _die() and _begin_routing() - a death scream and a panic scream
 ## are the same kind of sound, and the two never fire back-to-back for the
@@ -204,12 +204,12 @@ const IMPACT_SOUNDS: Array[AudioStream] = [
 ## later death by several seconds - ROUT_ESCAPE_TIME - or the unit escapes
 ## and this never plays a second time at all).
 const VOICE_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/FilmCow Recorded SFX/scream 1.wav"),
-	preload("res://sound/FilmCow Recorded SFX/scream 2.wav"),
-	preload("res://sound/FilmCow Recorded SFX/scream 3.wav"),
-	preload("res://sound/FilmCow Recorded SFX/scream 4.wav"),
-	preload("res://sound/FilmCow Recorded SFX/scream 5.wav"),
-	preload("res://sound/FilmCow Recorded SFX/scream 6.wav"),
+	preload("res://sound/sfx/scream 1.wav"),
+	preload("res://sound/sfx/scream 2.wav"),
+	preload("res://sound/sfx/scream 3.wav"),
+	preload("res://sound/sfx/scream 4.wav"),
+	preload("res://sound/sfx/scream 5.wav"),
+	preload("res://sound/sfx/scream 6.wav"),
 ]
 
 ## Deliberately much smaller than SkillCurve.MULTIPLIER_PER_LEVEL (0.02,

@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://cy6wakknapdif"
+path="res://.godot/imported/Spell Impact 2.ogg-5caea58af4e0d621d1976888fdda90f7.oggvorbisstr"
+
+[deps]
+
+source_file="res://sound/sfx/Spell Impact 2.ogg"
+dest_files=["res://.godot/imported/Spell Impact 2.ogg-5caea58af4e0d621d1976888fdda90f7.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

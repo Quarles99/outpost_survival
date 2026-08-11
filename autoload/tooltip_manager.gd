@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-## Generic "hover a resource icon/stat or a building for 2s -> tooltip"
+## Generic "hover a resource icon/stat or a building for 0.5s -> tooltip"
 ## system (Outpost_Survival/Actionable Ideas/Mouseover tooltip system.md).
 ## An autoload rather than a HUD child since it has to render above both
 ## world-space buildings and every CanvasLayer UI panel regardless of which
@@ -14,7 +14,7 @@ extends CanvasLayer
 ## request()/cancel() on mouse_entered/mouse_exited - this class knows
 ## nothing about resources or buildings specifically.
 
-const HOVER_DELAY := 2.0
+const HOVER_DELAY := 0.5
 const MAX_BODY_WIDTH := 240.0
 const SCREEN_MARGIN := 12.0
 const CURSOR_OFFSET := Vector2(18, 18)

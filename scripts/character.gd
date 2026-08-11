@@ -44,6 +44,27 @@ const MIN_MOVE_DURATION := 0.6
 const AVOIDANCE_RADIUS := 18.0
 const AVOIDANCE_NEIGHBOR_DISTANCE := 150.0
 const AVOIDANCE_TIME_HORIZON_AGENTS := 1.5
+## _move_to's other break condition, alongside is_navigation_finished()
+## (Fix stuck delivery - villagers getting stuck delivering wood to farms).
+## is_navigation_finished() uses target_desired_distance, which is never set
+## here so the engine default (10.0) applies - but two AVOIDANCE_RADIUS
+## agents (a hauler delivering to a WorkSpot the assigned worker is already
+## standing on) can never enforce closer than 2 * AVOIDANCE_RADIUS = 36.0
+## apart, so a 10.0 tolerance is unreachable exactly when the target is
+## occupied: the hauler pushes toward the spot forever, gets shoved back by
+## RVO, and re-aims - reads as "walking into" the citizen standing there.
+## 44.0 (36.0 + an 8.0 margin) was chosen by observation - low enough that
+## citizens don't visibly stop short of buildings, high enough to clear the
+## 36.0 enforced-separation floor with room to spare.
+const ARRIVE_TOLERANCE := 44.0
+## Engine default (100.0) was silently clamping every citizen's real
+## velocity ceiling - MOVE_SPEED(100) * a maxed speed skill's multiplier
+## (SkillCurve.multiplier_for_level(99) = 2.96) * the dirt-path speed bonus
+## (WorldGrid.PATH_SPEED_MULTIPLIER = 1.15) is ~340.4, well above the
+## default. Set explicitly (combat_unit.gd does the same for the same
+## reason) so those two bonuses - already documented as real - actually take
+## effect instead of being a partial no-op.
+const MAX_NAV_SPEED := 350.0
 ## Lowered 8.0 -> 2.0, then raised 2.0 -> 20.0, via Outpost_Survival/
 ## Balance.md's edit-and-hand-back workflow - a very long haul can now take
 ## noticeably longer than a short one (opposite of the brief 2.0s pass).
@@ -141,10 +162,10 @@ const DEFAULT_GATHER_SOUNDS: Array[AudioStream] = [
 	preload("res://sound/resource_gain.wav"),
 ]
 const CHOP_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/chop 1.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/chop 2.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/chop 3.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/chop 4.ogg"),
+	preload("res://sound/sfx/chop 1.ogg"),
+	preload("res://sound/sfx/chop 2.ogg"),
+	preload("res://sound/sfx/chop 3.ogg"),
+	preload("res://sound/sfx/chop 4.ogg"),
 ]
 ## Also used for Brickmaker (shares _run_farm_loop with Farm/Workshop, but
 ## its input is stone, unlike the others - see the branch in that loop) -
@@ -152,25 +173,25 @@ const CHOP_SOUNDS: Array[AudioStream] = [
 ## sound is a closer fit for turning stone into brick than the generic
 ## default.
 const MINE_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 1.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 2.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 3.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 4.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Chopping and Mining/mine 5.ogg"),
+	preload("res://sound/sfx/mine 1.ogg"),
+	preload("res://sound/sfx/mine 2.ogg"),
+	preload("res://sound/sfx/mine 3.ogg"),
+	preload("res://sound/sfx/mine 4.ogg"),
+	preload("res://sound/sfx/mine 5.ogg"),
 ]
 const SWORD_DRILL_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 1.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 2.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Sword Attacks Hits and Blocks/Sword Attack 3.ogg"),
+	preload("res://sound/sfx/Sword Attack 1.ogg"),
+	preload("res://sound/sfx/Sword Attack 2.ogg"),
+	preload("res://sound/sfx/Sword Attack 3.ogg"),
 ]
 const BOW_DRILL_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Attack 1.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Attacks/Bow Attacks Hits and Blocks/Bow Attack 2.ogg"),
+	preload("res://sound/sfx/Bow Attack 1.ogg"),
+	preload("res://sound/sfx/Bow Attack 2.ogg"),
 ]
 const SPELL_DRILL_SOUNDS: Array[AudioStream] = [
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 1.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 2.ogg"),
-	preload("res://sound/Free Fantasy SFX Pack By TomMusic/OGG Files/SFX/Spells/Spell Impact 3.ogg"),
+	preload("res://sound/sfx/Spell Impact 1.ogg"),
+	preload("res://sound/sfx/Spell Impact 2.ogg"),
+	preload("res://sound/sfx/Spell Impact 3.ogg"),
 ]
 ## Flavor "drill" amount shown in a TrainingGround worker's gather feedback
 ## (see _run_training_loop) - purely cosmetic, nothing accumulates it
@@ -321,6 +342,7 @@ func _ready() -> void:
 	nav_agent.avoidance_enabled = true
 	nav_agent.neighbor_distance = AVOIDANCE_NEIGHBOR_DISTANCE
 	nav_agent.time_horizon_agents = AVOIDANCE_TIME_HORIZON_AGENTS
+	nav_agent.max_speed = MAX_NAV_SPEED
 	nav_agent.velocity_computed.connect(_on_velocity_computed)
 	if not assigned_post:
 		_start_hauling()
@@ -468,7 +490,13 @@ func assign_to(post: Node, grant_move_xp: bool = true) -> void:
 ## make an old artificial deadline), only a cap on how much of it counts
 ## toward speed xp, preserving the old per-trip xp ceiling without risking
 ## stranding a citizen mid-detour by force-stopping them short of the target.
-func _move_to(target: Vector2, grant_xp: bool = true) -> void:
+##
+## Returns true on genuine arrival (is_navigation_finished() or within
+## ARRIVE_TOLERANCE of target), false if MOVE_HANG_SAFETY_SECONDS fired
+## instead - groundwork for the stuck-worker failsafe (Actionable Ideas/
+## Stuck-worker failsafe.md); existing `await _move_to(...)` call sites stay
+## valid unchanged, since GDScript permits ignoring a return value.
+func _move_to(target: Vector2, grant_xp: bool = true) -> bool:
 	if _move_tween:
 		_move_tween.kill()
 		_move_tween = null
@@ -488,7 +516,12 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 	## function's own doc comment) - this is only meant to catch the
 	## pathological "never going to finish" case, not cut a real walk short.
 	const MOVE_HANG_SAFETY_SECONDS := 60.0
-	while not nav_agent.is_navigation_finished() and elapsed < MOVE_HANG_SAFETY_SECONDS:
+	## ARRIVE_TOLERANCE is the other way out of this loop, alongside
+	## is_navigation_finished() - see that constant's own doc comment for why
+	## is_navigation_finished()'s default 10.0 tolerance is unreachable when
+	## the target is a WorkSpot another citizen is already standing on.
+	while not nav_agent.is_navigation_finished() and elapsed < MOVE_HANG_SAFETY_SECONDS \
+			and _base_position.distance_to(target) > ARRIVE_TOLERANCE:
 		var delta := get_process_delta_time()
 		var next_pos: Vector2 = nav_agent.get_next_path_position()
 		var direction := _base_position.direction_to(next_pos)
@@ -516,16 +549,28 @@ func _move_to(target: Vector2, grant_xp: bool = true) -> void:
 		## exactly what this guard preempts.
 		if not is_inside_tree():
 			_is_moving = false
-			return
+			nav_agent.set_velocity(Vector2.ZERO)
+			return false
 		await get_tree().process_frame
 	_is_moving = false
+	## Zeroed here (both the genuine-arrival and hang-hatch exits share this
+	## point) rather than left at whatever velocity was last requested - a
+	## stationary citizen whose velocity is still "toward target" keeps
+	## contributing that to the RVO sim's reciprocal avoidance (ORCA) even
+	## though _process only applies velocity while _is_moving, so a farmer
+	## standing on their WorkSpot was silently taking none of the avoidance
+	## burden while still advertising motion to it. combat_unit.gd does the
+	## same at every one of its own _move_to-equivalent exits.
+	nav_agent.set_velocity(Vector2.ZERO)
+	var arrived := elapsed < MOVE_HANG_SAFETY_SECONDS
 	while elapsed < MIN_MOVE_DURATION:
 		elapsed += get_process_delta_time()
 		if not is_inside_tree():
-			return
+			return false
 		await get_tree().process_frame
 	if grant_xp:
 		_gain_skill_xp("speed", SPEED_XP_PER_SECOND * minf(elapsed, MAX_MOVE_DURATION))
+	return arrived
 
 
 ## NavigationAgent2D avoidance computes off-thread, at the physics rate

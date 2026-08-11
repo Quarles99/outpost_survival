@@ -1,5 +1,26 @@
 Requested directly in chat: "Implement a fail safe if a worker has been stuck on the same job without progress for too long." Not started yet - research done, findings below so a future session doesn't have to re-derive them.
 
+## Update (2026-07-25) - one trigger removed, still not implemented
+
+Fixing "villagers getting stuck delivering wood to farms" (RVO agents enforcing
+more separation than `is_navigation_finished()`'s tolerance could ever satisfy
+against an occupied WorkSpot - see that bug note, now in `Completed/`) removed
+what was probably the single most common real-world trigger of the 60s
+`_move_to` stall described below: any haul delivery aimed at a WorkSpot another
+citizen was already standing on. `_move_to` also now returns `bool` (`true` on
+genuine arrival, `false` if `MOVE_HANG_SAFETY_SECONDS` fired) instead of
+nothing, which is the piece of groundwork this failsafe will actually need -
+callers can now tell a real arrival from a timed-out one, which they couldn't
+before. No caller reacts to the new return value yet (out of scope for that
+fix); wiring it up is still this note's job.
+
+The open question below - what counts as "progress" per loop - is **still
+unresolved**, and a generic stuck-time accumulator was deliberately **not**
+built this session. The per-loop risk table below is otherwise unchanged:
+`_run_generic_work_loop` (StoneMine), `_run_hauler_loop`'s job execution, and
+`_run_demolish_harvest` still have no fallback for a target that's unreachable
+for reasons other than RVO crowding (e.g. a genuine navmesh hole).
+
 ## What already exists
 
 `Character._move_to()` has a **per-call** escape hatch: `MOVE_HANG_SAFETY_SECONDS := 60.0` stops an individual navigation attempt from awaiting forever if `is_navigation_finished()` never becomes true. It does NOT recover the citizen or signal failure to the caller - the loop just falls through as if arrival happened (`_move_to()` returns normally either way), so a work loop calling `_move_to()` again next iteration toward the same unreachable point silently repeats the 60s stall forever. This is the actual gap: no cross-iteration "I've been stuck on this for N total minutes" tracking exists anywhere in `character.gd`.

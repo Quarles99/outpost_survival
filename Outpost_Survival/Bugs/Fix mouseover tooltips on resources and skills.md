@@ -1,1 +1,0 @@
-- No tool tip appearing when mousing over skill or resource icons

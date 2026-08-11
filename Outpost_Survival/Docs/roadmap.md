@@ -14,7 +14,7 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 - **Citizen recruitment.** Outpost Hall offers 3 candidates with pre-trained specializations, costing food. See [mechanics.md](mechanics.md#citizen-recruitment).
 - **Resource income/minute.** HUD rows show a rolling net rate alongside the current amount.
 - **Condensed build menu.** Numbered grid of solid-color, tinted buttons instead of a full-width list; applies to the crop-retool panel too.
-- **Larger map.** 28×28 tiles, 4x the original size.
+- **Larger map.** 56×56 tiles - doubled again since the original 4x-size pass. See [stats.md](stats.md#map-size-isoground-basetscn).
 - **Speed and strength skills.** Passive, trained regardless of assignment - speed from moving, strength from hauling. See [mechanics.md](mechanics.md#skills--leveling).
 - **Happiness bonuses/debuffs.** Four named bands apply a flat production multiplier on top of skill. See [mechanics.md](mechanics.md#happiness).
 - **Per-farm crop selection.** Any Farm-family building can be retooled into another recipe, free and instant. See [mechanics.md](mechanics.md#building--placement).
@@ -43,6 +43,9 @@ Tracks what's implemented vs. what's planned. Source of truth for "what's next" 
 - **Combat-building recruits.** A built Barracks/Archery Range/Mage Tower each offer one additional recruit per day, pre-trained in that building's own combat skill, on an independent cooldown from the Outpost Hall's - each capped at one built at a time. See [mechanics.md](mechanics.md#citizen-recruitment).
 - **Military building unit cap.** Barracks/Archery Range/Mage Tower each start with a worker cap of 3 (rather than the usual 1) and can be repeatedly upgraded with brick for +3 more each time, uncapped. See [stats.md](stats.md#military-building-unit-cap-trainingground-base).
 - **Town pathfinding.** Citizens navigate around buildings/trees via `NavigationAgent2D`, the same system the Battle Test sandbox uses - the navmesh re-bakes on every building/tree change. See [mechanics.md](mechanics.md#pathfinding).
+- **Citizen-vs-citizen avoidance & dirt paths.** Citizens now dodge each other while moving (RVO) instead of overlapping, and tiles worn by repeated foot traffic turn to dirt and grant a small speed bonus, fading back to grass once traffic stops. See [mechanics.md](mechanics.md#pathfinding).
+- **Demolish mode.** Removes a placed building (instant, full cost refunded) or in-progress construction site (instant, partial refund for materials already delivered); a mature tree or mineable rock is instead marked and fully harvested by an idle citizen before it's cleared, rather than being deleted for nothing. See [mechanics.md](mechanics.md#demolishing).
+- **Mineable rocks.** Scattered boulders that can be marked via Demolish Mode and harvested for stone, alongside the existing input-free Stone Mine. See [stats.md](stats.md#rocks-worldrock-base).
 
 ## Planned Next (from `Implement_Next.txt`)
 

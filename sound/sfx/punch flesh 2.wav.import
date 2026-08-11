@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://c5td681f6ki32"
+path="res://.godot/imported/punch flesh 2.wav-dcfa9d6b4d3fc92aec34eaba153f0a24.sample"
+
+[deps]
+
+source_file="res://sound/sfx/punch flesh 2.wav"
+dest_files=["res://.godot/imported/punch flesh 2.wav-dcfa9d6b4d3fc92aec34eaba153f0a24.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2
